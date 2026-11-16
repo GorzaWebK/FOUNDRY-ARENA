@@ -127,10 +127,19 @@ export class Pickup {
     this.halo.visible = false;
   }
 
-  update(dt, time) {
+  /** Multiplayer clients: follow the host's word on whether this is available. */
+  setActive(v) {
+    if (v && !this.active) this.reset();
+    else if (!v && this.active) this.take();
+  }
+
+  /** `authoritative` is false on multiplayer clients (the host runs the respawn timers). */
+  update(dt, time, authoritative = true) {
     if (!this.active) {
-      this.respawnT -= dt;
-      if (this.respawnT <= 0) this.reset();
+      if (authoritative) {
+        this.respawnT -= dt;
+        if (this.respawnT <= 0) this.reset();
+      }
       this.pad.material.emissiveIntensity = 0.05;
       return;
     }

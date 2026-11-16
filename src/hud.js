@@ -87,7 +87,7 @@ export class Hud {
     });
     this._set('you', p.kills, (v) => { e.you.textContent = v; });
     let lead = null;
-    for (const b of game.bots) if (!lead || b.kills > lead.kills) lead = b;
+    for (const c of game.chars) if (c !== p && (!lead || c.kills > lead.kills)) lead = c;
     if (lead) {
       this._set('lead', lead.kills, (v) => { e.lead.textContent = v; });
       this._set('leadName', lead.name, (v) => { e.leadName.textContent = v.toUpperCase(); });
@@ -116,8 +116,9 @@ export class Hud {
     this._set('dead', !p.alive, (v) => e.death.classList.toggle('hidden', !v));
     if (!p.alive) {
       const left = Math.max(0, p.respawnAt - game.time);
-      this._set('dc', Math.ceil(left), (v) => { e.deathCount.textContent = `Respawning in ${v}`; });
+      this._set('dc', Math.ceil(left), (v) => { e.deathCount.textContent = Number.isFinite(v) ? `Respawning in ${v}` : 'Waiting for the host…'; });
       this._set('dn', p.killer ? p.killer.name : '', (v) => { e.deathName.textContent = v; e.deathName.style.color = p.killer ? hex(p.killer.color) : ''; });
+      this._set('dby', !!p.killer, (v) => { $('death-by').style.visibility = v ? 'visible' : 'hidden'; });
     }
 
     // damage direction arcs follow the attacker as you turn

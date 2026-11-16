@@ -11,7 +11,8 @@ export class Character {
     this.id = id;
     this.name = name;
     this.color = color;
-    this.isPlayer = isPlayer;
+    this.isPlayer = isPlayer; // the person at this keyboard
+    this.isHuman = isPlayer; // any human (local or remote), as opposed to a bot
 
     // physics body
     this.pos = new THREE.Vector3();

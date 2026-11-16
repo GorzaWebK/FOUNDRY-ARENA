@@ -12,6 +12,8 @@ import { Player } from './player.js';
 import { Bot } from './bot.js';
 import { damageAtDistance } from './weapons.js';
 
+const r2 = (v) => Math.round(v * 100) / 100;
+
 const UP = new THREE.Vector3(0, 1, 0);
 const _o = new THREE.Vector3();
 const _dir = new THREE.Vector3();
@@ -93,7 +95,10 @@ export class Game {
 
     this.player = new Player(this);
     this.bots = [];
+    this.remotes = []; // multiplayer: characters driven over the network
     this.chars = [];
+    this.mode = 'sp'; // 'sp' | 'host' | 'client'
+    this.net = null; // set by Net while a multiplayer session is active
     this.skill = DIFFICULTY.normal;
     this.time = 0;
     this.matchTime = CFG.timeLimit;
@@ -129,7 +134,10 @@ export class Game {
   newMatch({ botCount, difficulty, attract = false }) {
     for (const b of this.bots) b.dispose();
     this.bots = [];
+    this.mode = this.net && !attract ? 'host' : 'sp';
+    if (this.mode !== 'host') this.clearRemotes();
     this.skill = DIFFICULTY[difficulty] || DIFFICULTY.normal;
+    this.difficulty = difficulty;
     this.attract = attract;
     this.time = 0;
     this.matchTime = CFG.timeLimit;
@@ -145,10 +153,52 @@ export class Game {
     for (let i = 0; i < n; i++) this.bots.push(new Bot(this, i + 1, BOT_ROSTER[i % BOT_ROSTER.length]));
     const p = this.player;
     p.kills = 0; p.deaths = 0; p.alive = false;
-    this.chars = attract ? [...this.bots] : [p, ...this.bots];
+    this.chars = attract ? [...this.bots] : [p, ...this.remotes, ...this.bots];
     for (const c of this.chars) { c.kills = 0; c.deaths = 0; c.alive = false; }
+    if (this.mode === 'host') this.net.onStart(); // tell clients before anyone spawns
     for (const c of this.chars) this.respawn(c, true);
     if (!attract) this.hud.centerMessage('FIGHT', `First to ${CFG.killLimit} kills`, 2.2, '#ff8a2a');
+  }
+
+  /** Multiplayer client: reset to a clean slate; the host drives everything else. */
+  startClient(matchTime) {
+    for (const b of this.bots) b.dispose();
+    this.bots = [];
+    this.mode = 'client';
+    this.attract = false;
+    this.time = 0;
+    this.matchTime = matchTime;
+    this.over = false;
+    this.winner = null;
+    this.effects.clear();
+    this.hud.reset();
+    for (const p of this.pickups) p.reset();
+    const p = this.player;
+    p.kills = 0; p.deaths = 0; p.alive = false;
+    p.respawnAt = Infinity; // wait for the host to place us
+    this.chars = [p, ...this.remotes];
+  }
+
+  charById(id) {
+    for (const c of this.chars) if (c.id === id) return c;
+    return null;
+  }
+
+  addRemote(c) {
+    this.remotes.push(c);
+    if (!this.attract) this.chars.push(c);
+  }
+
+  removeRemote(c) {
+    c.alive = false;
+    c.dispose();
+    this.remotes = this.remotes.filter((r) => r !== c);
+    this.chars = this.chars.filter((r) => r !== c);
+  }
+
+  clearRemotes() {
+    for (const r of this.remotes) r.dispose();
+    this.remotes = [];
   }
 
   ranking() {
@@ -160,6 +210,7 @@ export class Game {
     this.over = true;
     const rank = this.ranking();
     this.winner = rank[0];
+    if (this.mode === 'host') this.net.onEnd();
     if (this.onMatchEnd) this.onMatchEnd(this.winner, rank);
   }
 
@@ -187,6 +238,7 @@ export class Game {
   respawn(c, first = false) {
     const s = this.pickSpawn(c);
     c.spawnAt(s.x, s.y, s.z, s.yaw);
+    if (this.mode === 'host') this.net.onSpawn(c);
     if (c.isPlayer && !first) this.audio.play('respawn');
   }
 
@@ -207,6 +259,9 @@ export class Game {
     _up.crossVectors(_right, _dir);
     this.stats.shots++;
 
+    const client = this.mode === 'client';
+    const ends = this.net ? [] : null; // what everyone else needs to draw this shot
+    const claims = client ? [] : null; // "I hit X" reports for the host to check
     const victims = this._victims || (this._victims = []);
     victims.length = 0;
     for (let i = 0; i < def.pellets; i++) {
@@ -229,9 +284,14 @@ export class Game {
         v.dmg += dmg;
         v.head = v.head || head;
         if (i < 4) fx.hitBurst(ex, ey, ez, _d.x, _d.y, _d.z, victim.isProtected() ? 0x8fd3ff : victim.color, head);
+        if (ends) ends.push([r2(ex), r2(ey), r2(ez), 2, victim.id, head ? 1 : 0]);
+        if (claims) claims.push([victim.id, head ? 1 : 0, r2(tBest)]);
       } else if (hitWorld) {
         fx.impact(ex, ey, ez, _hit.nx, _hit.ny, _hit.nz, i < 3);
         if (i === 0) { _d.set(ex, ey, ez); this.audio.play('impact', _d); }
+        if (ends) ends.push([r2(ex), r2(ey), r2(ez), 1, r2(_hit.nx), r2(_hit.ny), r2(_hit.nz)]);
+      } else if (ends) {
+        ends.push([r2(ex), r2(ey), r2(ez), 0]);
       }
       if (def.pellets === 1 || i % 2 === 0) fx.tracer(_muz.x, _muz.y, _muz.z, ex, ey, ez);
     }
@@ -244,6 +304,18 @@ export class Game {
       this.audio.play(def.id, shooter.pos);
     }
     shooter.onFired(def);
+
+    if (client) {
+      // The host owns health. Report what we hit; show the hit marker right away.
+      this.net.sendFire(def, _muz, ends, claims);
+      for (const v of victims) {
+        if (v.c.isProtected()) continue;
+        this.hud.hitmarker(v.head, false);
+        this.audio.play(v.head ? 'headshot' : 'hit');
+      }
+      return;
+    }
+    if (this.mode === 'host') this.net.onShot(shooter, def, _muz, ends);
     this.emitNoise(shooter.pos.x, shooter.pos.y, shooter.pos.z, def.noise, shooter, 'shot');
     for (const v of victims) this.damage(v.c, v.dmg, shooter, v.head, def);
   }
@@ -251,7 +323,7 @@ export class Game {
   damage(victim, amount, attacker, head, def) {
     if (!victim.alive || this.over) return;
     if (victim.isProtected()) return;
-    if (!attacker.isPlayer && victim.isPlayer) amount *= this.skill.dmgVsPlayer;
+    if (!attacker.isHuman && victim.isHuman) amount *= this.skill.dmgVsPlayer;
     const absorbed = Math.min(victim.armor, amount * CFG.armorAbsorb);
     victim.armor -= absorbed;
     victim.health -= amount - absorbed;
@@ -273,19 +345,26 @@ export class Game {
     victim.respawnAt = this.time + CFG.respawnDelay;
     if (attacker !== victim) attacker.kills++;
     this.stats.kills++;
-    victim.onDeath(attacker);
-    this.effects.deathBurst(victim.pos.x, victim.pos.y, victim.pos.z, victim.color);
-    this.audio.play('death', victim.isPlayer ? null : victim.pos);
-    if (!this.attract) {
-      this.hud.addKill(attacker, victim, def ? def.name : '?', head);
-      if (attacker.isPlayer) {
-        this.audio.play('kill');
-        this.hud.centerMessage(`ELIMINATED ${victim.name.toUpperCase()}`, head ? 'Headshot' : `${attacker.kills} / ${CFG.killLimit}`, 1.6, '#' + victim.color.toString(16).padStart(6, '0'));
-      }
-    }
+    const weapon = def ? def.name : '?';
+    this.presentKill(victim, attacker, head, weapon);
+    if (this.mode === 'host') this.net.onKill(victim, attacker, head, weapon);
     if (attacker.kills >= CFG.killLimit) {
       if (this.attract) { for (const c of this.chars) { c.kills = 0; c.deaths = 0; } }
       else this.endMatch();
+    }
+  }
+
+  /** Everything a kill looks and sounds like (also used by multiplayer clients). */
+  presentKill(victim, attacker, head, weapon) {
+    victim.onDeath(attacker);
+    this.effects.deathBurst(victim.pos.x, victim.pos.y, victim.pos.z, victim.color);
+    this.audio.play('death', victim.isPlayer ? null : victim.pos);
+    if (this.attract) return;
+    this.hud.addKill(attacker, victim, weapon, head);
+    if (attacker.isPlayer) {
+      this.audio.play('kill');
+      const sub = head ? 'Headshot' : this.mode === 'client' ? '' : `${attacker.kills} / ${CFG.killLimit}`;
+      this.hud.centerMessage(`ELIMINATED ${victim.name.toUpperCase()}`, sub, 1.6, '#' + victim.color.toString(16).padStart(6, '0'));
     }
   }
 
@@ -323,7 +402,8 @@ export class Game {
   }
 
   updatePickups(dt) {
-    for (const p of this.pickups) {
+    for (let i = 0; i < this.pickups.length; i++) {
+      const p = this.pickups[i];
       p.update(dt, this.time);
       if (!p.active) continue;
       for (const c of this.chars) {
@@ -336,6 +416,7 @@ export class Game {
         this.effects.pickupBurst(p.pos.x, p.pos.y, p.pos.z, p.info.color);
         this.audio.play('pickup', c.isPlayer ? null : p.pos, 1, p.info.tone);
         if (c.isPlayer) this.hud.toast(p.info.label, '#' + p.info.color.toString(16).padStart(6, '0'));
+        if (this.mode === 'host') this.net.onPickup(i, c);
         break;
       }
     }
@@ -348,9 +429,11 @@ export class Game {
   update(dt) {
     if (this.over) {
       this.effects.update(dt);
+      for (const r of this.remotes) r.update(dt);
       this.orbitCamera(dt, 0.05);
       return;
     }
+    if (this.mode === 'client') { this.updateClient(dt); return; }
     this.time += dt;
     if (!this.attract) {
       this.matchTime -= dt;
@@ -361,6 +444,7 @@ export class Game {
     this.separate();
     if (this.attract) this.orbitCamera(dt, 0.045);
     else this.player.update(dt, this.input);
+    for (const r of this.remotes) r.update(dt);
     for (const b of this.bots) b.update(dt);
     this.updatePickups(dt);
     this.effects.update(dt);
@@ -368,6 +452,20 @@ export class Game {
     const cam = this.camera;
     this.audio.setListener(cam.position.x, cam.position.y, cam.position.z, this.attract ? 0 : this.player.yaw);
     if (!this.attract) this.hud.update(this, dt);
+  }
+
+  /** Multiplayer client frame: simulate only ourselves; the host sends the rest. */
+  updateClient(dt) {
+    this.time += dt;
+    this.matchTime = Math.max(0, this.matchTime - dt); // re-synced by every snapshot
+    this.separate();
+    this.player.update(dt, this.input);
+    for (const r of this.remotes) r.update(dt);
+    for (const p of this.pickups) p.update(dt, this.time, false);
+    this.effects.update(dt);
+    const cam = this.camera;
+    this.audio.setListener(cam.position.x, cam.position.y, cam.position.z, this.player.yaw);
+    this.hud.update(this, dt);
   }
 
   orbitCamera(dt, speed) {

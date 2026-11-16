@@ -11,6 +11,7 @@ export const DEFAULTS = {
   shadows: true,
   invertY: false,
   showFps: false,
+  name: '', // multiplayer display name
 };
 
 export function loadSettings() {

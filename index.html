@@ -65,6 +65,7 @@
         <table><thead><tr><th>#</th><th class="l">Player</th><th>Kills</th><th>Deaths</th></tr></thead><tbody id="sb-body"></tbody></table>
       </div>
       <div id="fps" class="hidden"></div>
+      <div id="room" class="hidden"></div>
     </div>
 
     <!-- ============================== MAIN MENU ============================== -->
@@ -83,6 +84,15 @@
             <div id="menu-settings"></div>
           </div>
           <div class="col">
+            <h4>Multiplayer</h4>
+            <label class="row mp"><span>Your name</span><input type="text" id="mp-name" maxlength="16" placeholder="Player" autocomplete="off" spellcheck="false" /></label>
+            <div class="mp-actions">
+              <button id="btn-host">Host game</button>
+              <span class="or">or</span>
+              <input type="text" id="mp-code" maxlength="8" placeholder="CODE" autocomplete="off" spellcheck="false" />
+              <button id="btn-join">Join</button>
+            </div>
+            <p id="mp-status" class="note"></p>
             <h4>Controls</h4>
             <ul class="keys">
               <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</li>
@@ -96,16 +106,21 @@
             <p class="note">Tip: prefer <kbd>C</kbd> to crouch — browsers reserve <kbd>Ctrl</kbd>+<kbd>W</kbd> for closing the tab.</p>
           </div>
         </div>
-        <button id="btn-play" class="primary">PLAY</button>
+        <button id="btn-play" class="primary">PLAY SOLO</button>
       </div>
     </div>
 
     <!-- ============================== PAUSE ============================== -->
     <div id="pause" class="overlay hidden">
       <div class="panel">
-        <h2>PAUSED</h2>
+        <h2 id="pause-title">PAUSED</h2>
         <button id="btn-resume" class="primary">RESUME</button>
         <p id="pause-hint" class="note"></p>
+        <div id="room-box" class="hidden">
+          <div class="room-line">Room code <b id="room-code"></b><span id="room-count"></span></div>
+          <button id="btn-copy">Copy invite link</button>
+          <p id="copy-note" class="note"></p>
+        </div>
         <div id="pause-settings"></div>
         <div class="btn-row">
           <button id="btn-restart">Restart match</button>
@@ -120,6 +135,7 @@
         <h2 id="end-title">VICTORY</h2>
         <p id="end-sub" class="tag"></p>
         <table class="final"><thead><tr><th>#</th><th class="l">Player</th><th>Kills</th><th>Deaths</th></tr></thead><tbody id="end-body"></tbody></table>
+        <p id="end-wait" class="note hidden">Waiting for the host to start the next match…</p>
         <div class="btn-row">
           <button id="btn-again" class="primary">PLAY AGAIN</button>
           <button id="btn-menu">Main menu</button>

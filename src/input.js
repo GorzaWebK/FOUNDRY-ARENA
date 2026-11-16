@@ -57,8 +57,9 @@ export class Input {
     });
   }
 
-  down(code) { return this.keys.has(code); }
-  hit(code) { return this.pressed.has(code); }
+  // keys only count while gameplay has focus (not while a menu is open)
+  down(code) { return this.active && this.keys.has(code); }
+  hit(code) { return this.active && this.pressed.has(code); }
 
   /** Ask for pointer lock. Resolves true once the pointer is captured. */
   requestLock() {

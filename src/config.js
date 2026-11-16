@@ -57,6 +57,10 @@ export const DIFFICULTY = {
   },
 };
 
+// Colours handed to human players in multiplayer, in join order (host first).
+export const HUMAN_COLORS = [0x4fc3f7, 0x9cff57, 0xff8fd8, 0xffffff, 0xffb86b, 0xa7a2ff, 0x5dffd9, 0xfff275];
+export const MAX_HUMANS = 8;
+
 export const BOT_ROSTER = [
   { name: 'Viper', color: 0xe5484d },
   { name: 'Rook', color: 0xf5a524 },

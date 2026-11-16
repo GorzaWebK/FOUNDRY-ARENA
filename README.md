@@ -1,7 +1,7 @@
 # Foundry Arena
 
-A complete browser first-person shooter: you versus AI bots in a free-for-all
-deathmatch. Three.js for rendering, Vite for tooling, plain JavaScript modules.
+A complete browser first-person shooter: you, your friends and AI bots in a
+free-for-all deathmatch. Play solo, or host a room and share the code. Three.js for rendering, Vite for tooling, plain JavaScript modules.
 Everything is procedural — geometry from primitives, textures drawn on canvases,
 sound synthesised with the Web Audio API. No assets are downloaded.
 
@@ -39,6 +39,40 @@ Every push to `main` is built and published to GitHub Pages by
 - Pickups: health (+50), armour (+50, absorbs half of incoming damage), ammo boxes,
   rifle and shotgun crates. Health/armour/crates return after 30 s, ammo boxes after 20 s.
 
+## Multiplayer
+
+No server to set up — one player hosts the match in their browser and the others
+connect to them directly.
+
+1. **Host:** enter a name, press **Host game**. You are in the match straight away
+   (bots included). Press `Esc` to see the room code and **Copy invite link**.
+2. **Friends:** open the invite link (or type the code) and press **Join**. Joining
+   mid-match is fine. Up to 8 humans, plus the host's bots.
+3. The host starts the next match from the end screen; closing the room (or the
+   host's tab) ends the session for everyone.
+
+How it works:
+
+- Connections are WebRTC data channels set up with [PeerJS](https://peerjs.com/).
+  Browsers find each other through PeerJS's free public signalling server; once
+  connected, game traffic flows directly between the players' browsers.
+- The host is the authority for health, kills, respawns, pickups, the clock and
+  all bots. Each player simulates their own movement and reports their own hits,
+  which the host sanity-checks (rate of fire, distance, line of sight). That keeps
+  shooting responsive at any ping, and is the right trade-off for playing with
+  friends; it is not hardened against a determined cheater.
+- A hosted match keeps running while the host's tab is in the background.
+- If a connection goes quiet for 10 seconds the player is dropped (or, for a
+  client, returned to the menu).
+
+Limits worth knowing: very strict corporate / school networks can block
+peer-to-peer connections, and the experience is only as good as the host's
+connection, since everything relays through them.
+
+For development: `?net=local` swaps WebRTC for a same-browser channel so two tabs
+can play together offline, and `?peerhost=…&peerport=…&peersecure=1` points the
+game at your own [PeerServer](https://github.com/peers/peerjs-server).
+
 ## Controls
 
 | Input                 | Action                              |
@@ -58,8 +92,8 @@ Every push to `main` is built and published to GitHub Pages by
 Prefer `C` for crouching: browsers reserve `Ctrl`+`W` for closing the tab (the game
 asks for confirmation before the tab closes mid-match).
 
-Sensitivity, field of view, volume, shadows, invert-Y, bot count and difficulty are
-saved to `localStorage`.
+Sensitivity, field of view, volume, shadows, invert-Y, bot count, difficulty and
+your multiplayer name are saved to `localStorage`.
 
 ## Weapons
 
@@ -109,6 +143,9 @@ spawn, pickup and patrol point is reachable by the bots.
 index.html            HUD + menu markup
 src/main.js           app flow: menus, pointer lock, pause, main loop
 src/game.js           match rules, hitscan, damage, spawning, pickups
+src/net.js            multiplayer session: host/client protocol
+src/netChar.js        characters driven over the network (interpolated)
+src/transport.js      PeerJS (WebRTC) and local-tab transports
 src/config.js         gameplay tuning, difficulty presets, bot roster
 src/maps/arena.js     the map (data only)
 src/world.js          collision world built from map data (boxes + ramp wedges)
