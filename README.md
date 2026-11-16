@@ -5,7 +5,11 @@ deathmatch. Three.js for rendering, Vite for tooling, plain JavaScript modules.
 Everything is procedural — geometry from primitives, textures drawn on canvases,
 sound synthesised with the Web Audio API. No assets are downloaded.
 
+**Repository:** https://github.com/GorzaWebK/FOUNDRY-ARENA
+
 ```bash
+git clone https://github.com/GorzaWebK/FOUNDRY-ARENA.git
+cd FOUNDRY-ARENA
 npm install
 npm run dev
 ```
