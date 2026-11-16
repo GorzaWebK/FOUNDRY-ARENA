@@ -5,7 +5,11 @@ deathmatch. Three.js for rendering, Vite for tooling, plain JavaScript modules.
 Everything is procedural — geometry from primitives, textures drawn on canvases,
 sound synthesised with the Web Audio API. No assets are downloaded.
 
+**▶ Play in your browser:** https://gorzawebk.github.io/FOUNDRY-ARENA/
+
 **Repository:** https://github.com/GorzaWebK/FOUNDRY-ARENA
+
+To run it locally:
 
 ```bash
 git clone https://github.com/GorzaWebK/FOUNDRY-ARENA.git
@@ -22,6 +26,9 @@ Open the printed URL (http://localhost:5173), pick a bot count and difficulty, p
 | `npm run build`     | production build into `dist/`                             |
 | `npm run preview`   | serve the production build                                |
 | `npm run check:map` | validate the map + nav grid and print an ASCII overview   |
+
+Every push to `main` is built and published to GitHub Pages by
+`.github/workflows/deploy.yml`.
 
 ## Rules
 
