@@ -91,11 +91,11 @@
 
     <!-- ============================== MAIN MENU ============================== -->
     <div id="menu" class="overlay">
-      <div class="panel wide">
+      <div class="panel wide menu-panel">
         <h1>FOUNDRY <span>ARENA</span></h1>
-        <p class="tag">Free-for-all deathmatch · first to 20 kills or best score after 10 minutes</p>
-        <div class="cols">
-          <div class="col">
+        <p class="tag">Arena shooter · play solo against bots, or host a room for your friends</p>
+        <div class="menu-grid">
+          <section class="card">
             <h4>Match</h4>
             <label class="row"><span>Mode</span><select id="set-mode"></select><output></output></label>
             <div class="mode-line"><p id="mode-blurb" class="note"></p><button id="btn-rules" class="small-btn">Rules…</button></div>
@@ -105,36 +105,58 @@
             <label class="row"><span>Difficulty</span>
               <select id="set-diff"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select><output></output>
             </label>
+          </section>
+          <section class="card">
             <h4 class="h-with-btn">Loadout <button id="btn-skins" class="link-btn">Weapon skins…</button></h4>
             <div id="menu-loadout" class="loadout"></div>
             <p class="note">Plus a pistol, 2 grenades and 2 flashbangs or smokes.</p>
-          </div>
-          <div class="col">
-            <h4>Multiplayer</h4>
+          </section>
+          <section class="card">
+            <h4>Play with friends</h4>
             <label class="row mp"><span>Your name</span><input type="text" id="mp-name" maxlength="16" placeholder="Player" autocomplete="off" spellcheck="false" /></label>
+            <button id="btn-host" class="wide-btn">Host a room</button>
             <div class="mp-actions">
-              <button id="btn-host">Host game</button>
-              <span class="or">or</span>
-              <input type="text" id="mp-code" maxlength="8" placeholder="CODE" autocomplete="off" spellcheck="false" />
+              <input type="text" id="mp-code" maxlength="8" placeholder="ROOM CODE" autocomplete="off" spellcheck="false" />
               <button id="btn-join">Join</button>
             </div>
             <p id="mp-status" class="note"></p>
-            <h4>Settings</h4>
-            <div id="menu-settings"></div>
-          </div>
-          <div class="col">
-            <h4>Controls</h4>
-            <ul class="keys" id="keys-list"></ul>
-            <button id="btn-controls" class="small-btn">Change controls…</button>
-            <p class="note">Tip: avoid <kbd>Ctrl</kbd> combos — browsers reserve <kbd>Ctrl</kbd>+<kbd>W</kbd> for closing the tab.</p>
-            <div class="acct-row"><span class="acct-line" title="Your player ID">ID <b id="acct-id-menu" class="acct-id">—</b></span><span class="acct-btns"><button id="btn-career" class="small-btn">Career</button><button id="btn-account" class="small-btn">Account…</button></span></div>
-          </div>
+          </section>
         </div>
         <div class="play-row">
           <button id="btn-play" class="primary">PLAY SOLO</button>
           <button id="btn-train">TRAINING RANGE</button>
         </div>
-        <p class="version-note" id="version-note"></p>
+        <div class="menu-foot">
+          <div class="foot-btns">
+            <button id="btn-open-settings" class="small-btn">Settings</button>
+            <button id="btn-open-controls" class="small-btn">Controls</button>
+            <button id="btn-career" class="small-btn">Career</button>
+            <button id="btn-account" class="small-btn">Account…</button>
+          </div>
+          <p class="foot-meta"><span class="acct-line" title="Your player ID">ID <b id="acct-id-menu" class="acct-id">—</b></span><span id="version-note"></span></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================== SETTINGS (from the main menu) ============================== -->
+    <div id="settings-ov" class="overlay hidden">
+      <div class="panel">
+        <h2>SETTINGS</h2>
+        <div id="menu-settings"></div>
+        <div class="btn-row"><button id="btn-settings-done" class="primary">DONE</button></div>
+      </div>
+    </div>
+
+    <!-- ============================== CONTROLS (summary) ============================== -->
+    <div id="keys-ov" class="overlay hidden">
+      <div class="panel">
+        <h2>CONTROLS</h2>
+        <ul class="keys" id="keys-list"></ul>
+        <p class="note">Tip: avoid <kbd>Ctrl</kbd> combos — browsers reserve <kbd>Ctrl</kbd>+<kbd>W</kbd> for closing the tab.</p>
+        <div class="btn-row">
+          <button id="btn-controls">Change controls…</button>
+          <button id="btn-keys-done" class="primary">DONE</button>
+        </div>
       </div>
     </div>
 

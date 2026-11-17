@@ -34,6 +34,11 @@ Every push to `main` is built and published to GitHub Pages by
 ## Game modes
 
 Pick one in the main menu for solo play, or as the host of a multiplayer room.
+
+The main menu keeps to the essentials: **Match** (mode, rules, map, bots,
+difficulty), **Loadout** and **Play with friends**, with Play Solo and the
+Training Range under them. **Settings**, **Controls**, **Career** and
+**Account** are buttons along the bottom that open their own panels.
 The pause menu's **Next match** section changes mode and map between matches.
 
 | Mode                  | How it works                                                                  |
@@ -126,7 +131,8 @@ sounds depends on the voices your browser and OS provide.
 | `Tab`                 | scoreboard                                    |
 | `Esc` or `P`          | pause menu                                    |
 
-These are the defaults. **Change controls…** (main menu or pause menu) lets you
+These are the defaults. **Controls → Change controls…** (main menu toolbar) or
+**Change controls…** (pause menu) lets you
 rebind every action to any key or mouse button, with two slots per action; a key
 can only do one thing, so binding it takes it away from whatever had it. `Esc`
 always pauses and the mouse wheel always swaps weapons. Avoid `Ctrl` combos:
@@ -144,7 +150,7 @@ invert-Y, crosshair, key bindings, mode, map, bots, difficulty, loadout, your
 multiplayer name and your training-range best are saved to `localStorage`.
 ### Career stats
 
-**Career** (next to your player ID on the main menu) shows your totals across
+**Career** (in the main menu's toolbar) shows your totals across
 every match you play, solo or multiplayer: matches, wins and win rate, kills,
 deaths, K/D, accuracy, headshots, best streak, longest kill, knife and grenade
 kills, time played, and kills with each weapon. The training range and the menu
@@ -163,7 +169,7 @@ see them in multiplayer, and some bots run camos too.
 ### Your account
 
 Every player gets a random, unique **player ID** (like `FA-7K3M-Q9XD`), shown at
-the bottom of the main menu's Controls column. Your account is everything this
+the bottom right of the main menu. Your account is everything this
 browser has saved (name, settings, crosshair, loadout, key bindings, training-range
 best). **Account…** lets you:
 
@@ -253,7 +259,7 @@ connect to them directly.
    place up, and when the host closes the room everyone is told rather than
    left retrying.
 6. Everyone has to be on the same version of the game. It's shown under the play
-   buttons on the main menu. If someone has an old tab open, joining tells them who
+   main menu's bottom right corner. If someone has an old tab open, joining tells them who
    needs to refresh (`Ctrl+Shift+R`) instead of letting them in.
 
 How it works:

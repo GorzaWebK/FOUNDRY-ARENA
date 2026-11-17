@@ -735,6 +735,11 @@ $('acct-file').addEventListener('change', async () => {
 });
 
 $('btn-controls').addEventListener('click', openControls);
+// main menu toolbar: Settings and Controls each open a panel of their own
+$('btn-open-settings').addEventListener('click', () => $('settings-ov').classList.remove('hidden'));
+$('btn-settings-done').addEventListener('click', () => $('settings-ov').classList.add('hidden'));
+$('btn-open-controls').addEventListener('click', () => $('keys-ov').classList.remove('hidden'));
+$('btn-keys-done').addEventListener('click', () => $('keys-ov').classList.add('hidden'));
 $('btn-controls-pause').addEventListener('click', openControls);
 $('btn-binds-done').addEventListener('click', closeControls);
 $('btn-binds-reset').addEventListener('click', () => {
@@ -775,6 +780,12 @@ window.addEventListener('keydown', (e) => {
   if (!$('account').classList.contains('hidden')) {
     if (e.code === 'Escape') closeAccount();
     return;
+  }
+  for (const id of ['settings-ov', 'keys-ov']) {
+    if (!$(id).classList.contains('hidden')) {
+      if (e.code === 'Escape') $(id).classList.add('hidden');
+      return;
+    }
   }
   if (!$('rules').classList.contains('hidden')) {
     if (e.code === 'Escape') $('rules').classList.add('hidden');
