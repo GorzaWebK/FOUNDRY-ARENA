@@ -33,6 +33,43 @@ export class AudioSys {
     if (this.master) this.master.gain.value = v;
   }
 
+  /**
+   * Flashbanged: everything goes quiet and muffled behind a ringing tone, then
+   * comes back over `dur` seconds. `amount` 0..1.
+   */
+  deafen(amount, dur) {
+    if (!this.ctx || this.muted || this.ctx.state !== 'running') return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    if (!this.duck) {
+      // a gain + low-pass between the master volume and the speakers
+      this.duck = ctx.createGain();
+      this.duckLp = ctx.createBiquadFilter();
+      this.duckLp.type = 'lowpass';
+      this.duckLp.frequency.value = 20000;
+      this.master.disconnect();
+      const comp = this.ctx.createDynamicsCompressor();
+      comp.threshold.value = -14; comp.ratio.value = 6; comp.attack.value = 0.002; comp.release.value = 0.12;
+      this.master.connect(this.duckLp).connect(this.duck).connect(comp).connect(ctx.destination);
+      this.ringOut = comp;
+    }
+    const g = this.duck.gain, f = this.duckLp.frequency;
+    g.cancelScheduledValues(t); f.cancelScheduledValues(t);
+    g.setValueAtTime(Math.max(0.08, 1 - amount * 0.85), t);
+    g.linearRampToValueAtTime(1, t + dur);
+    f.setValueAtTime(Math.max(500, 20000 * (1 - amount)), t);
+    f.exponentialRampToValueAtTime(20000, t + dur);
+    // the ring, which skips the muffling
+    const o = ctx.createOscillator(), og = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.value = 3400 + Math.random() * 300;
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.09 * amount * this.volume + 0.0002, t + 0.05);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(og).connect(this.ringOut);
+    o.start(t);
+    o.stop(t + dur + 0.05);
+  }
+
   setListener(x, y, z, yaw) { this.lx = x; this.ly = y; this.lz = z; this.lyaw = yaw; }
 
   // --- building blocks -----------------------------------------------------
@@ -272,6 +309,26 @@ export class AudioSys {
         const o = this._out(pos, 0.3 * vol, 5); if (!o) return;
         this._noise(o, t, 0.16, 'bandpass', 700, 1, 0.9, 0.05);
         this._noise(o, t, 0.03, 'bandpass', 2600, 5, 0.5); // pin
+        break;
+      }
+      case 'pin': {
+        const o = this._out(pos, 0.35 * vol, 5); if (!o) return;
+        this._tone(o, t, 0.05, 'triangle', 2400, 1800, 0.4);
+        this._noise(o, t + 0.04, 0.05, 'bandpass', 3200, 6, 0.5);
+        break;
+      }
+      case 'flashbang': {
+        const o = this._out(pos, 1.4 * vol, 24); if (!o) return;
+        this._noise(o, t, 0.35, 'highpass', 1800, 0.4, 1.6);
+        this._noise(o, t, 0.6, 'lowpass', 900, 0.3, 1.0);
+        this._tone(o, t, 0.25, 'square', 180, 60, 0.7);
+        break;
+      }
+      case 'smoke': {
+        const o = this._out(pos, 0.55 * vol, 10); if (!o) return;
+        this._noise(o, t, 0.06, 'bandpass', 1400, 1, 0.8);
+        const f = this._noise(o, t + 0.04, 2.6, 'bandpass', 3200, 0.7, 0.5, 0.15); // hiss
+        f.frequency.exponentialRampToValueAtTime(1500, t + 2.6);
         break;
       }
       case 'bounce': {

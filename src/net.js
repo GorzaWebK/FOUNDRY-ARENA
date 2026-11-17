@@ -21,7 +21,7 @@
 
 import { CFG, HUMAN_COLORS, MAX_HUMANS } from './config.js';
 import * as THREE from 'three';
-import { WEAPONS, WEAPON_BY_ID, KNIFE, isPrimary, damageAtDistance } from './weapons.js';
+import { WEAPONS, WEAPON_BY_ID, KNIFE, GRENADE, NADES, TACTICALS, TACTICAL_BY_ID, isPrimary, damageAtDistance } from './weapons.js';
 import { getMap } from './maps/index.js';
 import { getMode } from './modes.js';
 import { NetChar } from './netChar.js';
@@ -262,7 +262,9 @@ export class Net {
     // Last One Standing: a round in progress can't be joined, so watch until the next one
     const spectate = !!g.rules.lives;
     if (spectate) c.lives = 0;
-    conn.send({ t: 'welcome', v: this.version, vt: this.versionTime, you: c.id, map: g.map.id, mode: g.rules.id, mt: r2(g.matchTime), over: g.over, r: this._roster(), ts: g.teamScore });
+    const welcome = { t: 'welcome', v: this.version, vt: this.versionTime, you: c.id, map: g.map.id, mode: g.rules.id, mt: r2(g.matchTime), over: g.over, r: this._roster(), ts: g.teamScore };
+    if (g.over) Object.assign(welcome, { aw: g.awards, vo: g.voteOptions, vn: g.voteTally(), vl: Math.round((g.voteDeadline - performance.now()) / 1000) });
+    conn.send(welcome);
     if (!g.over && !spectate) g.respawn(c, true);
     this.broadcast({ t: 'roster', r: this._roster() }, conn);
     this.system(spectate ? `${name} joined — they'll play from the next round` : `${name} joined`);
@@ -289,6 +291,7 @@ export class Net {
     else if (m.t === 'f') this._hostFire(c, m);
     else if (m.t === 'g') this._hostGrenade(c, m);
     else if (m.t === 'k') this._hostKnife(c, m);
+    else if (m.t === 'vote') this._vote(c.id, m.i);
     else if (m.t === 'c') {
       const now = performance.now();
       const text = cleanChat(m.m);
@@ -345,16 +348,24 @@ export class Net {
   /** A remote player threw a grenade: the host owns it from here. */
   _hostGrenade(c, m) {
     const g = this.game;
-    if (!c.alive || g.over || c.grenades <= 0 || !vec3(m.o) || !vec3(m.v)) return;
+    const def = NADES[m.k | 0] || GRENADE;
+    if (g.over || !vec3(m.o) || !vec3(m.v)) return;
+    if (def !== GRENADE && def !== c.tacDef) return; // not what they carry
+    if (c.nadesOf(def) <= 0) return;
+    // a grenade dropped as they died can still arrive just after the kill
+    const justDied = !c.alive && performance.now() - (c.diedAt || 0) < 700;
+    if (!c.alive && !justDied) return;
     const now = performance.now();
     if (now - (c.lastNadeT || 0) < 500) return;
     c.getEye(_eye);
     if (Math.hypot(m.o[0] - _eye.x, m.o[1] - _eye.y, m.o[2] - _eye.z) > 3.5) return; // not from where they are
     if (Math.hypot(m.v[0], m.v[1], m.v[2]) > 32) return; // nobody throws that hard
     c.lastNadeT = now;
-    c.grenades--;
+    if (def === GRENADE) c.grenades--;
+    else c.tactical--;
     c.protectedUntil = 0;
-    g.spawnGrenade(g.nextGrenadeId++, c, m.o.slice(0, 3), m.v.slice(0, 3));
+    const fuse = clamp(num(m.f) ? m.f : def.fuse, 0, def.fuse);
+    g.spawnGrenade(g.nextGrenadeId++, c, m.o.slice(0, 3), m.v.slice(0, 3), def, fuse);
   }
 
   _hostState(c, d) {
@@ -376,6 +387,11 @@ export class Net {
     }
     c.weaponIdx = Math.min(c.weapons.length - 1, (d[6] | 0) === c.weapons[0].def.index ? 0 : 1);
     if (!g.rules.gunGame) c.weapons[0].reserve = clamp(d[7] | 0, 0, c.weapons[0].def.reserveMax);
+    const tac = TACTICALS[d[11] | 0];
+    if (num(d[11]) && tac && tac !== c.tacId) {
+      c.tacId = tac;
+      c.tacDef = TACTICAL_BY_ID[tac];
+    }
   }
 
   /** A remote player fired. Relay the visuals and check their hit claims. */
@@ -420,6 +436,9 @@ export class Net {
       t.head = t.head || head;
       totals.set(v, t);
     }
+    let hit = false;
+    for (const [v] of totals) if (!v.isProtected() && !g.sameTeam(v, c)) hit = true;
+    g.countShot(c, hit);
     for (const [v, t] of totals) g.damage(v, t.dmg, c, t.head, def);
   }
 
@@ -469,11 +488,12 @@ export class Net {
   }
 
   onGrenade(gr) {
-    this.broadcast({ t: 'gr', id: gr.id, own: gr.owner ? gr.owner.id : -1, o: [gr.x, gr.y, gr.z], v: [gr.vx, gr.vy, gr.vz] });
+    this.broadcast({ t: 'gr', id: gr.id, own: gr.owner ? gr.owner.id : -1, o: [gr.x, gr.y, gr.z], v: [gr.vx, gr.vy, gr.vz], k: gr.def.index, f: r2(gr.fuse) });
   }
 
-  onExplode(id, x, y, z) {
-    this.broadcast({ t: 'ex', id, x: r2(x), y: r2(y), z: r2(z) });
+  /** k: 0 frag, 1 flashbang, 2 smoke */
+  onExplode(id, x, y, z, k = 0) {
+    this.broadcast({ t: 'ex', id, x: r2(x), y: r2(y), z: r2(z), k });
   }
 
   /** Bots were switched on or off. */
@@ -483,8 +503,30 @@ export class Net {
   }
 
   onEnd() {
+    const g = this.game;
     this._sendSnapshot(); // final scores
-    this.broadcast({ t: 'end' });
+    this.broadcast({ t: 'end', aw: g.awards, vo: g.voteOptions, vl: Math.round((g.voteDeadline - performance.now()) / 1000) });
+  }
+
+  /** Host: someone voted for the next map / mode. */
+  _vote(id, i) {
+    const g = this.game;
+    if (!g.over || !g.voteOptions || !num(i)) return;
+    i |= 0;
+    if (i < 0 || i >= g.voteOptions.length) return;
+    g.votes.set(id, i);
+    this.broadcast({ t: 'votes', n: g.voteTally() });
+    if (this.hooks.onVotes) this.hooks.onVotes();
+  }
+
+  /** Vote for option i (host or client). */
+  vote(i) {
+    const g = this.game;
+    if (this.role === 'host') this._vote(g.player.id, i);
+    else if (this.conn) {
+      g.votes.set(g.player.id, i); // remembered locally to highlight our pick
+      this.conn.send({ t: 'vote', i });
+    }
   }
 
   // ======================================================================
@@ -499,7 +541,21 @@ export class Net {
     g.startClient(num(m.mt) ? m.mt : CFG.timeLimit, getMode(m.mode));
     this._applyRoster(m.r);
     if (Array.isArray(m.ts)) g.teamScore = [m.ts[0] | 0, m.ts[1] | 0];
-    if (m.over) g.over = true;
+    if (m.over) { this._readEnd(m); g.over = true; }
+  }
+
+  /** Client: awards + next-match choices from the host, checked before they reach the page. */
+  _readEnd(m) {
+    const g = this.game;
+    g.awards = (Array.isArray(m.aw) ? m.aw : []).slice(0, 8)
+      .filter((a) => Array.isArray(a) && a.length >= 4 && num(a[2]))
+      .map((a) => [cleanChat(a[0]).slice(0, 24), cleanName(a[1]), a[2], cleanChat(a[3]).slice(0, 40)]);
+    g.voteOptions = (Array.isArray(m.vo) ? m.vo : []).slice(0, 3)
+      .filter((o) => Array.isArray(o) && typeof o[0] === 'string' && typeof o[1] === 'string')
+      .map((o) => [getMap(o[0]).id, getMode(o[1]).id]);
+    g.votes = new Map();
+    g.voteCounts = Array.isArray(m.vn) && m.vn.every(num) ? m.vn.slice(0, 3) : g.voteOptions.map(() => 0);
+    g.voteDeadline = num(m.vl) ? performance.now() + clamp(m.vl, 0, 120) * 1000 : 0;
   }
 
   _applyRoster(list) {
@@ -585,19 +641,33 @@ export class Net {
         break;
       }
       case 'gr':
-        if (vec3(m.o) && vec3(m.v)) g.spawnGrenade(m.id, g.charById(m.own), m.o, m.v);
+        if (vec3(m.o) && vec3(m.v)) {
+          const def = NADES[m.k | 0] || GRENADE;
+          g.spawnGrenade(m.id, g.charById(m.own), m.o, m.v, def, num(m.f) ? clamp(m.f, 0, def.fuse) : def.fuse);
+        }
         break;
       case 'ex': {
         const i = g.grenades.findIndex((gr) => gr.id === m.id);
         if (i >= 0) g.removeGrenade(i);
-        if (num(m.x) && num(m.y) && num(m.z)) g.showExplosion(m.x, m.y, m.z);
+        if (num(m.x) && num(m.y) && num(m.z)) {
+          if (m.k === 1) g.showFlash(m.x, m.y, m.z, false);
+          else if (m.k === 2) g.showSmoke(m.x, m.y, m.z);
+          else g.showExplosion(m.x, m.y, m.z);
+        }
         break;
       }
       case 'c':
         this.hooks.onChat(cleanName(m.n), num(m.col) ? m.col : 0, cleanChat(m.m));
         break;
+      case 'votes':
+        if (Array.isArray(m.n) && m.n.every(num)) {
+          g.voteCounts = m.n.slice(0, 3);
+          if (this.hooks.onVotes) this.hooks.onVotes();
+        }
+        break;
       case 'end':
         if (g.over) break;
+        this._readEnd(m);
         g.over = true;
         g.winner = g.ranking()[0];
         if (g.onMatchEnd) g.onMatchEnd(g.winner, g.ranking());
@@ -672,7 +742,7 @@ export class Net {
       d: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z), r3(p.yaw), r3(p.pitch),
         (p.crouching ? 2 : 0) | (p.onGround ? 8 : 0),
         p.weapon.def.index, p.weapons[0].reserve === Infinity ? 0 : p.weapons[0].reserve, this.mySeq,
-        r2(p.lean), WEAPON_BY_ID[p.primary].index],
+        r2(p.lean), WEAPON_BY_ID[p.primary].index, Math.max(0, TACTICALS.indexOf(p.tacId))],
     });
   }
 
@@ -683,8 +753,8 @@ export class Net {
   }
 
   /** Client: ask the host to spawn a grenade we just threw. */
-  sendGrenade(o, v) {
-    if (this.conn) this.conn.send({ t: 'g', o, v });
+  sendGrenade(o, v, k = 0, f = GRENADE.fuse) {
+    if (this.conn) this.conn.send({ t: 'g', o, v, k, f });
   }
 
   // ======================================================================

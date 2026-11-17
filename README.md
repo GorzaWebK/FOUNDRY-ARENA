@@ -42,10 +42,20 @@ The pause menu's **Next match** section changes mode and map between matches.
 | **King of the Hill**  | Blue vs Red over a zone that moves every minute; a team scores a point a second while it holds the zone with no enemies inside. First to 100. A light pillar marks the zone and a HUD marker points to it |
 | **Team Deathmatch**   | Blue vs Red, no friendly fire; first team to 40 kills. Humans are spread across both teams and bots fill the rest |
 | **Gun Game**          | every 2 kills hand you the next gun: LMG → rifle → SMG → shotgun → sniper → pistol. One pistol kill wins. Unlimited reserve ammo |
-| **Last One Standing** | 5 lives each, no respawns after that; the last player alive wins. You spectate from above once you are out, and players joining mid-round watch until the next one |
+| **Last One Standing** | 5 lives each, no respawns after that; the last player alive wins. Once you're out you spectate the survivors over their shoulder (fire / aim to cycle, jump for the overhead view); players joining mid-round watch until the next one |
 | **Snipers Only**      | free-for-all with sniper rifles and pistols; first to 15 kills                |
 
 Every mode has a 10 minute clock; when it runs out the mode's best score wins.
+
+## End of a match
+
+The end screen shows the final scores, **awards** (Sharpshooter for best
+accuracy, Headhunter, Unstoppable for the longest streak, Long Shot, Demolitions,
+Butcher, Hill Keeper, and Punching Bag for the most deaths) and three choices for
+the **next match**: the map and mode lined up in the menu, plus two others.
+Solo, you pick one and press **Play again**. In multiplayer everyone votes; the
+host can start whenever they like, and the next match starts by itself after
+30 seconds. Most votes wins, and a tie goes to the host's pick.
 
 ## Training range
 
@@ -80,7 +90,7 @@ sounds depends on the voices your browser and OS provide.
 - 100 HP, no regeneration. Respawn after 3 s at a spawn point away from enemies,
   with 2 s of spawn protection (attacking ends it early).
 - **Loadout:** you choose a primary weapon and always carry a pistol and 2 grenades
-  (3 max). Change your primary any time from the pause menu; it applies on your
+  (3 max), plus your choice of 2 flashbangs or 2 smoke grenades. Change your primary any time from the pause menu; it applies on your
   next respawn.
 - Pickups: health (+50), armour (+50, absorbs half of incoming damage), ammo boxes
   (primary ammo + 1 grenade) and supply crates (full ammo + grenades).
@@ -98,7 +108,8 @@ sounds depends on the voices your browser and OS provide.
 | `Shift`               | sprint (firing or aiming pauses it)           |
 | `C` or `Ctrl`         | crouch — press it **while sprinting to slide**, again to cancel the slide |
 | `Q` / `E`             | lean left / right (tap to toggle; hold if **Toggle lean** is off) |
-| `F`                   | throw a grenade                               |
+| `F`                   | grenade: hold to cook, release to throw       |
+| `G`                   | flashbang / smoke (whichever you picked)      |
 | `V`                   | knife                                         |
 | `T`                   | inspect your weapon                           |
 | `R`                   | reload                                        |
@@ -121,8 +132,11 @@ momentum for about a second with a low profile; jumping or pressing crouch
 again cancels it.
 
 Sensitivity, field of view, volume, graphics quality, announcer voice, kill cam,
-invert-Y, key bindings, mode, map, bots, difficulty, loadout, your multiplayer
-name and your training-range best are saved to `localStorage`.
+invert-Y, crosshair, key bindings, mode, map, bots, difficulty, loadout, your
+multiplayer name and your training-range best are saved to `localStorage`.
+**Crosshair** (under Settings) sets its colour, line length (0 for a dot only),
+thickness, extra gap, centre dot and outline, with a live preview. The lines
+still spread apart to show your current accuracy.
 **Graphics: Low** turns off shadows and fill lights and renders at 75% resolution.
 
 ## Weapons
@@ -136,6 +150,14 @@ name and your training-range best are saved to `localStorage`.
 | LMG           | 60 / 120      | 17      | huge belt, heavy: slower movement, long reload       |
 | Pistol        | 12 / ∞        | 25      | everyone's sidearm                                   |
 | Grenade       | 2 (max 3)     | up to 130 | 2.3 s fuse, bounces, 7.5 m blast; walls block it; hurts you too |
+| Flashbang     | 2             | —       | 1.6 s fuse; whites out the screen and muffles sound for up to 3.6 s for anyone who can see it (much less if they're facing away). Bots lose track of you while blinded |
+| Smoke         | 2             | —       | 1.2 s fuse; a 4.6 m cloud for 15 s that nobody (bots included) can see through. Bullets still go through it |
+
+**Cooking:** pressing `F` or `G` pulls the pin and lowers your gun; the fuse burns
+while you hold the key, shown by a ring under the crosshair, and the grenade is
+thrown when you let go. A cooked frag goes off sooner after it lands. Hold it for
+the whole fuse and it goes off in your hand; die holding one and it drops at your
+feet.
 | Knife (`V`)   | —             | 55 / 150 | quick melee with any gun in hand: two stabs from the front, one from behind; lunges at targets just out of reach |
 
 Every gun is modelled in detail (rails, sights, scopes, moving slides, pumps and
@@ -226,7 +248,9 @@ combat systems:
   close in, snipers hold still to shoot, and they draw the pistol when the
   primary runs dry at a bad moment.
 - **Grenades** — they lob grenades at settled fights or to flush you out of
-  cover, and run from grenades that land near them.
+  cover, and run from grenades that land near them. Bots carrying flashbangs throw
+  them ahead of a push (and look away); bots carrying smoke cover their retreat
+  with it. A flashbanged bot can't see and stumbles; smoke blocks their sight.
 - **Personality** — every bot rolls its own aggression, aim and preferences, so
   they do not all behave alike.
 
@@ -241,6 +265,7 @@ src/main.js           app flow: menus, pointer lock, pause, lobby, chat, main lo
 src/game.js           match flow, hitscan, grenades, damage, spawning, pickups, streaks
 src/modes.js          game modes: rules, scoring, ranking, HUD text, results
 src/killcam.js        rolling recording + kill cam replay
+src/smoke.js          smoke grenade clouds (visuals + line-of-sight blocking)
 src/training.js       training range: targets, stands, challenge, stats
 src/bindings.js       rebindable controls
 src/announcer.js      killstreak call-outs (banner + speech synthesis)

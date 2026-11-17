@@ -297,6 +297,7 @@ export class Range {
     if (p.alive) {
       for (const w of p.weapons) if (w.reserve !== Infinity) w.reserve = w.def.reserveMax;
       p.grenades = GRENADE.max;
+      p.tactical = p.tacDef.max;
     }
 
     // weapon stands: walk onto one to take that gun

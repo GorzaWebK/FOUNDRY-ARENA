@@ -14,11 +14,13 @@
       <div id="vignette"></div>
       <div id="lowhp"></div>
       <div id="protect-frame"></div>
+      <div id="smokehaze"></div>
 
-      <div id="crosshair">
+      <div id="crosshair" class="xh">
         <i class="ch-dot"></i><i class="ch-l ch-top"></i><i class="ch-l ch-bottom"></i><i class="ch-l ch-left"></i><i class="ch-l ch-right"></i>
       </div>
       <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+      <div id="cook" class="hidden"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" /><circle id="cook-arc" cx="20" cy="20" r="16" /></svg><span id="cook-t">2.3</span></div>
       <div id="dmg"></div>
 
       <div id="topbar">
@@ -53,11 +55,13 @@
           <div class="slot" data-i="0"><b>1</b> <span id="slot-prim">Rifle</span></div>
           <div class="slot" data-i="1"><b>2</b> Pistol</div>
           <div class="slot nade" id="slot-nade"><b>F</b> Grenade × <span id="nade-count">2</span></div>
+          <div class="slot nade" id="slot-tac"><b>G</b> <span id="tac-name">Flash</span> × <span id="tac-count">2</span></div>
           <div class="slot" id="slot-knife"><b>V</b> Knife</div>
         </div>
       </div>
 
       <div id="killcam" class="hidden"><div class="kc-title">KILL CAM</div><div id="kc-who"></div><div id="kc-count"></div></div>
+      <div id="spectate" class="hidden"><div id="spec-who"></div><div id="spec-keys"></div></div>
       <div id="death" class="hidden">
         <div id="death-by">Eliminated by <b id="death-name">Bot</b></div>
         <div id="death-count">Respawning in 3</div>
@@ -74,6 +78,7 @@
       <div id="dmg-nums"></div>
       <div id="hill-marker" class="hidden"><i></i><span></span></div>
       <div id="scope" class="hidden"><i class="sc-h"></i><i class="sc-v"></i></div>
+      <div id="flashbang"></div>
       <div id="chat">
         <div id="chat-log"></div>
         <input type="text" id="chat-input" class="hidden" maxlength="140" placeholder="Message everyone — Enter to send" autocomplete="off" spellcheck="false" />
@@ -99,7 +104,7 @@
             </label>
             <h4>Loadout</h4>
             <div id="menu-loadout" class="loadout"></div>
-            <p class="note">You carry your primary, a pistol and 2 grenades.</p>
+            <p class="note">Plus a pistol, 2 grenades and 2 flashbangs or smokes.</p>
           </div>
           <div class="col">
             <h4>Multiplayer</h4>
@@ -149,6 +154,7 @@
         </div>
         <h4>Loadout <small>— applies on your next respawn</small></h4>
         <div id="pause-loadout" class="loadout compact"></div>
+        <div id="pause-tac" class="loadout compact tac"></div>
         <p id="loadout-note" class="note"></p>
         <h4>Settings</h4>
         <div id="pause-settings"></div>
@@ -167,8 +173,19 @@
       <div class="panel">
         <h2 id="end-title">VICTORY</h2>
         <p id="end-sub" class="tag"></p>
-        <table class="final"><thead><tr><th>#</th><th class="l">Player</th><th>Kills</th><th>Deaths</th></tr></thead><tbody id="end-body"></tbody></table>
-        <p id="end-wait" class="note hidden">Waiting for the host to start the next match…</p>
+        <div class="end-cols">
+          <div>
+            <table class="final"><thead><tr><th>#</th><th class="l">Player</th><th>Kills</th><th>Deaths</th></tr></thead><tbody id="end-body"></tbody></table>
+          </div>
+          <div>
+            <h4>Awards</h4>
+            <div id="end-awards" class="awards"></div>
+            <h4>Next match <small id="vote-title">— pick one</small></h4>
+            <div id="vote-opts" class="vote"></div>
+            <p id="vote-note" class="note"></p>
+          </div>
+        </div>
+        <p id="end-wait" class="note hidden">The next match starts when the timer runs out, or sooner if the host starts it.</p>
         <div class="btn-row">
           <button id="btn-again" class="primary">PLAY AGAIN</button>
           <button id="btn-menu">Main menu</button>

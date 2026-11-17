@@ -80,13 +80,43 @@ export const DEFAULT_PRIMARY = 'rifle';
 
 export function isPrimary(id) { return PRIMARIES.includes(id); }
 
+// Hold the throw key to "cook" any grenade: the fuse burns while you hold it,
+// and one held too long goes off in your hand.
 export const GRENADE = {
-  name: 'Grenade',
+  kind: 'frag', index: 0, name: 'Grenade', color: 0x3f4a2c,
   start: 2, max: 3,
   fuse: 2.3, speed: 17, gravity: 20,
   radius: 7.5, damage: 130, selfScale: 0.6,
   cooldown: 0.9, noise: 70,
 };
+
+/** Blinds and deafens anyone looking towards it (yourself included). No damage. */
+export const FLASH = {
+  kind: 'flash', index: 1, name: 'Flashbang', short: 'Flash', color: 0xc9ccd0,
+  start: 2, max: 2,
+  fuse: 1.6, speed: 17, gravity: 20,
+  radius: 22, // blinds out to this distance (with line of sight)
+  maxBlind: 3.6, // seconds of white-out, facing it up close
+  cooldown: 0.9, noise: 45,
+  blurb: 'Blinds anyone looking at it',
+};
+
+/** A thick cloud that blocks sight for a while. No damage. */
+export const SMOKE = {
+  kind: 'smoke', index: 2, name: 'Smoke', short: 'Smoke', color: 0x55606a,
+  start: 2, max: 2,
+  fuse: 1.2, speed: 15, gravity: 20,
+  radius: 4.6, // cloud radius once it has spread
+  life: 15, // seconds the cloud lasts
+  cooldown: 0.9, noise: 10,
+  blurb: 'A cloud nobody can see through',
+};
+
+export const NADES = [GRENADE, FLASH, SMOKE];
+export const TACTICALS = ['flash', 'smoke'];
+export const DEFAULT_TACTICAL = 'flash';
+export const TACTICAL_BY_ID = { flash: FLASH, smoke: SMOKE };
+export const isTactical = (id) => TACTICALS.includes(id);
 
 /** Quick melee (V). Usable at any time, whatever gun is in your hands. */
 export const KNIFE = {

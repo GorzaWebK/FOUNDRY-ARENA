@@ -10,13 +10,17 @@ import { Pickup } from './pickups.js';
 import { ViewModel } from './viewmodel.js';
 import { Player } from './player.js';
 import { Bot } from './bot.js';
-import { damageAtDistance, GRENADE, KNIFE, makeLoadout, makeSingle } from './weapons.js';
-import { getMode, TEAM_COLORS, TEAM_NAMES, GUN_LADDER, gunLevel } from './modes.js';
+import { damageAtDistance, GRENADE, FLASH, KNIFE, makeLoadout, makeSingle } from './weapons.js';
+import { SmokeClouds } from './smoke.js';
+import { applyCrosshair } from './settings.js';
+import { getMode, MODES, TEAM_COLORS, TEAM_NAMES, GUN_LADDER, gunLevel } from './modes.js';
+import { MAPS, getMap } from './maps/index.js';
 import { Announcer } from './announcer.js';
 import { KillCam } from './killcam.js';
 import { Range } from './training.js';
 
 export const HILL_TIME = 60; // seconds before the hill moves
+export const VOTE_TIME = 30; // multiplayer: seconds to vote before the next match starts by itself
 const HILL_COLORS = { [-1]: 0xffffff, 0: TEAM_COLORS[0], 1: TEAM_COLORS[1], 2: 0xffd24d };
 const MULTI_WINDOW = 4; // seconds between kills that still count as a multi-kill
 const MULTI_NAMES = { 2: 'Double Kill', 3: 'Triple Kill', 4: 'Quad Kill' }; // 5+: Mega Kill
@@ -69,8 +73,9 @@ export function rayChar(ox, oy, oz, dx, dy, dz, c, tMax, out) {
 }
 
 const GRENADE_GEO = new THREE.IcosahedronGeometry(0.11, 0);
-function makeGrenadeMesh() {
-  const m = new THREE.Mesh(GRENADE_GEO, new THREE.MeshLambertMaterial({ color: 0x3f4a2c, emissive: 0xff2200, emissiveIntensity: 0 }));
+const FLASH_GEO = new THREE.CylinderGeometry(0.06, 0.06, 0.2, 8);
+function makeGrenadeMesh(kind) {
+  const m = new THREE.Mesh(kind === 'frag' ? GRENADE_GEO : FLASH_GEO, new THREE.MeshLambertMaterial({ color: 0x3f4a2c, emissive: 0xff2200, emissiveIntensity: 0 }));
   m.castShadow = true;
   return m;
 }
@@ -98,6 +103,7 @@ export class Game {
     this.camera.rotation.order = 'YXZ';
 
     this.effects = new Effects(this.scene);
+    this.smokes = new SmokeClouds(this.scene);
     this.viewmodel = new ViewModel();
     this.announcer = new Announcer(settings, audio, hud);
     this.killcam = new KillCam(this);
@@ -111,7 +117,7 @@ export class Game {
     this.pickups = [];
     this.worldObjs = [];
     this.grenades = [];
-    this.grenadePool = [];
+    this.grenadePool = { frag: [], flash: [], smoke: [] };
     this.nextGrenadeId = 1;
     this.botsOn = true;
     this.loadMap(map);
@@ -129,6 +135,10 @@ export class Game {
     this.attract = true;
     this.winner = null;
     this.onMatchEnd = null;
+    this.awards = [];
+    this.voteOptions = null;
+    this.votes = new Map(); // character id -> option index
+    this.voteDeadline = 0;
     this.stats = { stuck: 0, shots: 0, kills: 0 };
 
     this.resize();
@@ -179,9 +189,11 @@ export class Game {
       this.renderer.shadowMap.needsUpdate = true;
       for (const p of this.lights.points) p.visible = high;
       this.effects.lowDetail = !high;
+      this.smokes.lowDetail = !high;
       this.resize();
     }
     if (!key || key === 'volume') this.audio.setVolume(this.settings.volume);
+    if (!key || key.startsWith('xh')) applyCrosshair(this.settings);
   }
 
   // ======================================================================
@@ -207,6 +219,7 @@ export class Game {
     this.matchTime = this.rules.training ? Infinity : CFG.timeLimit;
     this.over = false;
     this.winner = null;
+    this.awards = []; this.voteOptions = null; this.votes = new Map(); this.voteDeadline = 0;
     this.stats = { stuck: 0, shots: 0, kills: 0 };
     if (this.range) { this.range.dispose(); this.range = null; }
     if (this.rules.training) this.range = new Range(this);
@@ -264,6 +277,7 @@ export class Game {
     this.matchTime = matchTime;
     this.over = false;
     this.winner = null;
+    this.awards = []; this.voteOptions = null; this.votes = new Map(); this.voteDeadline = 0; this.voteCounts = [];
     this.effects.clear();
     this.clearGrenades();
     this.hud.reset();
@@ -283,6 +297,73 @@ export class Game {
     c.gunLevel = 0;
     c.lives = this.rules.lives || 0;
     c.hillTime = 0;
+    // for the end-of-match awards (kept by whoever runs the match)
+    c.st = { shots: 0, hits: 0, heads: 0, knives: 0, nades: 0, bestStreak: 0, longest: 0 };
+  }
+
+  /** A shot left `c`'s gun; `hit` = it hurt an enemy. Called by the match authority. */
+  countShot(c, hit) {
+    if (!c.st || this.range || this.attract) return;
+    c.st.shots++;
+    if (hit) c.st.hits++;
+  }
+
+  /**
+   * End-of-match awards: [title, name, colour, detail] for whoever did best at
+   * each thing. Ties go to the higher-placed player.
+   */
+  computeAwards() {
+    const rank = this.ranking().filter((c) => c.st);
+    const best = (score, min) => {
+      let top = null, v = -Infinity;
+      for (const c of rank) { const s = score(c); if (s > v) { v = s; top = c; } }
+      return top && v >= min ? [top, v] : null;
+    };
+    const out = [];
+    const add = (title, r, text) => { if (r) out.push([title, r[0].name, r[0].color, text(r[1])]); };
+    add('Sharpshooter', best((c) => (c.st.shots >= 15 ? c.st.hits / c.st.shots : -1), 0.2), (v) => `${Math.round(v * 100)}% accuracy`);
+    add('Headhunter', best((c) => c.st.heads, 2), (v) => `${v} headshot kills`);
+    add('Unstoppable', best((c) => c.st.bestStreak, 3), (v) => `${v}-kill streak`);
+    add('Long Shot', best((c) => c.st.longest, 30), (v) => `${Math.round(v)} m kill`);
+    add('Demolitions', best((c) => c.st.nades, 1), (v) => `${v} grenade kill${v === 1 ? '' : 's'}`);
+    add('Butcher', best((c) => c.st.knives, 1), (v) => `${v} knife kill${v === 1 ? '' : 's'}`);
+    if (this.rules.hill) add('Hill Keeper', best((c) => c.hillTime || 0, 10), (v) => `${Math.round(v)} s on the hill`);
+    add('Punching Bag', best((c) => c.deaths, 6), (v) => `${v} deaths`);
+    return out.slice(0, 6);
+  }
+
+  /** Three [mapId, modeId] choices for the next match: the current pick plus two others. */
+  makeVoteOptions() {
+    const s = this.settings;
+    const opts = [[getMap(s.map).id, getMode(s.mode).id]];
+    const combos = [];
+    for (const m of MAPS) for (const r of MODES) combos.push([m.id, r.id]);
+    for (let tries = 0; opts.length < 3 && tries < 300; tries++) {
+      const c = combos[(Math.random() * combos.length) | 0];
+      if (opts.some((o) => o[0] === c[0] && o[1] === c[1])) continue;
+      // a real choice: different maps and different modes while there are enough to go round
+      if (tries < 100 && opts.some((o) => o[0] === c[0] || o[1] === c[1])) continue;
+      if (tries < 200 && opts.some((o) => o[1] === c[1])) continue;
+      opts.push(c);
+    }
+    return opts;
+  }
+
+  /** Votes per option. */
+  voteTally() {
+    const n = this.voteOptions ? this.voteOptions.map(() => 0) : [];
+    for (const i of this.votes.values()) if (i >= 0 && i < n.length) n[i]++;
+    return n;
+  }
+
+  /** Most votes wins; a tie goes to the host's pick if it's one of them, else the first. */
+  voteWinner() {
+    const n = this.voteTally();
+    if (!n.length) return -1;
+    const top = Math.max(...n);
+    const mine = this.votes.get(this.player.id);
+    if (mine !== undefined && n[mine] === top) return mine;
+    return n.indexOf(top);
   }
 
   /** The weapons a character gets on spawning, under the current rules. */
@@ -357,6 +438,10 @@ export class Game {
     this.over = true;
     const rank = this.ranking();
     this.winner = rank[0];
+    this.awards = this.computeAwards();
+    this.voteOptions = this.makeVoteOptions();
+    this.votes = new Map();
+    this.voteDeadline = this.mode === 'host' ? performance.now() + VOTE_TIME * 1000 : 0;
     if (this.mode === 'host') this.net.onEnd();
     if (this.onMatchEnd) this.onMatchEnd(this.winner, rank);
   }
@@ -476,6 +561,7 @@ export class Game {
       return;
     }
     if (this.mode === 'host') this.net.onShot(shooter, def, _muz, ends);
+    this.countShot(shooter, victims.some((v) => !v.c.isProtected() && !this.sameTeam(v.c, shooter)));
     this.emitNoise(shooter.pos.x, shooter.pos.y, shooter.pos.z, def.noise, shooter, 'shot');
     for (const v of victims) this.damage(v.c, v.dmg, shooter, v.head, def);
   }
@@ -502,6 +588,7 @@ export class Game {
   kill(victim, attacker, head, def) {
     victim.health = 0;
     victim.alive = false;
+    victim.diedAt = performance.now();
     victim.deaths++;
     victim.respawnAt = this.time + CFG.respawnDelay;
     if (this.rules.lives) {
@@ -511,6 +598,15 @@ export class Game {
     if (attacker !== victim) {
       attacker.kills++;
       if (this.rules.teams && !this.rules.hill && attacker.team >= 0) this.teamScore[attacker.team]++;
+      const st = attacker.st;
+      if (st) {
+        if (def === KNIFE) st.knives++;
+        else if (def === GRENADE) st.nades++;
+        else {
+          if (head) st.heads++;
+          st.longest = Math.max(st.longest, attacker.pos.distanceTo(victim.pos));
+        }
+      }
     }
     this.stats.kills++;
     const weapon = def ? def.name : '?';
@@ -538,6 +634,7 @@ export class Game {
       attacker.multi = this.time - attacker.lastKillT <= MULTI_WINDOW ? attacker.multi + 1 : 1;
       attacker.lastKillT = this.time;
       attacker.streak++;
+      if (attacker.st) attacker.st.bestStreak = Math.max(attacker.st.bestStreak, attacker.streak);
       if (!this.firstBlood) { this.firstBlood = true; first = true; }
     }
     if (this.attract) return;
@@ -642,22 +739,28 @@ export class Game {
   // grenades
   // ======================================================================
 
-  throwGrenade(char, dir) {
+  /** `fuse` = seconds left on it (cooking burns some); `drop` = let go of it, no throw. */
+  throwGrenade(char, dir, def = GRENADE, fuse = def.fuse, drop = false) {
     char.getEye(_o);
     if (dir) _dir.copy(dir);
     else { char.aimDir(_dir); _dir.y += 0.1; _dir.normalize(); } // a little loft
-    const sp = GRENADE.speed;
-    const o = [r2(_o.x + _dir.x * 0.25), r2(_o.y + _dir.y * 0.25 - 0.1), r2(_o.z + _dir.z * 0.25)];
-    const v = [r2(_dir.x * sp + char.vel.x * 0.4), r2(_dir.y * sp + Math.max(0, char.vel.y) * 0.3), r2(_dir.z * sp + char.vel.z * 0.4)];
-    if (this.mode === 'client') { this.net.sendGrenade(o, v); return; } // the host spawns it for everyone
-    this.spawnGrenade(this.nextGrenadeId++, char, o, v);
+    const sp = drop ? 0.6 : def.speed;
+    const o = drop ? [r2(char.pos.x), r2(char.pos.y + 1.0), r2(char.pos.z)]
+      : [r2(_o.x + _dir.x * 0.25), r2(_o.y + _dir.y * 0.25 - 0.1), r2(_o.z + _dir.z * 0.25)];
+    const k = drop ? 0.3 : 0.4;
+    const v = [r2(_dir.x * sp + char.vel.x * k), r2(_dir.y * sp + Math.max(0, char.vel.y) * 0.3), r2(_dir.z * sp + char.vel.z * k)];
+    fuse = r2(Math.max(0, fuse));
+    if (this.mode === 'client') { this.net.sendGrenade(o, v, def.index, fuse); return; } // the host spawns it for everyone
+    this.spawnGrenade(this.nextGrenadeId++, char, o, v, def, fuse);
   }
 
-  spawnGrenade(id, owner, o, v) {
-    const mesh = this.grenadePool.pop() || makeGrenadeMesh();
+  spawnGrenade(id, owner, o, v, def = GRENADE, fuse = def.fuse) {
+    const mesh = this.grenadePool[def.kind].pop() || makeGrenadeMesh(def.kind);
     mesh.visible = true;
+    mesh.material.color.set(def.color);
+    mesh.material.emissive.set(def.kind === 'frag' ? 0xff2200 : def.kind === 'flash' ? 0xffffff : 0x66ff99);
     this.scene.add(mesh);
-    const g = { id, owner, x: o[0], y: o[1], z: o[2], vx: v[0], vy: v[1], vz: v[2], fuse: GRENADE.fuse, mesh, resting: false, bounceT: 0 };
+    const g = { id, owner, def, x: o[0], y: o[1], z: o[2], vx: v[0], vy: v[1], vz: v[2], fuse, mesh, resting: false, bounceT: 0 };
     this.grenades.push(g);
     _d.set(g.x, g.y, g.z);
     this.audio.play('throw', owner && owner.isPlayer ? null : _d);
@@ -668,12 +771,13 @@ export class Game {
   removeGrenade(i) {
     const g = this.grenades[i];
     this.scene.remove(g.mesh);
-    this.grenadePool.push(g.mesh);
+    this.grenadePool[g.def.kind].push(g.mesh);
     this.grenades.splice(i, 1);
   }
 
   clearGrenades() {
     for (let i = this.grenades.length - 1; i >= 0; i--) this.removeGrenade(i);
+    if (this.smokes) this.smokes.clear();
   }
 
   updateGrenades(dt) {
@@ -727,17 +831,83 @@ export class Game {
           if (g.fuse < -1.5) this.removeGrenade(i); // the host's "boom" never arrived
         } else {
           this.removeGrenade(i);
-          this.explode(g.x, g.y, g.z, g.owner, g.id);
+          this.detonate(g);
         }
       }
     }
+  }
+
+  /** A grenade's fuse ran out (host / solo). */
+  detonate(g) {
+    const k = g.def.kind;
+    if (k === 'frag') { this.explode(g.x, g.y, g.z, g.owner, g.id); return; }
+    if (this.mode === 'host') this.net.onExplode(g.id, g.x, g.y, g.z, g.def.index);
+    if (k === 'flash') {
+      this.emitNoise(g.x, g.y, g.z, FLASH.noise, g.owner, 'shot');
+      this.showFlash(g.x, g.y, g.z, true, g.owner);
+    } else {
+      this.showSmoke(g.x, g.y, g.z);
+    }
+  }
+
+  /**
+   * How hard a flashbang at (x, y, z) hits someone: 0..1. Full strength up close
+   * and looking at it, much less looking away, nothing behind a wall.
+   */
+  flashAmount(c, x, y, z) {
+    c.getEye(_o);
+    const dx = x - _o.x, dy = y - _o.y, dz = z - _o.z;
+    const d = Math.hypot(dx, dy, dz);
+    if (d >= FLASH.radius) return 0;
+    if (this.world.segmentBlocked(x, y + 0.15, z, _o.x, _o.y, _o.z)) return 0;
+    if (this.smokes.blocks(x, y + 0.15, z, _o.x, _o.y, _o.z)) return 0;
+    c.aimDir(_dir);
+    const dot = d > 0.5 ? (dx * _dir.x + dy * _dir.y + dz * _dir.z) / d : 1;
+    const face = dot > 0.55 ? 1 : dot > -0.2 ? 0.3 + 0.7 * ((dot + 0.2) / 0.75) : 0.22;
+    const near = 1 - Math.pow(d / FLASH.radius, 1.6);
+    return Math.min(1, face * near * 1.15);
+  }
+
+  /** A flashbang went off: the bang for everyone, blindness for whoever saw it. */
+  showFlash(x, y, z, authority, owner = null) {
+    this.effects.flashBang(x, y, z);
+    _d.set(x, y, z);
+    this.audio.play('flashbang', _d);
+    if (this.attract) return;
+    // the player at this keyboard works out their own blindness, wherever the match runs
+    const p = this.player;
+    if (p.alive) {
+      const a = this.flashAmount(p, x, y, z);
+      if (a > 0.05) {
+        const dur = FLASH.maxBlind * a;
+        p.blindUntil = Math.max(p.blindUntil, this.time + dur);
+        this.hud.flashed(a, dur);
+        this.audio.deafen(a, dur);
+      }
+    }
+    if (!authority) return;
+    for (const b of this.bots) {
+      if (!b.alive) continue;
+      // a bot that threw it knows to look away
+      const a = this.flashAmount(b, x, y, z) * (b === owner ? 0.25 : 1);
+      if (a > 0.12) b.flashed(FLASH.maxBlind * a);
+    }
+  }
+
+  /** A smoke grenade popped: the cloud settles on the floor below it. */
+  showSmoke(x, y, z) {
+    let gy = y;
+    if (this.world.raycast(x, y + 0.3, z, 0, -1, 0, 6, _hit)) gy = y + 0.3 - _hit.t;
+    this.smokes.add(x, gy, z);
+    _d.set(x, y, z);
+    this.audio.play('smoke', _d);
   }
 
   /** Authoritative detonation: effects + damage to everyone in range and in sight. */
   explode(x, y, z, owner, id) {
     this.showExplosion(x, y, z);
     if (this.range) this.range.explode(x, y, z, GRENADE.radius, GRENADE.damage);
-    if (this.mode === 'host') this.net.onExplode(id, x, y, z);
+    if (this.mode === 'host') this.net.onExplode(id, x, y, z, 0);
     this.emitNoise(x, y, z, GRENADE.noise, owner, 'shot');
     const sy = y + 0.3;
     for (const c of [...this.chars]) {
@@ -926,6 +1096,7 @@ export class Game {
   update(dt) {
     if (this.over) {
       this.effects.update(dt);
+      this.smokes.update(dt);
       for (const r of this.remotes) r.update(dt);
       this.orbitCamera(dt, 0.05);
       return;
@@ -949,6 +1120,7 @@ export class Game {
     if (this.rules.hill && !this.attract) this.updateHill(dt);
     this.updateHillFx(this.time);
     this.effects.update(dt);
+    this.smokes.update(dt);
     if (!this.attract) { this.killcam.record(dt); this.killcam.update(dt); }
     this.lastDt = dt;
 
@@ -969,6 +1141,7 @@ export class Game {
     if (this.rules.hill) this.hill.t = Math.max(0, this.hill.t - dt); // re-synced by snapshots
     this.updateHillFx(this.time);
     this.effects.update(dt);
+    this.smokes.update(dt);
     this.killcam.record(dt);
     this.killcam.update(dt);
     this.lastDt = dt;

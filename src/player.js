@@ -6,6 +6,7 @@ import { CFG } from './config.js';
 import { moveBody } from './physics.js';
 import { verticalFov } from './settings.js';
 import { GUN_LADDER } from './modes.js';
+import { GRENADE } from './weapons.js';
 
 const _v = new THREE.Vector3();
 const _hit = { t: 0, nx: 0, ny: 0, nz: 0 };
@@ -36,6 +37,7 @@ export class Player extends Character {
 
   spawnAt(x, y, z, yaw) {
     this.primary = this.game.settings.primary; // loadout choices apply on (re)spawn
+    this.tacId = this.game.settings.tactical;
     super.spawnAt(x, y, z, yaw);
     const g = this.game;
     g.killcam.stop();
@@ -51,6 +53,8 @@ export class Player extends Character {
     this.sliding = false;
     this.slideT = 0; this.slideCd = 0;
     this.leanLatch = 0;
+    this.specTarget = null;
+    this.specCamOn = false;
   }
 
   aimDir(out) {
@@ -72,7 +76,7 @@ export class Player extends Character {
 
   update(dt, input) {
     const g = this.game;
-    if (!this.alive) { this.updateDeathCam(dt); return; }
+    if (!this.alive) { this.updateDeathCam(dt, input); return; }
     const settings = g.settings;
     const w = this.weapon;
 
@@ -218,7 +222,7 @@ export class Player extends Character {
     if (input.actHit('pistol')) this.switchWeapon(1);
     if (input.wheel !== 0 && this.switchT <= 0) this.switchWeapon(this.weaponIdx === 0 ? 1 : 0);
     if (input.actHit('reload')) this.startReload();
-    if (input.actHit('grenade')) this.throwGrenade();
+    this.updateCook(dt, input);
     if (input.actHit('knife')) this.knife();
     if (input.actHit('inspect')) this.game.viewmodel.inspect();
     this.tryFire(input.act('fire'), input.actHit('fire'), this.ads);
@@ -251,8 +255,38 @@ export class Player extends Character {
       mdx: input.mdx, mdy: input.mdy,
       // anything that needs the gun cancels an inspect
       busy: input.act('fire') || input.act('aim') || this.sprinting || this.sliding || this.weapon.reloadT > 0
-        || this.switchT > 0 || this.meleeT > 0,
+        || this.switchT > 0 || this.meleeT > 0 || !!this.cook,
+      cooking: !!this.cook,
     });
+  }
+
+  /**
+   * Grenades: press to pull the pin, hold to cook, let go to throw. The fuse
+   * burns while you hold it, so a cooked grenade goes off sooner after landing,
+   * and one held for its whole fuse goes off in your hand.
+   */
+  updateCook(dt, input) {
+    const g = this.game;
+    if (!this.cook) {
+      for (const [act, def] of [['grenade', GRENADE], ['tactical', this.tacDef]]) {
+        if (!input.actHit(act) || this.nadesOf(def) <= 0 || this.grenadeT > 0 || this.meleeT > 0) continue;
+        this.cook = { def, t: 0, act };
+        this.weapon.reloadT = 0;
+        g.audio.play('pin');
+        break;
+      }
+      return;
+    }
+    const c = this.cook;
+    c.t += dt;
+    const left = c.def.fuse - c.t;
+    if (left <= 0) {
+      this.cook = null;
+      this.throwGrenade(null, c.def, 0, true); // held too long
+    } else if (!input.act(c.act)) {
+      this.cook = null;
+      this.throwGrenade(null, c.def, left);
+    }
   }
 
   updateCamera(dt, hs) {
@@ -283,12 +317,14 @@ export class Player extends Character {
     if (Math.abs(f - cam.fov) > 0.01) { cam.fov = f; cam.updateProjectionMatrix(); }
   }
 
-  updateDeathCam(dt) {
+  updateDeathCam(dt, input) {
     const g = this.game, cam = g.camera;
     this.deathT += dt;
-    // out of lives: watch the rest of the match from above
     if (g.killcam.active) return; // the kill cam has the camera
-    if (g.isOut(this) && this.deathT > 2.5) { g.orbitCamera(dt, 0.05); return; }
+    // out of lives (or joined mid-round): follow the players still in it
+    if (g.isOut(this) && (this.deathT > 2.5 || !this.killer)) { this.updateSpectate(dt, input); return; }
+    this.specTarget = null;
+    this.specCamOn = false;
     this.scoped = false;
     this.leanOff = 0; this.lean = 0;
     const t = Math.min(1, this.deathT / 0.6);
@@ -312,6 +348,57 @@ export class Player extends Character {
       pitch = Math.atan2(_v.y, Math.hypot(_v.x, _v.z)) * t;
     }
     cam.rotation.set(pitch, yaw, t * 0.35);
+    const vf = verticalFov(g.settings.fov);
+    if (Math.abs(cam.fov - vf) > 0.01) { cam.fov = vf; cam.updateProjectionMatrix(); }
+  }
+
+  /**
+   * Spectating: an over-the-shoulder camera on someone still alive. Fire / aim
+   * cycle forwards / backwards, jump switches to the overhead view.
+   */
+  updateSpectate(dt, input) {
+    const g = this.game, cam = g.camera;
+    const live = g.chars.filter((c) => c !== this && c.alive);
+    if (input && input.actHit('jump')) this.specOverhead = !this.specOverhead;
+    if (!live.length || this.specOverhead) {
+      this.specTarget = null;
+      this.specCamOn = false;
+      g.orbitCamera(dt, 0.05);
+      return;
+    }
+    let i = live.indexOf(this.specTarget);
+    let snap = false;
+    if (i < 0) {
+      // start on whoever got us, if they're still going
+      i = Math.max(0, live.indexOf(this.killer));
+      snap = true;
+    }
+    if (input && input.actHit('fire')) { i = (i + 1) % live.length; snap = true; }
+    if (input && input.actHit('aim')) { i = (i - 1 + live.length) % live.length; snap = true; }
+    const t = live[i];
+    this.specTarget = t;
+    this.yaw = t.yaw; // so sounds pan the way the camera faces
+    // camera: behind and a little above their shoulder, pulled in if a wall is in the way
+    t.getEye(_v);
+    const ex = _v.x, ey = _v.y + 0.25, ez = _v.z;
+    const pitch = Math.max(-0.7, Math.min(0.6, t.pitch));
+    const cp = Math.cos(pitch);
+    const fx = -Math.sin(t.yaw) * cp, fy = Math.sin(pitch), fz = -Math.cos(t.yaw) * cp;
+    const rx = Math.cos(t.yaw), rz = -Math.sin(t.yaw);
+    let bx = -fx * 3.2 + rx * 0.55, by = -fy * 3.2 + 0.35, bz = -fz * 3.2 + rz * 0.55;
+    const bl = Math.hypot(bx, by, bz);
+    bx /= bl; by /= bl; bz /= bl;
+    let dist = bl;
+    if (g.world.raycast(ex, ey, ez, bx, by, bz, bl + 0.3, _hit)) dist = Math.max(0.3, _hit.t - 0.3);
+    const tx = ex + bx * dist, ty = ey + by * dist, tz = ez + bz * dist;
+    const k = snap || !this.specCamOn ? 1 : 1 - Math.exp(-dt * 14);
+    this.specCamOn = true;
+    cam.position.set(
+      cam.position.x + (tx - cam.position.x) * k,
+      cam.position.y + (ty - cam.position.y) * k,
+      cam.position.z + (tz - cam.position.z) * k,
+    );
+    cam.lookAt(ex + fx * 10, ey + fy * 10 - 0.4, ez + fz * 10);
     const vf = verticalFov(g.settings.fov);
     if (Math.abs(cam.fov - vf) > 0.01) { cam.fov = vf; cam.updateProjectionMatrix(); }
   }
@@ -343,6 +430,13 @@ export class Player extends Character {
   }
 
   onDeath(killer) {
+    if (this.cook) {
+      // a grenade in your hand when you die drops at your feet
+      const c = this.cook;
+      this.cook = null;
+      this.throwGrenade(null, c.def, Math.max(0, c.def.fuse - c.t), true);
+    }
+    if (this.game.hud.flashT > 0.4) this.game.hud.flashT = 0.4; // don't watch the kill cam in a white-out
     this.killer = killer;
     this.deathT = 0;
     this.game.killcam.begin(killer, this);

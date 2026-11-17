@@ -15,7 +15,7 @@ import { Character } from './character.js';
 import { CFG } from './config.js';
 import { moveBody } from './physics.js';
 import { BotModel } from './botModel.js';
-import { GRENADE } from './weapons.js';
+import { GRENADE, FLASH, SMOKE, TACTICALS } from './weapons.js';
 
 export const STATE = {
   PATROL: 'patrol',
@@ -111,6 +111,7 @@ export class Bot extends Character {
 
   spawnAt(x, y, z, yaw) {
     this.primary = Math.random() < 0.7 ? this.pers.favorite : rollPrimary();
+    this.tacId = TACTICALS[(Math.random() * TACTICALS.length) | 0];
     super.spawnAt(x, y, z, yaw);
     this.resetAI();
     this.lastStuckPos.copy(this.pos);
@@ -166,6 +167,7 @@ export class Bot extends Character {
 
   canSee(c, m) {
     const w = this.game.world;
+    if (this.isBlind()) return false; // flashbanged
     const dx = c.pos.x - this.pos.x, dz = c.pos.z - this.pos.z;
     const dy = c.pos.y - this.pos.y;
     const d2 = dx * dx + dy * dy + dz * dz;
@@ -177,8 +179,10 @@ export class Bot extends Character {
       if (dot < (m.visible ? 0.2 : 0.46)) return false;
     }
     c.getEye(_e2); // a leaning head pokes out from cover
-    if (!w.segmentBlocked(_eye.x, _eye.y, _eye.z, _e2.x, _e2.y, _e2.z)) return true;
-    return !w.segmentBlocked(_eye.x, _eye.y, _eye.z, c.pos.x, c.pos.y + c.height * 0.5, c.pos.z);
+    const sm = this.game.smokes;
+    if (!w.segmentBlocked(_eye.x, _eye.y, _eye.z, _e2.x, _e2.y, _e2.z) && !sm.blocks(_eye.x, _eye.y, _eye.z, _e2.x, _e2.y, _e2.z)) return true;
+    const by = c.pos.y + c.height * 0.5;
+    return !w.segmentBlocked(_eye.x, _eye.y, _eye.z, c.pos.x, by, c.pos.z) && !sm.blocks(_eye.x, _eye.y, _eye.z, c.pos.x, by, c.pos.z);
   }
 
   think() {
@@ -306,7 +310,11 @@ export class Bot extends Character {
         const m = this.memOf(e);
         // head for where they were going, not just where they were
         _t.copy(m.lastPos).addScaledVector(m.lastVel, 0.6);
-        if (Math.random() < 0.5 * this.pers.aggression) this.tryGrenadeAt(m.lastPos.x, m.lastPos.y, m.lastPos.z); // flush them out
+        if (Math.random() < 0.5 * this.pers.aggression) {
+          // flush them out (a flashbang first, if that's what we carry)
+          const def = this.tacDef === FLASH && this.tactical > 0 && Math.random() < 0.6 ? FLASH : GRENADE;
+          this.tryGrenadeAt(m.lastPos.x, m.lastPos.y, m.lastPos.z, def);
+        }
         const hz = this.game.hillZone();
         if (hz && Math.hypot(m.lastPos.x - hz[0], m.lastPos.z - hz[2]) > hz[3] + 6) { this.enterHill(); return; }
         this.enterChase(_t, e, 'enemy');
@@ -452,6 +460,12 @@ export class Bot extends Character {
   /** Low on health: run for a health pack, or failing that, break line of sight. */
   enterRetreat(threat) {
     const g = this.game, nav = g.nav, now = g.time;
+    // cover the escape with smoke, between us and them
+    if (this.tacDef === SMOKE && this.tactical > 0 && Math.random() < 0.75) {
+      const dx = threat.pos.x - this.pos.x, dz = threat.pos.z - this.pos.z, l = Math.hypot(dx, dz) || 1;
+      const k = Math.min(5, l * 0.4);
+      this.tryGrenadeAt(this.pos.x + (dx / l) * k, this.pos.y, this.pos.z + (dz / l) * k, SMOKE);
+    }
     const avoid = { x: threat.pos.x, z: threat.pos.z, r: 12, w: 6 };
     let best = null, bestCost = Infinity;
     for (const p of g.pickups) {
@@ -800,7 +814,7 @@ export class Bot extends Character {
     // a live grenade nearby trumps everything: get away from it
     let flee = false;
     for (const gr of g.grenades) {
-      if (gr.fuse > 1.7) continue; // takes a moment to notice it
+      if (gr.def !== GRENADE || gr.fuse > 1.7) continue; // takes a moment to notice it; only frags hurt
       const dx = this.pos.x - gr.x, dz = this.pos.z - gr.z;
       const d2 = dx * dx + dz * dz;
       if (d2 > 56 || Math.abs(this.pos.y - gr.y) > 3) continue;
@@ -810,7 +824,8 @@ export class Bot extends Character {
       flee = true;
       break;
     }
-    const maxSp = Math.max(this.wishSpeed, pushed ? 2.5 : 0, flee ? CFG.botSprint : 0);
+    let maxSp = Math.max(this.wishSpeed, pushed ? 2.5 : 0, flee ? CFG.botSprint : 0);
+    if (this.isBlind() && !flee) maxSp *= 0.45; // blinded: feeling their way
     const wl = Math.hypot(wx, wz);
     if (wl > maxSp && wl > 0) { wx *= maxSp / wl; wz *= maxSp / wl; }
 
@@ -966,22 +981,28 @@ export class Bot extends Character {
   }
 
   /** Lob a grenade at a spot, if the throw is makeable. */
-  tryGrenadeAt(x, y, z) {
+  tryGrenadeAt(x, y, z, def = GRENADE) {
     const g = this.game;
-    if (this.grenades <= 0 || this.grenadeT > 0 || g.time < this.nextGrenadeT) return false;
+    if (this.nadesOf(def) <= 0 || this.grenadeT > 0 || this.isBlind()) return false;
+    if (def !== SMOKE && g.time < this.nextGrenadeT) return false;
     this.getEye(_eye);
     const dx = x - _eye.x, dz = z - _eye.z, dy = y + 0.3 - _eye.y;
     const dh = Math.hypot(dx, dz);
-    if (dh < 8 || dh > 26) return false; // too close hurts us, too far won't reach
-    const v = GRENADE.speed, gr = GRENADE.gravity;
+    const minD = def === GRENADE ? 8 : def === FLASH ? 7 : 1.5; // a frag too close hurts us; a flash would blind us
+    if (dh < minD || dh > 26) return false; // too far won't reach
+    const v = def.speed, gr = def.gravity;
     const disc = v * v * v * v - gr * (gr * dh * dh + 2 * dy * v * v);
     if (disc < 0) return false;
     const ang = Math.atan2(v * v - Math.sqrt(disc), gr * dh); // the flatter of the two arcs
     const c = Math.cos(ang);
     _d.set((dx / dh) * c, Math.sin(ang), (dz / dh) * c);
     if (g.world.raycast(_eye.x, _eye.y, _eye.z, _d.x, _d.y, _d.z, 3.5, null)) return false; // wall in the way
-    this.nextGrenadeT = g.time + rand(5, 10);
-    return this.throwGrenade(_d);
+    if (g.world.raycast(_eye.x, _eye.y, _eye.z, _d.x, _d.y, _d.z, Math.min(3.5, dh), null) && def === SMOKE) return false;
+    if (def !== SMOKE) this.nextGrenadeT = g.time + rand(5, 10);
+    // a flashbang is thrown so it pops near them, not after rolling past
+    const fuse = def === FLASH ? Math.min(def.fuse, dh / (v * Math.cos(Math.atan2(_d.y, Math.hypot(_d.x, _d.z)))) + 0.25) : def.fuse;
+    if (!this.throwGrenade(_d, def, fuse)) return false;
+    return true;
   }
 
   updateCombat(dt) {
@@ -1004,7 +1025,8 @@ export class Bot extends Character {
         const cone = w.def.pellets > 1 ? 0 : this.currentSpread(ads) * d;
         // a settled fight at mid range is a good moment for a grenade
         if (d > 9 && d < 24 && this.trackTime > 0.8 && Math.random() < dt * 0.6 * this.pers.aggression) {
-          this.tryGrenadeAt(t.pos.x + t.vel.x * 0.8, t.pos.y, t.pos.z + t.vel.z * 0.8);
+          const def = this.tacDef === FLASH && this.tactical > 0 && Math.random() < 0.4 ? FLASH : GRENADE;
+          this.tryGrenadeAt(t.pos.x + t.vel.x * 0.8, t.pos.y, t.pos.z + t.vel.z * 0.8, def);
         }
         if (this.aimOff < tol && d < w.def.botMaxRange * 1.4 && cone < 0.95) {
           if (w.def.auto) {
@@ -1044,6 +1066,17 @@ export class Bot extends Character {
   // ======================================================================
 
   onFired() { this.model.muzzleFlash(); }
+
+  /** Hit by a flashbang: can't see anything, stumbles around, fires blind at the last spot. */
+  flashed(dur) {
+    this.blindUntil = Math.max(this.blindUntil, this.game.time + dur);
+    if (this.target) {
+      const m = this.memOf(this.target);
+      m.visible = false;
+    }
+    this.target = null;
+    this.reactT = Math.max(this.reactT, dur * 0.5);
+  }
   onKnife() { this.model.melee(); }
 
   onReload(w) { this.game.audio.play('reload', this.pos, 0.6, w.def.reload); }

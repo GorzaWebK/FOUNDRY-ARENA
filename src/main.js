@@ -5,7 +5,7 @@ import { MAPS, getMap } from './maps/index.js';
 import { MODES, getMode } from './modes.js';
 import RANGE_MAP from './maps/range.js';
 import { TRAINING } from './training.js';
-import { WEAPON_BY_ID, PRIMARIES } from './weapons.js';
+import { WEAPON_BY_ID, PRIMARIES, TACTICALS, TACTICAL_BY_ID } from './weapons.js';
 import { loadSettings, saveSettings, buildSettingsUI } from './settings.js';
 import { AudioSys } from './audio.js';
 import { Hud } from './hud.js';
@@ -50,6 +50,7 @@ const net = new Net(game, {
     startAttract();
     setMpStatus(reason, true);
   },
+  onVotes: () => renderVote(),
   onMatchStart: () => {
     setState('playing');
     hud.setLockHint(!input.locked);
@@ -162,11 +163,38 @@ function buildLoadoutUI(container) {
     loadoutButtons.push([id, b]);
   }
 }
+const tacButtons = [];
+function buildTacUI(container) {
+  for (const id of TACTICALS) {
+    const def = TACTICAL_BY_ID[id];
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = def.name;
+    b.title = def.blurb;
+    b.addEventListener('click', () => {
+      settings.tactical = id;
+      saveSettings(settings);
+      syncLoadout();
+      if (state === 'paused') $('pause-hint').textContent = `${def.name} selected — you'll have it when you next respawn.`;
+    });
+    container.append(b);
+    tacButtons.push([id, b]);
+  }
+}
 function syncLoadout() {
   for (const [id, b] of loadoutButtons) b.classList.toggle('on', id === settings.primary);
+  for (const [id, b] of tacButtons) b.classList.toggle('on', id === settings.tactical);
 }
 buildLoadoutUI($('menu-loadout'));
 buildLoadoutUI($('pause-loadout'));
+{
+  // main menu: the flashbang / smoke pick sits in the spare grid cell beside the LMG
+  const cell = document.createElement('div');
+  cell.className = 'tac-cell';
+  $('menu-loadout').append(cell);
+  buildTacUI(cell);
+}
+buildTacUI($('pause-tac'));
 syncLoadout();
 
 // ---------------------------------------------------------------- multiplayer lobby UI
@@ -212,6 +240,7 @@ function updateRoomUi() {
   $('btn-restart').textContent = training ? 'Restart range' : 'Restart match';
   $('btn-quit').textContent = on ? (net.role === 'host' ? 'Close room' : 'Leave game') : 'Main menu';
   $('btn-again').classList.toggle('hidden', net.role === 'client');
+  $('btn-again').textContent = net.role === 'host' ? 'START NEXT MATCH' : 'PLAY AGAIN';
   $('btn-menu').textContent = on ? (net.role === 'host' ? 'Close room' : 'Leave game') : 'Main menu';
   $('end-wait').classList.toggle('hidden', net.role !== 'client');
   hud.chatHint(on && state === 'playing' && !chatting);
@@ -379,7 +408,8 @@ function renderKeysList() {
     `${k('jump')} jump · ${k('sprint')} sprint`,
     `${k('crouch')} crouch · while sprinting: slide`,
     `${k('leanLeft')} lean left · ${k('leanRight')} lean right`,
-    `${k('grenade')} grenade · ${k('knife')} knife · ${k('reload')} reload · ${k('inspect')} inspect`,
+    `${k('grenade')} grenade (hold to cook) · ${k('tactical')} flash / smoke`,
+    `${k('knife')} knife · ${k('reload')} reload · ${k('inspect')} inspect`,
     `${k('primary')} primary · ${k('pistol')} pistol · <kbd>Wheel</kbd> swap`,
     `${k('chat')} chat (multiplayer)`,
     `${k('scoreboard')} scoreboard · <kbd>Esc</kbd> / ${k('pause')} pause`,
@@ -471,7 +501,7 @@ hud.setBindHints(label);
 $('btn-play').addEventListener('click', startMatch);
 $('btn-host').addEventListener('click', hostGame);
 $('btn-join').addEventListener('click', joinGame);
-$('btn-again').addEventListener('click', startMatch);
+$('btn-again').addEventListener('click', startNext);
 $('btn-resume').addEventListener('click', resume);
 $('btn-restart').addEventListener('click', restart);
 $('btn-train').addEventListener('click', startTraining);
@@ -526,11 +556,102 @@ game.onMatchEnd = () => {
   $('end-title').style.color = res.draw ? '#ffd24d' : won ? '#5dff9a' : '#ff6b6b';
   $('end-sub').textContent = `${game.rules.name}: ${res.sub}`;
   hud.renderScores(game, $('end-body'));
+  renderAwards();
+  renderVote();
   setState('ended');
   audio.muted = false;
   audio.play(won ? 'win' : 'lose');
   input.exitLock();
 };
+
+// ---------------------------------------------------------------- awards + next-match vote
+const hexCol = (c) => '#' + (c >>> 0).toString(16).padStart(6, '0').slice(-6);
+
+function renderAwards() {
+  const box = $('end-awards');
+  box.textContent = '';
+  const list = game.awards || [];
+  if (!list.length) {
+    const p = document.createElement('div');
+    p.className = 'none';
+    p.textContent = 'No awards this time.';
+    box.append(p);
+    return;
+  }
+  for (const [title, name, color, detail] of list) {
+    const d = document.createElement('div');
+    d.className = 'award';
+    const t = document.createElement('div'); t.className = 't'; t.textContent = title;
+    const n = document.createElement('div'); n.className = 'n'; n.textContent = name; n.style.color = hexCol(color);
+    const s = document.createElement('div'); s.className = 'd'; s.textContent = detail;
+    d.append(t, n, s);
+    box.append(d);
+  }
+}
+
+function voteCounts() {
+  return net.role === 'client' ? game.voteCounts || [] : game.voteTally();
+}
+
+function renderVote() {
+  const box = $('vote-opts');
+  const opts = game.voteOptions || [];
+  box.textContent = '';
+  const mine = game.votes.get(game.player.id);
+  const counts = voteCounts();
+  const top = Math.max(0, ...counts);
+  opts.forEach(([mapId, modeId], i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = getMap(mapId).name;
+    const sm = document.createElement('small');
+    sm.textContent = getMode(modeId).name;
+    b.append(sm);
+    if (net.active) {
+      const c = document.createElement('b');
+      c.textContent = counts[i] || 0;
+      b.append(c);
+    }
+    b.classList.toggle('mine', mine === i);
+    b.classList.toggle('lead', top > 0 && counts[i] === top);
+    b.title = getMode(modeId).blurb || '';
+    b.addEventListener('click', () => {
+      audio.play('ui');
+      if (net.active) net.vote(i);
+      else game.votes.set(game.player.id, i);
+      renderVote();
+    });
+    box.append(b);
+  });
+  $('vote-title').textContent = net.active ? '— everyone votes' : '— pick one';
+  updateVoteNote();
+}
+
+function updateVoteNote() {
+  const el = $('vote-note');
+  if (!game.voteOptions || !game.voteOptions.length) { el.textContent = ''; return; }
+  if (net.active && game.voteDeadline) {
+    const left = Math.max(0, Math.ceil((game.voteDeadline - performance.now()) / 1000));
+    const txt = `Starts in ${left}s${net.role === 'host' ? ' — or press Start next match' : ''}. Most votes wins.`;
+    if (el.textContent !== txt) el.textContent = txt;
+  } else if (!net.active) {
+    el.textContent = 'Then press Play again.';
+  }
+}
+
+/** Play again (solo) / start the next match (host), with whatever won the vote. */
+function startNext() {
+  if (net.role === 'client') return;
+  const i = game.over ? game.voteWinner() : -1;
+  const o = i >= 0 && game.voteOptions ? game.voteOptions[i] : null;
+  if (o) {
+    settings.map = o[0];
+    settings.mode = o[1];
+    saveSettings(settings);
+    syncMatchPickers();
+  }
+  startMatch();
+}
 
 // ---------------------------------------------------------------- main loop
 function tick(dt, render) {
@@ -541,6 +662,11 @@ function tick(dt, render) {
     game.update(dt);
   }
   net.update(dt);
+  if (state === 'ended') {
+    updateVoteNote();
+    // multiplayer: when the vote timer runs out, the host starts the winner
+    if (net.role === 'host' && game.voteDeadline && performance.now() >= game.voteDeadline) { game.voteDeadline = 0; startNext(); }
+  }
   if (render) game.render();
   input.endFrame();
 }

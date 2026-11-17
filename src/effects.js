@@ -209,13 +209,36 @@ export class Effects {
     this.glow(x, y + 0.4, z, 9, 0xffc070);
     this.glows[(this.gNext + this.glows.length - 1) % this.glows.length].life = 0.16;
     this.flash.position.set(x, y + 0.6, z);
+    this.flash.color.set(0xffc46b);
     this.flash.intensity = 160;
     this.flashT = 0.12;
     if (groundY !== undefined) this.decal(x, groundY, z, 0, 1, 0, 3.2);
   }
 
+  /** Flashbang: a white burst and a blinding light, no fire. */
+  flashBang(x, y, z) {
+    for (let i = 0; i < 30; i++) {
+      const a = Math.random() * Math.PI * 2, up = Math.random();
+      const sp = 3 + Math.random() * 9;
+      this._spawn(x, y + 0.1, z, Math.cos(a) * sp * (1 - up * 0.5), 1 + up * sp * 0.7, Math.sin(a) * sp * (1 - up * 0.5),
+        0.15 + Math.random() * 0.3, 0.04 + Math.random() * 0.05, i % 2 ? 0xffffff : 0xe8f4ff, 0.8);
+    }
+    for (let i = 0; i < 10; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 0.4 + Math.random() * 1.5;
+      this._spawn(x, y + 0.2, z, Math.cos(a) * sp, 0.8 + Math.random() * 1.4, Math.sin(a) * sp,
+        0.8 + Math.random() * 0.6, 0.14 + Math.random() * 0.12, 0x9a9a9a, -0.04);
+    }
+    this.glow(x, y + 0.3, z, 12, 0xffffff);
+    this.glows[(this.gNext + this.glows.length - 1) % this.glows.length].life = 0.2;
+    this.flash.position.set(x, y + 0.5, z);
+    this.flash.color.set(0xeef6ff);
+    this.flash.intensity = 260;
+    this.flashT = 0.16;
+  }
+
   muzzleLight(x, y, z) {
     this.flash.position.set(x, y, z);
+    this.flash.color.set(0xffc46b);
     this.flash.intensity = 40;
     this.flashT = 0.05;
   }

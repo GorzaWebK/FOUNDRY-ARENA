@@ -120,6 +120,7 @@ export class Pickup {
       case 'crate':
         prim.reserve = prim.def.reserveMax;
         c.grenades = GRENADE.max;
+        if (c.tacDef) c.tactical = c.tacDef.max;
         break;
       default: break;
     }

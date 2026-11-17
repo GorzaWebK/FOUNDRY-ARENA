@@ -347,6 +347,10 @@ export class ViewModel {
       this.knife.visible = false;
     }
 
+    // a grenade in the off hand (pin pulled): the gun waits low
+    this.cookAmt = (this.cookAmt || 0) + ((s.cooking ? 1 : 0) - (this.cookAmt || 0)) * Math.min(1, dt * 12);
+    if (this.cookAmt > 0.001) { p.y -= this.cookAmt * 0.14; rx -= this.cookAmt * 0.45; }
+
     // grenade throw: dip down and back up
     if (this.throwT > 0) {
       this.throwT -= dt;

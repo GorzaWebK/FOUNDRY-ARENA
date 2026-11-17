@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { CFG } from './config.js';
-import { makeLoadout, SWITCH_TIME, GRENADE, KNIFE, DEFAULT_PRIMARY } from './weapons.js';
+import { makeLoadout, SWITCH_TIME, GRENADE, KNIFE, DEFAULT_PRIMARY, DEFAULT_TACTICAL, TACTICAL_BY_ID } from './weapons.js';
 import { gunLevel } from './modes.js';
 import { hasHeadroom } from './physics.js';
 
@@ -53,6 +53,11 @@ export class Character {
     this.weaponIdx = 0;
     this.switchT = 0;
     this.grenades = GRENADE.start;
+    this.tacId = DEFAULT_TACTICAL; // loadout choice: flashbang or smoke
+    this.tacDef = TACTICAL_BY_ID[this.tacId];
+    this.tactical = this.tacDef.start;
+    this.cook = null; // { def, t }: a grenade in hand with its pin pulled
+    this.blindUntil = 0; // flashbanged until this game time
     this.grenadeT = 0; // throw cooldown
     this.knifeT = 0; // knife cooldown
     this.meleeT = 0; // swing in progress: can't shoot
@@ -110,6 +115,10 @@ export class Character {
     this.weaponIdx = 0;
     this.switchT = 0;
     this.grenades = GRENADE.start;
+    this.tacDef = TACTICAL_BY_ID[this.tacId] || TACTICAL_BY_ID[DEFAULT_TACTICAL];
+    this.tactical = this.tacDef.start;
+    this.cook = null;
+    this.blindUntil = 0;
     this.grenadeT = 0;
     this.knifeT = 0;
     this.meleeT = 0;
@@ -219,7 +228,7 @@ export class Character {
    */
   tryFire(held, pressed, ads = 0) {
     const w = this.weapon;
-    if (!held || this.switchT > 0 || w.reloadT > 0 || w.cooldown > 0 || this.meleeT > 0) return false;
+    if (!held || this.switchT > 0 || w.reloadT > 0 || w.cooldown > 0 || this.meleeT > 0 || this.cook) return false;
     if (!w.def.auto && !pressed) return false;
     if (w.mag <= 0) {
       if (pressed) this.onDryFire();
@@ -236,7 +245,7 @@ export class Character {
 
   /** Quick knife attack. Cancels a reload; the gun is back in your hands right after. */
   knife() {
-    if (!this.alive || this.knifeT > 0) return false;
+    if (!this.alive || this.knifeT > 0 || this.cook) return false;
     this.knifeT = KNIFE.cooldown;
     this.meleeT = KNIFE.busy;
     this.weapon.reloadT = 0;
@@ -246,15 +255,26 @@ export class Character {
     return true;
   }
 
-  /** Throw a grenade along the aim direction (or `dir`, if given). */
-  throwGrenade(dir = null) {
-    if (!this.alive || this.grenades <= 0 || this.grenadeT > 0) return false;
-    this.grenades--;
-    this.grenadeT = GRENADE.cooldown;
-    this.game.throwGrenade(this, dir);
-    this.onThrow();
+  /** How many of this kind of grenade are left. */
+  nadesOf(def) { return def === GRENADE ? this.grenades : def === this.tacDef ? this.tactical : 0; }
+
+  /**
+   * Throw a grenade along the aim direction (or `dir`, if given). `fuse` is what's
+   * left of it (less when cooked); `drop` lets go of it instead of throwing.
+   */
+  throwGrenade(dir = null, def = GRENADE, fuse = def.fuse, drop = false) {
+    if (!this.alive && !drop) return false;
+    if (this.nadesOf(def) <= 0 || (this.grenadeT > 0 && !drop)) return false;
+    if (def === GRENADE) this.grenades--;
+    else this.tactical--;
+    this.grenadeT = def.cooldown;
+    this.protectedUntil = 0;
+    this.game.throwGrenade(this, dir, def, fuse, drop);
+    if (!drop) this.onThrow();
     return true;
   }
+
+  isBlind() { return this.game.time < this.blindUntil; }
 
   // hooks
   onKnife() {}

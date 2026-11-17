@@ -24,6 +24,8 @@ export class Hud {
       death: $('death'), deathName: $('death-name'), deathCount: $('death-count'),
       sb: $('scoreboard'), sbBody: $('sb-body'), fps: $('fps'), lockHint: $('lock-hint'),
       slotPrim: $('slot-prim'), nade: $('slot-nade'), nadeCount: $('nade-count'), scope: $('scope'),
+      tac: $('slot-tac'), tacName: $('tac-name'), tacCount: $('tac-count'),
+      flash: $('flashbang'), haze: $('smokehaze'), cook: $('cook'), cookArc: $('cook-arc'), cookT: $('cook-t'),
       chat: $('chat'), chatLog: $('chat-log'), chatHint: $('chat-hint'),
       hillStatus: $('hill-status'), hillMarker: $('hill-marker'),
       youLabel: $('tb-youlabel'), announce: $('announce'), anMain: $('an-main'), anSub: $('an-sub'),
@@ -42,6 +44,7 @@ export class Hud {
     this.sbVisible = false;
     this.sbTimer = 0;
     this.fpsAcc = 0; this.fpsN = 0;
+    this.flashT = 0; this.flashDur = 1; this.flashPeak = 1;
   }
 
   show(v) { this.root.classList.toggle('hidden', !v); }
@@ -54,6 +57,8 @@ export class Hud {
     for (const a of this.arcs) a.el.remove();
     this.arcs.length = 0;
     this.hitT = this.vigT = this.toastT = this.cmT = 0;
+    this.flashT = 0;
+    this.el.flash.style.opacity = 0;
     this.el.toast.style.opacity = 0;
     this.el.cm.style.opacity = 0;
     this.el.hit.style.opacity = 0;
@@ -93,6 +98,30 @@ export class Hud {
     }
     this._set('prim', p.weapons[0].def.name, (v) => { e.slotPrim.textContent = v; });
     this._set('nades', p.grenades, (v) => { e.nadeCount.textContent = v; e.nade.classList.toggle('empty', v === 0); });
+    this._set('tacN', p.tacDef.short, (v) => { e.tacName.textContent = v; });
+    this._set('tacs', p.tactical, (v) => { e.tacCount.textContent = v; e.tac.classList.toggle('empty', v === 0); });
+
+    // a cooking grenade: ring + seconds left on the fuse
+    const ck = p.alive && p.cook;
+    this._set('cookOn', !!ck, (v) => e.cook.classList.toggle('hidden', !v));
+    if (ck) {
+      const left = Math.max(0, ck.def.fuse - ck.t);
+      this._set('cookT', left.toFixed(1), (v) => { e.cookT.textContent = v; });
+      this._set('cookA', Math.round((1 - left / ck.def.fuse) * 100), (v) => { e.cookArc.style.strokeDashoffset = (v / 100) * 100.5; });
+      this._set('cookHot', left < 0.8, (v) => e.cook.classList.toggle('hot', v));
+    }
+
+    // flashbanged: a white-out that holds, then fades
+    if (this.flashT > 0) {
+      this.flashT -= dt;
+      const f = Math.max(0, Math.min(1, this.flashT / (this.flashDur * 0.55)));
+      e.flash.style.opacity = (f * this.flashPeak).toFixed(3);
+      if (this.flashT <= 0) e.flash.style.opacity = 0;
+    }
+    // standing in smoke
+    const cam = game.camera.position;
+    const haze = game.smokes.density(cam.x, cam.y, cam.z);
+    this._set('haze', Math.round(haze * 40), (v) => { e.haze.style.opacity = (v / 40) * 0.88; });
     this._set('scope', p.alive && p.scoped, (v) => e.scope.classList.toggle('hidden', !v));
     this._set('knife', p.knifeT > 0, (v) => { $('slot-knife').classList.toggle('empty', v); });
 
@@ -134,7 +163,19 @@ export class Hud {
 
     // death overlay
     const kc = game.killcam.active;
-    this._set('dead', !p.alive && !kc, (v) => e.death.classList.toggle('hidden', !v));
+    const spec = !p.alive && !kc && game.isOut(p) && (p.specTarget || p.specOverhead);
+    this._set('dead', !p.alive && !kc && !spec, (v) => e.death.classList.toggle('hidden', !v));
+    this._set('spec', !!spec, (v) => { $('spectate').classList.toggle('hidden', !v); this.root.classList.toggle('spectating', v); });
+    if (spec) {
+      const t = p.specTarget;
+      const who = t ? `${t.id}|${t.name}|${t.color}|${Math.max(0, Math.ceil(t.health))}|${t.lives}` : 'overhead';
+      this._set('specWho', who, () => {
+        $('spec-who').innerHTML = t
+          ? `Spectating <b style="color:${hex(t.color)}">${esc(t.name)}</b><small>${Math.max(0, Math.ceil(t.health))} HP · ${t.lives} ${t.lives === 1 ? 'life' : 'lives'}</small>`
+          : 'Overhead view';
+      });
+      this._set('specKeys', this.specKeys, (v) => { $('spec-keys').textContent = v; });
+    }
     this._set('kc', kc, (v) => $('killcam').classList.toggle('hidden', !v));
     if (kc) {
       this._set('kcWho', game.killcam.killerName, (v) => { $('kc-who').innerHTML = `Watching <b style="color:${hex(game.killcam.killerColor)}">${esc(v)}</b>`; });
@@ -233,6 +274,15 @@ export class Hud {
     this.hitT = kill ? 0.3 : 0.18;
   }
 
+  /** Flashbanged: `amount` 0..1, for `dur` seconds. */
+  flashed(amount, dur) {
+    if (this.flashT > 0 && this.flashT > dur) return;
+    this.flashT = dur;
+    this.flashDur = dur;
+    this.flashPeak = Math.min(1, 0.45 + amount * 0.7);
+    this.el.flash.style.opacity = this.flashPeak;
+  }
+
   damageFrom(attacker, amount) {
     this.vigT = Math.min(0.7, 0.3 + amount / 60);
     this.el.vig.style.opacity = 1;
@@ -262,10 +312,12 @@ export class Hud {
   /** Show the player's own key bindings in HUD hints. */
   setBindHints(label) {
     this.reloadKey = label('reload').toUpperCase();
+    this.specKeys = `Out of lives · ${label('fire')}: next player · ${label('aim')}: previous · ${label('jump')}: overhead view`;
     const b = (sel) => document.querySelector(sel);
     b('#slots .slot[data-i="0"] b').textContent = label('primary');
     b('#slots .slot[data-i="1"] b').textContent = label('pistol');
     b('#slot-nade b').textContent = label('grenade');
+    b('#slot-tac b').textContent = label('tactical');
     b('#slot-knife b').textContent = label('knife');
     this.el.chatHint.textContent = `${label('chat')} to chat`;
     this.cache.rl = null;
