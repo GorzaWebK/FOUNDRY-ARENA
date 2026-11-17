@@ -27,6 +27,7 @@ export const DEFAULTS = {
   leanToggle: true, // tap Q / E to lean instead of holding
   rules: { limits: {}, time: 0, ff: false, pickups: true, hardcore: false }, // custom match rules (limits per mode)
   skins: {}, // weapon id -> skin id (only used once unlocked)
+  team: 'auto', // team modes: 'auto' | 'cobalt' | 'crimson'
   // crosshair
   xhColor: '#ffffff',
   xhLen: 9, // line length, px (0 = dot only)
@@ -53,6 +54,7 @@ export function loadSettings() {
   if (!['high', 'low'].includes(s.quality)) s.quality = 'high';
   if (!isPrimary(s.primary)) s.primary = DEFAULT_PRIMARY;
   if (!isTactical(s.tactical)) s.tactical = DEFAULT_TACTICAL;
+  if (!['auto', 'cobalt', 'crimson'].includes(s.team)) s.team = 'auto';
   if (!MAPS.some((m) => m.id === s.map)) s.map = DEFAULT_MAP;
   if (!MODES.some((m) => m.id === s.mode)) s.mode = DEFAULT_MODE;
   s.binds = cleanBinds(s.binds);

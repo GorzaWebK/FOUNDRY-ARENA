@@ -145,7 +145,7 @@ export class Net {
         this._begin(m);
         resolve();
       };
-      conn.send({ t: 'hello', name: cleanName(name), v: this.version, vt: this.versionTime, pid: this.pid, cos: this._myCos() });
+      conn.send({ t: 'hello', name: cleanName(name), v: this.version, vt: this.versionTime, pid: this.pid, cos: this._myCos(), tp: this.game.player.teamPref });
     });
   }
 
@@ -294,6 +294,7 @@ export class Net {
     const c = new NetChar(g, this.nextId++, name, saved && !used.has(saved.color) ? saved.color : color, false);
     c.conn = conn;
     c.pid = pid;
+    c.teamPref = m.tp === 0 || m.tp === 1 ? m.tp : -1;
     c.setCosmetics(unpackCosmetics(m.cos));
     c.lastSeen = now;
     c.alive = false;
@@ -353,6 +354,14 @@ export class Net {
     return packCosmetics(cos.equipped, cos.level, cos.prestige);
   }
 
+  /** Ask to switch team (client), or switch (host). */
+  requestTeam(t) {
+    const g = this.game;
+    g.player.teamPref = t;
+    if (this.role === 'host') g.switchTeam(g.player, t);
+    else if (this.conn) this.conn.send({ t: 'team', tm: t });
+  }
+
   /** Our cosmetics or level changed: let everyone know. */
   cosmeticsChanged() {
     const g = this.game;
@@ -362,6 +371,7 @@ export class Net {
   }
 
   _hostMsg(c, m) {
+    const g0 = this.game;
     c.lastSeen = performance.now();
     if (m.t === 'u') this._hostState(c, m.d);
     else if (m.t === 'f') this._hostFire(c, m);
@@ -369,6 +379,10 @@ export class Net {
     else if (m.t === 'k') this._hostKnife(c, m);
     else if (m.t === 'vote') this._vote(c.id, m.i);
     else if (m.t === 'bye') c.leftOnPurpose = true;
+    else if (m.t === 'team') {
+      const now = performance.now();
+      if ((m.tm === 0 || m.tm === 1) && now - (c.lastTeamT || 0) > 1000) { c.lastTeamT = now; g0.switchTeam(c, m.tm); }
+    }
     else if (m.t === 'cos') {
       const now = performance.now();
       if (now - (c.lastCosT || 0) < 300) return;

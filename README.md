@@ -59,6 +59,11 @@ The pause menu's **Next match** section changes mode and map between matches.
 
 Every mode has a 10 minute clock; when it runs out the mode's best score wins.
 
+In team modes, **Team** on the main menu picks Cobalt, Crimson or Auto, and the
+pause menu's **Switch team** button moves you mid-match (you respawn on your new
+side). Bots fill in around the players and move across to keep the teams even,
+so you and a friend can both pick the same side and take on the bots together.
+
 **Rules…** (next to the mode, on the main menu and in the pause menu's Next match
 section) customises the next match: the score limit (kills, points or lives,
 depending on the mode), the time limit (5–30 minutes), friendly fire in team

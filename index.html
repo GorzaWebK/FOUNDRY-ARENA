@@ -102,6 +102,7 @@
             <div class="mode-line"><p id="mode-blurb" class="note"></p><button id="btn-rules" class="small-btn">Rules…</button></div>
             <label class="row"><span>Map</span><select id="set-map"></select><output></output></label>
             <label class="row"><span>Bots</span><input type="checkbox" id="set-bots-on" /><output></output></label>
+            <label class="row" id="row-team"><span>Team</span><select id="set-team"><option value="auto">Auto</option><option value="cobalt">Cobalt</option><option value="crimson">Crimson</option></select><output></output></label>
             <label class="row" id="row-botcount"><span>Bot count</span><input type="range" id="set-bots" min="1" max="10" step="1" /><output id="out-bots"></output></label>
             <label class="row"><span>Difficulty</span>
               <select id="set-diff"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select><output></output>
@@ -189,6 +190,7 @@
         <button id="btn-controls-pause" class="small-btn">Change controls…</button>
         <div class="btn-row">
           <button id="btn-range-reset" class="hidden">Reset stats</button>
+          <button id="btn-switch-team" class="hidden">Switch team</button>
           <button id="btn-bots">Bots: On</button>
           <button id="btn-restart">Restart match</button>
           <button id="btn-quit">Main menu</button>

@@ -12,7 +12,7 @@ import '@fontsource/barlow/latin-700.css';
 import '@fontsource/saira-stencil-one/latin-400.css';
 import './style.css';
 import { MAPS, getMap } from './maps/index.js';
-import { MODES, getMode, makeRules, customSummary, TIME_OPTIONS, HARDCORE_HEALTH } from './modes.js';
+import { MODES, getMode, makeRules, customSummary, TIME_OPTIONS, HARDCORE_HEALTH, TEAM_NAMES } from './modes.js';
 import RANGE_MAP from './maps/range.js';
 import { TRAINING } from './training.js';
 import { WEAPON_BY_ID, PRIMARIES, TACTICALS, TACTICAL_BY_ID, WEAPONS as WEAPON_LIST } from './weapons.js';
@@ -120,10 +120,15 @@ function customFor(id) {
 /** The rules the next match will use. */
 function nextRules() { return makeRules(settings.mode, customFor(settings.mode)); }
 
+const TEAM_PREF = { auto: -1, cobalt: 0, crimson: 1 };
 function syncMatchPickers() {
   for (const s of mapSels) s.value = settings.map;
   for (const s of modeSels) s.value = settings.mode;
   const r = nextRules();
+  // team choice only matters in team modes
+  $('row-team').classList.toggle('hidden', !r.teams);
+  $('set-team').value = settings.team;
+  game.player.teamPref = TEAM_PREF[settings.team];
   const sum = customSummary(r);
   for (const id of ['mode-blurb', 'pause-mode-blurb']) {
     const el = $(id);
@@ -450,8 +455,34 @@ function pause() {
   $('loadout-note').textContent = r.gunGame ? 'Gun Game hands out the guns. Your pick waits for the next mode.'
     : r.forcePrimary ? 'Snipers Only: everyone carries a sniper rifle.' : '';
   syncMatchPickers();
+  syncSwitchTeam();
   setState('paused');
 }
+
+/** Pause menu: "Switch to Crimson / Cobalt" in team modes. */
+function syncSwitchTeam() {
+  const r = game.rules, b = $('btn-switch-team');
+  const show = !!r.teams && !r.training && !game.over && !game.attract;
+  b.classList.toggle('hidden', !show);
+  if (show) b.textContent = `Switch to ${TEAM_NAMES[1 - Math.max(0, game.player.team)]}`;
+}
+$('btn-switch-team').addEventListener('click', () => {
+  const t = 1 - Math.max(0, game.player.team);
+  settings.team = t === 0 ? 'cobalt' : 'crimson';
+  saveSettings(settings);
+  if (net.role === 'client') net.requestTeam(t);
+  else if (net.role === 'host') net.requestTeam(t);
+  else game.switchTeam(game.player, t);
+  game.player.teamPref = t;
+  syncMatchPickers();
+  setTimeout(syncSwitchTeam, 400); // a client hears back from the host first
+  resume();
+});
+$('set-team').addEventListener('change', () => {
+  settings.team = $('set-team').value;
+  saveSettings(settings);
+  syncMatchPickers();
+});
 
 async function resume() {
   if (state !== 'paused') return;

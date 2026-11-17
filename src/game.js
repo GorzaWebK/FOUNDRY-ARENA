@@ -415,15 +415,62 @@ export class Game {
     if (c.model) c.model.setColor(color, c.name);
   }
 
-  /** Split everyone into alternating teams (humans first, so they spread out too). */
+  /**
+   * Split everyone into teams: players who picked a team get it, other players
+   * are spread across both, and bots fill in so the sides come out even.
+   */
   assignTeams() {
-    let i = 0;
-    for (const c of this.chars) { c.team = this.rules.teams ? i++ % 2 : -1; this.paint(c); }
+    if (!this.rules.teams) { for (const c of this.chars) { c.team = -1; this.paint(c); } return; }
+    const n = [0, 0];
+    const put = (c, t) => { c.team = t; n[t]++; };
+    for (const c of this.chars) c.team = -1;
+    for (const c of this.chars) if (c.isHuman && (c.teamPref === 0 || c.teamPref === 1)) put(c, c.teamPref);
+    for (const c of this.chars) if (c.isHuman && c.team < 0) put(c, n[0] <= n[1] ? 0 : 1);
+    for (const c of this.chars) if (!c.isHuman) put(c, n[0] <= n[1] ? 0 : 1);
+    for (const c of this.chars) this.paint(c);
   }
 
-  /** A late arrival joins the smaller team. */
+  /** Move bots across until neither team has more than one extra player. */
+  balanceBots() {
+    if (!this.rules.teams) return;
+    for (let guard = 0; guard < 12; guard++) {
+      const n = [0, 0];
+      for (const c of this.chars) if (c.team >= 0) n[c.team]++;
+      if (Math.abs(n[0] - n[1]) <= 1) return;
+      const big = n[0] > n[1] ? 0 : 1;
+      // a dead bot moves first (no one sees it swap sides)
+      const bot = this.bots.filter((b) => b.team === big).sort((a, b) => (a.alive ? 1 : 0) - (b.alive ? 1 : 0))[0];
+      if (!bot) return;
+      this.setTeam(bot, 1 - big, false);
+    }
+  }
+
+  /** Put `c` on team `t`. `respawn`: send them to their new side now. */
+  setTeam(c, t, respawn = true) {
+    if (!this.rules.teams || (t !== 0 && t !== 1) || c.team === t) return false;
+    if (this.ctf) { const f = this.ctf.carrying(c); if (f) { this.ctf.drop(f); this.ctf.event('drop', f.team, c); } }
+    c.team = t;
+    this.paint(c);
+    if (c.target !== undefined) c.target = null;
+    if (respawn && c.alive && !this.over) this.respawn(c);
+    return true;
+  }
+
+  /** A player asked to switch sides mid-match (host / solo). */
+  switchTeam(c, t) {
+    if (this.over || this.attract || !this.rules.teams) return false;
+    c.teamPref = t;
+    if (!this.setTeam(c, t)) return false;
+    this.balanceBots();
+    if (this.mode === 'host') { this.net.onRosterChanged(); this.net.system(`${c.name} switched to ${TEAM_NAMES[t]}`); }
+    else this.hud.feedNote(`${c.name} switched to ${TEAM_NAMES[t]}`, TEAM_COLORS[t]);
+    return true;
+  }
+
+  /** A late arrival joins the team they picked, or else the smaller one. */
   joinTeam(c) {
     if (!this.rules.teams) { c.team = -1; this.paint(c); return; }
+    if (c.isHuman && (c.teamPref === 0 || c.teamPref === 1)) { c.team = c.teamPref; this.paint(c); this.balanceBots(); return; }
     const n = [0, 0], humans = [0, 0];
     for (const o of this.chars) {
       if (o === c || o.team < 0) continue;
