@@ -4,8 +4,11 @@
 import foundry from './arena.js';
 import span from './span.js';
 import cloister from './cloister.js';
+import depot from './depot.js';
+import skyline from './skyline.js';
+import dockyard from './dockyard.js';
 
-export const MAPS = [foundry, span, cloister];
+export const MAPS = [foundry, span, cloister, depot, skyline, dockyard];
 export const DEFAULT_MAP = foundry.id;
 
 export function getMap(id) {

@@ -119,6 +119,45 @@ const builders = {
     ctx.strokeRect(1, 1, s - 2, s - 2);
     ctx.strokeRect(f, f, s - 2 * f, s - 2 * f);
   },
+  /** corrugated sheet metal (shipping containers, sheds) */
+  corrugated(ctx, s) {
+    ctx.fillStyle = '#cdcdcd';
+    ctx.fillRect(0, 0, s, s);
+    const ribs = 8;
+    for (let i = 0; i < ribs; i++) {
+      const x = (i * s) / ribs, w = s / ribs;
+      const g = ctx.createLinearGradient(x, 0, x + w, 0);
+      g.addColorStop(0, 'rgba(0,0,0,0.22)');
+      g.addColorStop(0.35, 'rgba(255,255,255,0.18)');
+      g.addColorStop(0.7, 'rgba(0,0,0,0.05)');
+      g.addColorStop(1, 'rgba(0,0,0,0.26)');
+      ctx.fillStyle = g;
+      ctx.fillRect(x, 0, w, s);
+    }
+    blotches(ctx, s, 14, 0.08);
+    speckle(ctx, s, 3500, 0.07);
+    // rust streaks
+    for (let i = 0; i < 10; i++) {
+      ctx.fillStyle = `rgba(90,40,10,${0.04 + Math.random() * 0.06})`;
+      ctx.fillRect(Math.random() * s, Math.random() * s * 0.5, 2 + Math.random() * 3, s * (0.2 + Math.random() * 0.5));
+    }
+  },
+  /** brick wall */
+  brick(ctx, s) {
+    ctx.fillStyle = '#9a9a9a'; // mortar
+    ctx.fillRect(0, 0, s, s);
+    const rows = 8, h = s / rows, w = s / 4;
+    for (let r = 0; r < rows; r++) {
+      const off = r % 2 ? w / 2 : 0;
+      for (let c = -1; c < 5; c++) {
+        const v = 200 + Math.random() * 40;
+        ctx.fillStyle = `rgb(${v},${v},${v})`;
+        ctx.fillRect(c * w + off + 2, r * h + 2, w - 4, h - 4);
+      }
+    }
+    blotches(ctx, s, 16, 0.08);
+    speckle(ctx, s, 4000, 0.08);
+  },
 };
 
 const cache = new Map();
