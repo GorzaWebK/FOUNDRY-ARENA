@@ -519,6 +519,11 @@ export class Game {
     if (this.onCosmetics) this.onCosmetics(this.progress.equipped());
   }
 
+  /** A daily-challenge event, if this match counts. */
+  ch(ev, amount = 1, meta = {}) {
+    if (this.forCareer && !this.over) this.progress.challenge(ev, amount, { mode: this.rules.id, ...meta });
+  }
+
   /** XP for something you did in a match that counts. */
   xp(amount, label) {
     if (this.forCareer && !this.over) this.progress.add(amount, label);
@@ -544,7 +549,7 @@ export class Game {
   hillXp() {
     if (!this.rules.hill || this.attract) return;
     const t = Math.floor(this.player.hillTime || 0);
-    if (t > this.hillXpT) this.xp((t - this.hillXpT) * XP.hillSecond, 'Hill time');
+    if (t > this.hillXpT) { this.xp((t - this.hillXpT) * XP.hillSecond, 'Hill time'); this.ch('hill', t - this.hillXpT); }
     this.hillXpT = t;
   }
 
@@ -777,13 +782,15 @@ export class Game {
           // XP for the kill and how it was done
           const wid = weaponIdOf(weapon);
           this.xp(XP.kill, 'Kills');
-          if (wid === 'knife') this.xp(XP.knife, 'Knife kills');
-          else if (wid === 'grenade') this.xp(XP.grenade, 'Grenade kills');
+          this.ch('kill', 1, { weapon: wid });
+          if (wid === 'knife') { this.xp(XP.knife, 'Knife kills'); this.ch('knife'); }
+          else if (wid === 'grenade') { this.xp(XP.grenade, 'Grenade kills'); this.ch('nade'); }
           else {
-            if (head) this.xp(XP.headshot, 'Headshots');
-            if (dist >= 40) this.xp(XP.longshot, 'Long shots');
+            if (head) { this.xp(XP.headshot, 'Headshots'); this.ch('head'); }
+            if (dist >= 40) { this.xp(XP.longshot, 'Long shots'); this.ch('long'); }
           }
           if (me.streak >= 3) this.xp(XP.streak, 'Streaks');
+          this.ch('streak', me.streak);
         }
       }
       if (victim === me) this.career.death();

@@ -3,6 +3,7 @@
 // event adds to a per-match tally that the end screen shows, and to the total.
 
 import { DEFAULT_EQUIPPED, ITEMS, SLOTS, itemOf, itemUnlocked } from './cosmetics.js';
+import { dailyFor, today } from './challenges.js';
 
 export const PROGRESS_KEY = 'foundry-arena-progress';
 export const MAX_LEVEL = 50;
@@ -22,7 +23,7 @@ export const XP = {
 };
 
 function blank() {
-  return { v: 1, xp: 0, prestige: 0, equipped: { ...DEFAULT_EQUIPPED } };
+  return { v: 1, xp: 0, prestige: 0, equipped: { ...DEFAULT_EQUIPPED }, daily: { day: '', prog: {}, done: {} } };
 }
 
 /** Level (1..50) and progress into it, from total XP this prestige. */
@@ -39,6 +40,10 @@ export class Progress {
       const raw = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
       if (typeof raw.xp === 'number' && raw.xp >= 0) this.p.xp = Math.floor(raw.xp);
       if (typeof raw.prestige === 'number') this.p.prestige = Math.max(0, Math.min(MAX_PRESTIGE, raw.prestige | 0));
+      if (raw.daily && typeof raw.daily === 'object' && typeof raw.daily.day === 'string') {
+        const num = (o) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([, v]) => typeof v === 'number' || v === true));
+        this.p.daily = { day: raw.daily.day, prog: num(raw.daily.prog), done: num(raw.daily.done) };
+      }
       if (raw.equipped && typeof raw.equipped === 'object') {
         for (const s of SLOTS) if (ITEMS[s.id].some((i) => i.id === raw.equipped[s.id])) this.p.equipped[s.id] = raw.equipped[s.id];
       }
@@ -84,6 +89,34 @@ export class Progress {
     this.p.equipped[slot] = id;
     this.save();
     return true;
+  }
+
+  // ---------------------------------------------------------------- daily challenges
+
+  /** Today's challenges with progress: [{ c, n, done }]. A new day starts a new set. */
+  dailies() {
+    const d = this.p.daily, day = today();
+    if (d.day !== day) { d.day = day; d.prog = {}; d.done = {}; }
+    return dailyFor(day).map((c) => ({ c, n: Math.min(c.goal, d.prog[c.id] || 0), done: !!d.done[c.id] }));
+  }
+
+  /** Something that might move a challenge happened. meta: { weapon, mode }. */
+  challenge(ev, amount = 1, meta = {}) {
+    if (this.frozen) return;
+    const d = this.p.daily;
+    for (const { c, done } of this.dailies()) {
+      if (done || c.ev !== ev) continue;
+      if (c.weapon && c.weapon !== meta.weapon) continue;
+      if (c.mode && c.mode !== meta.mode) continue;
+      d.prog[c.id] = c.max ? Math.max(d.prog[c.id] || 0, amount) : (d.prog[c.id] || 0) + amount;
+      this.dirty = true;
+      if (d.prog[c.id] >= c.goal) {
+        d.done[c.id] = true;
+        this.add(c.xp, 'Challenges');
+        if (this.onChallenge) this.onChallenge(c);
+        this.save();
+      }
+    }
   }
 
   canPrestige() { return this.level >= MAX_LEVEL && this.prestige < MAX_PRESTIGE; }

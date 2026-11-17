@@ -29,6 +29,7 @@ import { getAccount, exportCode, parseCode, importAccount } from './account.js';
 import { SKINS, SKIN_KILLS, skinSwatchCss, skinUnlocked, skinLockText } from './skins.js';
 import { SLOTS, ITEMS, itemOf, itemUnlocked, unlocksAt } from './cosmetics.js';
 import { XP, levelFromXp, MAX_LEVEL } from './progress.js';
+import { msToReset } from './challenges.js';
 
 {
   // version stamp on the main menu, so players can compare before joining
@@ -83,6 +84,7 @@ function setState(s) {
   ui.menu.classList.toggle('hidden', s !== 'menu');
   ui.pause.classList.toggle('hidden', s !== 'paused');
   ui.end.classList.toggle('hidden', s !== 'ended');
+  if (s === 'menu') { renderDaily(); renderLevelChip(); }
   hud.show(s === 'playing' || s === 'paused');
   input.active = s === 'playing';
   audio.muted = s === 'menu' || (s === 'paused' && !net.active);
@@ -605,6 +607,35 @@ function closeAccount() { $('account').classList.add('hidden'); }
 // ---------------------------------------------------------------- XP, levels, customize
 const fmt = (n) => n.toLocaleString('en-GB');
 game.progress.onXp = (amount) => { if (state === 'playing') hud.xpPop(amount); };
+game.progress.onChallenge = (c) => {
+  if (state === 'playing') game.announcer.announce('Challenge complete', `${c.text}  +${fmt(c.xp)} XP`);
+  renderDaily();
+};
+
+/** The main menu's "Today" card. */
+function renderDaily() {
+  const box = $('daily-list');
+  if (!box) return;
+  box.textContent = '';
+  for (const { c, n, done } of game.progress.dailies()) {
+    const row = document.createElement('div');
+    row.className = 'daily' + (done ? ' done' : '');
+    const top = document.createElement('div'); top.className = 'd-top';
+    const t = document.createElement('span'); t.textContent = c.text;
+    const x = document.createElement('b'); x.textContent = done ? 'DONE' : `+${fmt(c.xp)}`;
+    top.append(t, x);
+    const line = document.createElement('div'); line.className = 'd-line';
+    const bar = document.createElement('div'); bar.className = 'd-bar';
+    const fill = document.createElement('i'); fill.style.width = `${Math.round((n / c.goal) * 100)}%`;
+    bar.append(fill);
+    const cnt = document.createElement('small'); cnt.textContent = `${n}/${c.goal}`;
+    line.append(bar, cnt);
+    row.append(top, line);
+    box.append(row);
+  }
+  const ms = msToReset(), h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+  $('daily-reset').textContent = `New set in ${h}h ${m}m`;
+}
 // your own-screen cosmetics: knife finish, weapon charm, crosshair shape
 game.onCosmetics = (eq) => {
   game.viewmodel.setKnife(itemOf('knife', eq.knife));
@@ -1002,6 +1033,8 @@ game.onMatchEnd = () => {
     if (won) pr.add(XP.matchWon, 'Victory');
     const mine = (game.awards || []).filter((a) => a[1] === game.player.name).length;
     if (mine) pr.add(XP.award * mine, 'Awards');
+    pr.challenge('match', 1, { mode: game.rules.id });
+    if (won) pr.challenge('win', 1, { mode: game.rules.id });
   }
   game.progress.save();
   renderEndXp();

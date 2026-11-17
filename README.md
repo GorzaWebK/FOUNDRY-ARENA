@@ -189,6 +189,14 @@ star next to your level (★1, ★2… up to 10). Level unlocks come back as you
 up again; prestige-only items (the Reborn and Immortal titles, the Prestige name
 tag, the Gilded calling card), weapon skins and career stats are kept.
 
+### Daily challenges
+
+The **Today** card on the main menu has three challenges, the same for everyone
+on the same day and fresh at midnight: things like 15 kills with one gun, 8
+headshot kills, a 5-kill streak, capturing 2 flags or winning a Team Deathmatch
+match. Each is worth 500 to 900 XP, paid the moment you finish it (with a
+call-out if you're mid-match). They count in any match except the training range.
+
 ### Weapon skins
 
 Every gun has five camos: Woodland, Desert, Arctic, Crimson and Tiger. A gun's
@@ -365,6 +373,7 @@ src/career.js         career stats (local, part of the account)
 src/skins.js          weapon camos: patterns, unlocks, colours
 src/progress.js       XP, levels, prestige, equipped cosmetics
 src/cosmetics.js      the unlock catalogue (what each level gives) + network form
+src/challenges.js     daily challenge pool and the day's pick
 src/smoke.js          smoke grenade clouds (visuals + line-of-sight blocking)
 src/account.js        player ID + account code export / import
 src/training.js       training range: targets, stands, challenge, stats
