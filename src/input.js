@@ -1,9 +1,6 @@
 // Keyboard + mouse state with per-frame "pressed" edges and pointer lock.
 
-const GAME_KEYS = new Set([
-  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight',
-  'KeyC', 'KeyR', 'Digit1', 'Digit2', 'Digit3', 'Tab', 'KeyQ', 'KeyE', 'KeyF', 'KeyV', 'KeyT',
-]);
+import { defaultBinds } from './bindings.js';
 
 export class Input {
   constructor(canvas) {
@@ -17,9 +14,12 @@ export class Input {
     this.locked = false;
     this.active = false; // true while gameplay should receive input
     this.onLockChange = null;
+    this.binds = defaultBinds(); // action -> [code, code]; replaced with the saved bindings
+    this.capture = null; // while rebinding: called with the next key / mouse code instead
 
     window.addEventListener('keydown', (e) => {
-      if (this.active && GAME_KEYS.has(e.code)) e.preventDefault();
+      if (this.capture) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) this.capture(e.code); return; }
+      if (this.active && this.isBound(e.code)) e.preventDefault();
       if (e.repeat) return;
       this.keys.add(e.code);
       this.pressed.add(e.code);
@@ -33,15 +33,21 @@ export class Input {
       this.mdx += e.movementX;
       this.mdy += e.movementY;
     });
+    window.addEventListener('mousedown', (e) => {
+      if (this.capture) { e.preventDefault(); e.stopImmediatePropagation(); this.capture('Mouse' + e.button); return; }
+    }, true);
     canvas.addEventListener('mousedown', (e) => {
       if (!this.active) return;
       if (e.button === 0) { this.left = true; this.leftPressed = true; }
       if (e.button === 2) this.right = true;
+      this.keys.add('Mouse' + e.button);
+      this.pressed.add('Mouse' + e.button);
       e.preventDefault();
     });
     window.addEventListener('mouseup', (e) => {
       if (e.button === 0) this.left = false;
       if (e.button === 2) this.right = false;
+      this.keys.delete('Mouse' + e.button);
     });
     window.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('wheel', (e) => {
@@ -58,8 +64,31 @@ export class Input {
   }
 
   // keys only count while gameplay has focus (not while a menu is open)
-  down(code) { return this.active && this.keys.has(code); }
-  hit(code) { return this.active && this.pressed.has(code); }
+  down(code) {
+    if (!this.active || !code) return false;
+    return this.keys.has(code) || (code === 'Mouse0' && this.left) || (code === 'Mouse2' && this.right);
+  }
+  hit(code) {
+    if (!this.active || !code) return false;
+    return this.pressed.has(code) || (code === 'Mouse0' && this.leftPressed);
+  }
+
+  /** Is any key bound to this action held? */
+  act(action) {
+    const b = this.binds[action];
+    return !!b && (this.down(b[0]) || this.down(b[1]));
+  }
+
+  /** Was any key bound to this action pressed this frame? */
+  actHit(action) {
+    const b = this.binds[action];
+    return !!b && (this.hit(b[0]) || this.hit(b[1]));
+  }
+
+  isBound(code) {
+    for (const k in this.binds) if (this.binds[k][0] === code || this.binds[k][1] === code) return true;
+    return false;
+  }
 
   /** Ask for pointer lock. Resolves true once the pointer is captured. */
   requestLock() {

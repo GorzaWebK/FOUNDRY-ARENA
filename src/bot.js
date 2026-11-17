@@ -224,6 +224,11 @@ export class Bot extends Character {
   hear(x, y, z, src, kind, frac) {
     if (!this.alive || this.target) return;
     if (src && this.game.sameTeam(src, this)) return; // a teammate's noise is nothing to investigate
+    // King of the Hill: look toward noises, but the hill is the job
+    if (this.game.rules.hill && kind === 'shot') {
+      if (this.game.time > this.lookUntil) { this.lookPos.set(x, y + 1.4, z); this.lookUntil = this.game.time + 1.2; }
+      return;
+    }
     const now = this.game.time;
     if (kind === 'shot') {
       // busy saving my skin, or already hunting a specific enemy: ignore
@@ -302,6 +307,8 @@ export class Bot extends Character {
         // head for where they were going, not just where they were
         _t.copy(m.lastPos).addScaledVector(m.lastVel, 0.6);
         if (Math.random() < 0.5 * this.pers.aggression) this.tryGrenadeAt(m.lastPos.x, m.lastPos.y, m.lastPos.z); // flush them out
+        const hz = this.game.hillZone();
+        if (hz && Math.hypot(m.lastPos.x - hz[0], m.lastPos.z - hz[2]) > hz[3] + 6) { this.enterHill(); return; }
         this.enterChase(_t, e, 'enemy');
       } else {
         this.pickNext();
@@ -318,7 +325,11 @@ export class Bot extends Character {
     if (this.alert) {
       const a = this.alert;
       this.alert = null;
-      if (now - a.t < 2.5) {
+      // holding the hill: turn to face it instead of leaving the zone
+      if (this.game.rules.hill && this.game.inHill(this)) {
+        this.lookPos.set(a.pos.x, a.pos.y + 1.4, a.pos.z);
+        this.lookUntil = now + 1.5;
+      } else if (now - a.t < 2.5) {
         if (!(this.state === STATE.CHASE && this.goal.distanceTo(a.pos) < 5)) {
           this.enterChase(a.pos, a.src, a.urgent ? 'enemy' : 'noise');
         }
@@ -326,11 +337,14 @@ export class Bot extends Character {
       }
     }
     if (this.done) {
-      if (this.state === STATE.CHASE) this.enterSearch(this.goal);
+      if (this.state === STATE.CHASE && !this.game.rules.hill) this.enterSearch(this.goal);
       else this.pickNext();
       return;
     }
-    if ((this.state === STATE.PATROL || this.state === STATE.SEARCH) && now > this.nextNeedCheck) {
+    // the hill moved while we were heading for (or sitting on) the old one
+    const g = this.game;
+    if (g.rules.hill && this.state === STATE.PATROL && this.hillIdx !== g.hill.idx) { this.enterHill(); return; }
+    if (!g.rules.hill && (this.state === STATE.PATROL || this.state === STATE.SEARCH) && now > this.nextNeedCheck) {
       this.nextNeedCheck = now + 1;
       const p = this.choosePickup(this.state === STATE.SEARCH ? 10 : Infinity);
       if (p) this.enterCollect(p);
@@ -338,9 +352,28 @@ export class Bot extends Character {
   }
 
   pickNext() {
+    if (this.game.rules.hill) {
+      // the hill is the job; only detour for health when badly hurt
+      const p = this.health < 45 ? this.choosePickup(25) : null;
+      if (p && p.type === 'health') this.enterCollect(p);
+      else this.enterHill();
+      return;
+    }
     const p = this.choosePickup(Infinity);
     if (p) this.enterCollect(p);
     else this.enterPatrol();
+  }
+
+  /** King of the Hill: walk to a spot inside the zone and hold it for a bit. */
+  enterHill() {
+    const g = this.game, h = g.hillZone();
+    if (!h) { this.enterPatrol(); return; }
+    this.setState(STATE.PATROL);
+    this.hillIdx = g.hill.idx;
+    const a = Math.random() * Math.PI * 2, r = Math.random() * h[3] * 0.7;
+    const n = g.nav.nearest(h[0] + Math.cos(a) * r, h[1], h[2] + Math.sin(a) * r);
+    if (n < 0 || !this.setGoal(g.nav.px[n], g.nav.py[n], g.nav.pz[n])) this.setGoal(h[0], h[1], h[2]);
+    this.waitT = rand(2.5, 5);
   }
 
   setState(s) {
@@ -650,8 +683,11 @@ export class Bot extends Character {
     const tx = t.pos.x - this.pos.x, tz = t.pos.z - this.pos.z;
     const tl = Math.hypot(tx, tz) || 1;
     let best = -1, bestS = -Infinity, bestCov = false;
+    const hz = g.hillZone();
+    const toHill = hz ? Math.atan2(hz[2] - this.pos.z, hz[0] - this.pos.x) : 0;
     for (let i = 0; i < 11; i++) {
-      const a = Math.random() * Math.PI * 2, r = rand(1.8, 6.5);
+      // King of the Hill: half the candidates lie toward the zone
+      const a = hz && i % 2 === 0 ? toHill + rand(-0.6, 0.6) : Math.random() * Math.PI * 2, r = rand(1.8, 6.5);
       const x = this.pos.x + Math.cos(a) * r, z = this.pos.z + Math.sin(a) * r;
       const n = nav.nodeAt(x, z, this.pos.y, 1.0);
       if (n < 0) continue;
@@ -663,6 +699,12 @@ export class Bot extends Character {
       s += wantCover ? (los ? -6 : 7) : (los ? 5 : -7);
       const lateral = Math.abs((nx - this.pos.x) * (-tz / tl) + (nz - this.pos.z) * (tx / tl));
       s += Math.min(lateral, 4) * 0.55;
+      // King of the Hill: fight from inside the zone where possible
+      if (hz) {
+        const dh = Math.hypot(nx - hz[0], nz - hz[2]);
+        if (dh <= hz[3] && Math.abs(ny - hz[1]) <= 2.2) s += 6;
+        s -= Math.min(dh, 30) * 0.3;
+      }
       s += clamp(ny - t.pos.y, -2, 2) * 0.4;
       for (const c of g.chars) {
         if (c === this || c === t || !c.alive) continue;

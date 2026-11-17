@@ -237,6 +237,12 @@ export default {
     { type: 'ammo', pos: [-36.5, 0, 28.5] },
   ],
 
+  // King of the Hill zones: [x, floorY, z, radius]
+  hills: [
+    [0.5, 1, 0.5, 4.5], [0.5, 0, 31, 4], [-35.5, 3, 0.5, 3.5],
+    [17, 0, -20, 5], [-19, 0, 19.5, 5], [25, 3, 0.5, 3.5],
+  ],
+
   // Points of interest the bots patrol between.
   pois: [
     [0.5, 1, -3.5], [2.5, 1, 2.5],

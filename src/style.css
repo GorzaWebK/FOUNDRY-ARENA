@@ -259,3 +259,57 @@ h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 #menu .loadout button { padding: 6px 9px; }
 #menu .note { margin-top: 6px; }
 #mode-blurb { min-height: 2.6em; }
+
+/* ------------------------------------------------------------------ controls / rebinding */
+#controls { z-index: 30; }
+#controls .panel { width: min(560px, 100%); }
+.binds { display: grid; grid-template-columns: 1fr 120px 120px; gap: 4px 8px; align-items: center; margin-top: 12px; font-size: 14px; }
+.binds button { padding: 6px 8px; font-size: 12px; font-family: var(--mono); letter-spacing: 0; font-weight: 600; background: #1b222b; }
+.binds button.listening { border-color: var(--accent); color: var(--accent); animation: blink 0.8s infinite; }
+.binds button.empty { color: var(--dim); }
+@keyframes blink { 50% { opacity: 0.5; } }
+.small-btn { padding: 7px 12px; font-size: 12px; margin-top: 8px; }
+#binds-note { min-height: 1.3em; color: var(--accent2); }
+/* compact rows so the whole list (and DONE) fits on a 720p screen */
+#controls .panel { padding: 18px 24px; }
+#controls h2 { font-size: 26px; margin-bottom: 6px; }
+#controls .binds { gap: 2px 8px; margin-top: 8px; font-size: 13px; }
+#controls .binds button { padding: 3px 6px; font-size: 11px; }
+#controls .btn-row { margin-top: 8px; }
+#controls button.primary { padding: 10px 18px; font-size: 15px; }
+
+/* ------------------------------------------------------------------ king of the hill */
+#hill-status {
+  position: absolute; top: 70px; left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: 800;
+  letter-spacing: 0.14em; background: rgba(12, 16, 22, 0.62); padding: 4px 12px; border-radius: 6px; white-space: nowrap;
+}
+#hill-status.on { outline: 1px solid currentColor; }
+#hill-marker { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); text-align: center; }
+#hill-marker i {
+  display: block; width: 14px; height: 14px; margin: 0 auto 2px; transform: rotate(45deg);
+  border: 2px solid currentColor; background: rgba(12, 16, 22, 0.4); box-shadow: 0 0 8px currentColor;
+}
+#hill-marker span { font-family: var(--mono); font-size: 11px; font-weight: 700; }
+
+/* ------------------------------------------------------------------ kill cam */
+#killcam { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px rgba(160, 0, 0, 0.45); }
+#killcam .kc-title {
+  position: absolute; top: 84px; left: 50%; transform: translateX(-50%); font-size: 14px; font-weight: 900; letter-spacing: 0.4em;
+  background: #c62828; color: #fff; padding: 4px 14px 4px 18px; border-radius: 4px;
+}
+#kc-who { position: absolute; top: 116px; left: 50%; transform: translateX(-50%); font-size: 18px; font-weight: 800; white-space: nowrap; }
+#kc-count { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 14px; color: #e6c9c9; }
+
+/* ------------------------------------------------------------------ training range */
+.play-row { display: flex; gap: 10px; }
+.play-row .primary { flex: 3; }
+.play-row #btn-train { flex: 1; font-size: 14px; }
+#range-panel {
+  position: absolute; left: 16px; top: 72px; font-size: 13px; line-height: 1.55; background: rgba(12, 16, 22, 0.62);
+  padding: 8px 12px; border-radius: 8px; max-width: 340px;
+}
+#range-panel b { letter-spacing: 0.1em; font-size: 11px; color: #ffb36b; }
+#range-panel .rp-live { color: #5dff9a; font-size: 13px; }
+#dmg-nums { position: absolute; inset: 0; pointer-events: none; }
+.dmg-num { position: absolute; left: 0; top: 0; font-family: var(--mono); font-weight: 800; font-size: 18px; color: #fff; opacity: 0; text-shadow: 0 1px 3px #000; }
+.dmg-num.head { color: #ffd24d; font-size: 22px; }

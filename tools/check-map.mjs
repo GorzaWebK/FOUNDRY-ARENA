@@ -53,6 +53,18 @@ function check(kind, p) {
 map.spawns.forEach((s) => check('spawn', s));
 map.pickups.forEach((p) => check('pickup:' + p.type, p.pos));
 map.pois.forEach((p) => check('poi', p));
+// a hill needs reachable ground inside its circle (its centre may be a crate or a pillar)
+for (const h of map.hills || []) {
+  let ok = false;
+  for (let a = 0; a < 16 && !ok; a++) {
+    for (const f of [0, 0.4, 0.7]) {
+      const id = nav.nodeAt(h[0] + Math.cos(a * 0.39) * h[3] * f, h[2] + Math.sin(a * 0.39) * h[3] * f, h[1], 0.3);
+      if (id >= 0 && nav.reach[id]) { ok = true; break; }
+    }
+  }
+  if (!ok) { console.log(`ERROR hill at ${h.slice(0, 3)} has no reachable ground`); bad++; }
+}
+if (!map.hills || map.hills.length < 3) { console.log('ERROR map needs at least 3 King of the Hill zones'); bad++; }
 
 // every spawn must be able to path to every pickup, and back
 for (const s of map.spawns) {

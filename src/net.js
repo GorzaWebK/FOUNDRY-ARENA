@@ -401,11 +401,13 @@ export class Net {
       (ch.alive ? 1 : 0) | (ch.crouching ? 2 : 0) | (ch.isProtected() ? 4 : 0) | (ch.onGround ? 8 : 0),
       Math.max(0, Math.round(ch.health * 10) / 10), Math.round(ch.armor * 10) / 10,
       ch.kills, ch.deaths, ch.weapon.def.index, r2(ch.lean), ch.lives,
-      ch.weapons[0].def.index, ch.weapons.length > 1 ? 1 : 0,
+      ch.weapons[0].def.index, ch.weapons.length > 1 ? 1 : 0, Math.round(ch.hillTime || 0),
     ]);
     let p = '';
     for (const pk of g.pickups) p += pk.active ? '1' : '0';
-    this.broadcast({ t: 's', mt: r2(g.matchTime), c, p, ts: g.teamScore });
+    const snap = { t: 's', mt: r2(g.matchTime), c, p, ts: g.teamScore };
+    if (g.rules.hill) snap.hl = [g.hill.idx, r2(g.hill.t), g.hill.holder];
+    this.broadcast(snap);
   }
 
   // hooks called by Game on the host ---------------------------------------
@@ -584,13 +586,20 @@ export class Net {
     const g = this.game, p = g.player;
     if (num(m.mt)) g.matchTime = m.mt;
     if (Array.isArray(m.ts)) g.teamScore = [m.ts[0] | 0, m.ts[1] | 0];
+    if (Array.isArray(m.hl) && g.rules.hill && m.hl.every(num)) {
+      const [idx, t, holder] = m.hl;
+      if (idx !== g.hill.idx && g.time > 1) g.announcer.announce('Hill moved', 'Get to the new zone');
+      if (holder !== g.hill.holder && (holder === 0 || holder === 1)) g.hillTaken(holder);
+      g.hill.idx = idx; g.hill.t = t; g.hill.holder = holder;
+    }
     if (Array.isArray(m.c)) {
       for (const e of m.c) {
         if (!Array.isArray(e) || e.length < 12) continue;
-        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, held, lean, lives, prim, side] = e;
+        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, held, lean, lives, prim, side, hillT] = e;
         if (id === p.id) {
           p.kills = k; p.deaths = d;
           if (num(lives)) p.lives = lives;
+          if (num(hillT)) p.hillTime = hillT;
           p.applyGunLevel(); // gun game: a kill may have earned the next gun
           if (p.alive) { p.health = hp; p.armor = ar; }
           if (!(fl & 4)) p.protectedUntil = 0;
@@ -608,6 +617,7 @@ export class Net {
         c.netLean = num(lean) ? clamp(lean, -1, 1) : 0;
         c.health = hp; c.armor = ar; c.kills = k; c.deaths = d;
         if (num(lives)) c.lives = lives;
+        if (num(hillT)) c.hillTime = hillT;
         if (num(held)) c.netHeld = held | 0;
         if (num(prim)) c.netPrim = prim | 0;
         if (num(side)) c.netSide = !!side;
@@ -656,6 +666,7 @@ export class Net {
     const g = this.game, fx = g.effects;
     const def = WEAPONS[m.w];
     if (!def || !Array.isArray(m.m) || !Array.isArray(m.e)) return;
+    g.killcam.shot(m.id, m.w, m.m, m.e);
     const [mx, my, mz] = m.m;
     const shooter = g.charById(m.id);
     for (let i = 0; i < m.e.length && i < def.pellets; i++) {

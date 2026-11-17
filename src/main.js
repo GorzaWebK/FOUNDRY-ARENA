@@ -3,6 +3,8 @@
 import './style.css';
 import { MAPS, getMap } from './maps/index.js';
 import { MODES, getMode } from './modes.js';
+import RANGE_MAP from './maps/range.js';
+import { TRAINING } from './training.js';
 import { WEAPON_BY_ID, PRIMARIES } from './weapons.js';
 import { loadSettings, saveSettings, buildSettingsUI } from './settings.js';
 import { AudioSys } from './audio.js';
@@ -11,6 +13,7 @@ import { Input } from './input.js';
 import { Game } from './game.js';
 import { Net, cleanName } from './net.js';
 import { cleanRoomCode } from './transport.js';
+import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -22,6 +25,7 @@ const audio = new AudioSys();
 audio.volume = settings.volume;
 const hud = new Hud();
 const input = new Input(canvas);
+input.binds = settings.binds; // the same object: rebinding updates input immediately
 const game = new Game({ canvas, settings, audio, hud, input, map: getMap(settings.map) });
 
 // 'menu' (attract mode) | 'playing' | 'paused' | 'ended'
@@ -193,8 +197,11 @@ function updateRoomUi() {
   $('room-count').textContent = on ? `${n} player${n === 1 ? '' : 's'} connected` : '';
   $('pause-title').textContent = on ? 'MENU' : 'PAUSED';
   $('btn-restart').classList.toggle('hidden', net.role === 'client');
-  $('next-match').classList.toggle('hidden', net.role === 'client');
-  $('btn-bots').classList.toggle('hidden', net.role === 'client');
+  const training = !!game.rules.training && !game.attract;
+  $('next-match').classList.toggle('hidden', net.role === 'client' || training);
+  $('btn-bots').classList.toggle('hidden', net.role === 'client' || training);
+  $('btn-range-reset').classList.toggle('hidden', !training);
+  $('btn-restart').textContent = training ? 'Restart range' : 'Restart match';
   $('btn-quit').textContent = on ? (net.role === 'host' ? 'Close room' : 'Leave game') : 'Main menu';
   $('btn-again').classList.toggle('hidden', net.role === 'client');
   $('btn-menu').textContent = on ? (net.role === 'host' ? 'Close room' : 'Leave game') : 'Main menu';
@@ -237,7 +244,7 @@ function closeChat(send) {
 
 chatInput.addEventListener('keydown', (e) => {
   e.stopPropagation();
-  if (e.code === 'Enter' || e.code === 'NumpadEnter') { e.preventDefault(); closeChat(true); }
+  if (e.code === 'Enter' || e.code === 'NumpadEnter' || settings.binds.chat.includes(e.code) && e.code !== 'Space' && e.key.length !== 1) { e.preventDefault(); closeChat(true); }
   else if (e.code === 'Escape') closeChat(false);
 });
 chatInput.addEventListener('blur', () => closeChat(false));
@@ -246,6 +253,24 @@ chatInput.addEventListener('blur', () => closeChat(false));
 async function lock() {
   if (NOLOCK) { input.locked = true; return true; }
   return input.requestLock();
+}
+
+/** Solo practice on the training range. */
+async function startTraining() {
+  if (net.active) return;
+  audio.resume();
+  audio.setVolume(settings.volume);
+  game.newMatch({ botCount: 1, bots: false, difficulty: settings.difficulty, map: RANGE_MAP, rules: TRAINING });
+  setState('playing');
+  hud.centerMessage('TRAINING RANGE', 'Walk onto a stand to swap guns · step on the orange pad for the 30s challenge', 4, '#ff8a2a');
+  const ok = await lock();
+  if (!ok && state === 'playing') hud.setLockHint(true);
+}
+
+/** Restart whatever is being played (a match, or the range). */
+function restart() {
+  if (game.rules.training) startTraining();
+  else startMatch();
 }
 
 async function startMatch() {
@@ -333,12 +358,116 @@ async function resume() {
   else $('pause-hint').textContent = 'Could not capture the mouse yet — click Resume again.';
 }
 
+// ---------------------------------------------------------------- controls (rebinding)
+const label = (action) => bindLabel(settings.binds, action);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/** Main-menu summary of the current controls. */
+function renderKeysList() {
+  const k = (a) => `<kbd>${esc(label(a))}</kbd>`;
+  $('keys-list').innerHTML = [
+    `${k('forward')}${k('left')}${k('back')}${k('right')} move`,
+    `<kbd>Mouse</kbd> look · ${k('fire')} fire · ${k('aim')} aim`,
+    `${k('jump')} jump · ${k('sprint')} sprint`,
+    `${k('crouch')} crouch · while sprinting: slide`,
+    `${k('leanLeft')} lean left · ${k('leanRight')} lean right`,
+    `${k('grenade')} grenade · ${k('knife')} knife · ${k('reload')} reload · ${k('inspect')} inspect`,
+    `${k('primary')} primary · ${k('pistol')} pistol · <kbd>Wheel</kbd> swap`,
+    `${k('chat')} chat (multiplayer)`,
+    `${k('scoreboard')} scoreboard · <kbd>Esc</kbd> / ${k('pause')} pause`,
+  ].map((l) => `<li>${l}</li>`).join('');
+}
+
+let listening = null; // [action, slot] waiting for a key
+
+function renderBinds() {
+  const box = $('binds');
+  box.innerHTML = '';
+  for (const a of ACTIONS) {
+    const name = document.createElement('span');
+    name.textContent = a.label;
+    box.append(name);
+    for (let slot = 0; slot < 2; slot++) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      const code = settings.binds[a.id][slot];
+      const on = listening && listening[0] === a.id && listening[1] === slot;
+      b.textContent = on ? 'Press a key…' : keyName(code);
+      b.classList.toggle('listening', !!on);
+      b.classList.toggle('empty', !code && !on);
+      b.addEventListener('click', () => startListening(a.id, slot));
+      box.append(b);
+    }
+  }
+}
+
+function bindsChanged() {
+  saveSettings(settings);
+  renderBinds();
+  renderKeysList();
+  hud.setBindHints(label);
+}
+
+function startListening(action, slot) {
+  listening = [action, slot];
+  $('binds-note').textContent = '';
+  renderBinds();
+  // the click that started this is still bubbling: start capturing on the next tick
+  setTimeout(() => {
+    input.capture = (code) => {
+      input.capture = null;
+      const [act, sl] = listening;
+      listening = null;
+      if (code === 'Escape') { renderBinds(); return; }
+      if (code === 'Backspace' || code === 'Delete') { settings.binds[act][sl] = ''; bindsChanged(); return; }
+      // a key can only do one thing: take it away from whatever had it
+      let moved = null;
+      for (const other of ACTIONS) {
+        const arr = settings.binds[other.id];
+        for (let i = 0; i < 2; i++) {
+          if (arr[i] === code && !(other.id === act && i === sl)) { arr[i] = ''; moved = other.label; }
+        }
+      }
+      settings.binds[act][sl] = code;
+      $('binds-note').textContent = moved ? `${keyName(code)} was taken from “${moved}”.` : '';
+      bindsChanged();
+    };
+  }, 0);
+}
+
+let controlsReturn = null;
+function openControls() {
+  controlsReturn = state;
+  listening = null;
+  $('binds-note').textContent = '';
+  renderBinds();
+  $('controls').classList.remove('hidden');
+}
+function closeControls() {
+  input.capture = null;
+  listening = null;
+  $('controls').classList.add('hidden');
+}
+$('btn-controls').addEventListener('click', openControls);
+$('btn-controls-pause').addEventListener('click', openControls);
+$('btn-binds-done').addEventListener('click', closeControls);
+$('btn-binds-reset').addEventListener('click', () => {
+  const d = defaultBinds();
+  for (const k of Object.keys(d)) settings.binds[k] = d[k];
+  $('binds-note').textContent = 'Controls reset to the defaults.';
+  bindsChanged();
+});
+renderKeysList();
+hud.setBindHints(label);
+
 $('btn-play').addEventListener('click', startMatch);
 $('btn-host').addEventListener('click', hostGame);
 $('btn-join').addEventListener('click', joinGame);
 $('btn-again').addEventListener('click', startMatch);
 $('btn-resume').addEventListener('click', resume);
-$('btn-restart').addEventListener('click', startMatch);
+$('btn-restart').addEventListener('click', restart);
+$('btn-train').addEventListener('click', startTraining);
+$('btn-range-reset').addEventListener('click', () => { if (game.range) game.range.resetStats(); resume(); });
 $('btn-quit').addEventListener('click', leaveToMenu);
 $('btn-menu').addEventListener('click', leaveToMenu);
 
@@ -353,16 +482,22 @@ canvas.addEventListener('click', () => {
 window.addEventListener('keydown', (e) => {
   const typing = e.target instanceof HTMLInputElement && e.target.type === 'text';
   if (typing) return;
-  if ((e.code === 'Enter' || e.code === 'NumpadEnter') && state === 'playing' && net.active) {
+  if (!$('controls').classList.contains('hidden')) {
+    if (e.code === 'Escape') closeControls();
+    return;
+  }
+  const binds = settings.binds;
+  if (binds.chat.includes(e.code) && state === 'playing' && net.active) {
     e.preventDefault();
     openChat();
     return;
   }
-  if (e.code === 'Escape' || e.code === 'KeyP') {
+  const pauseKey = binds.pause.includes(e.code);
+  if (e.code === 'Escape' || pauseKey) {
     if (state === 'playing') {
       if (NOLOCK || !input.locked) pause();
       else input.exitLock();
-    } else if (state === 'paused' && e.code === 'KeyP' && !e.repeat) {
+    } else if (state === 'paused' && pauseKey && !e.repeat) {
       // (Esc can't resume: browsers don't let the unlock key re-capture the mouse)
       resume();
     }
@@ -392,7 +527,7 @@ game.onMatchEnd = () => {
 // ---------------------------------------------------------------- main loop
 function tick(dt, render) {
   if (state === 'playing') {
-    hud.setScoreboard(input.down('Tab'), game);
+    hud.setScoreboard(input.act('scoreboard'), game);
     game.update(dt);
   } else if (state === 'menu' || state === 'ended' || (state === 'paused' && net.active)) {
     game.update(dt);

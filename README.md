@@ -39,12 +39,29 @@ The pause menu's **Next match** section changes mode and map between matches.
 | Mode                  | How it works                                                                  |
 | --------------------- | ----------------------------------------------------------------------------- |
 | **Deathmatch**        | free-for-all; first to 20 kills, or most kills after 10 minutes               |
+| **King of the Hill**  | Blue vs Red over a zone that moves every minute; a team scores a point a second while it holds the zone with no enemies inside. First to 100. A light pillar marks the zone and a HUD marker points to it |
 | **Team Deathmatch**   | Blue vs Red, no friendly fire; first team to 40 kills. Humans are spread across both teams and bots fill the rest |
 | **Gun Game**          | every 2 kills hand you the next gun: LMG → rifle → SMG → shotgun → sniper → pistol. One pistol kill wins. Unlimited reserve ammo |
 | **Last One Standing** | 5 lives each, no respawns after that; the last player alive wins. You spectate from above once you are out, and players joining mid-round watch until the next one |
 | **Snipers Only**      | free-for-all with sniper rifles and pistols; first to 15 kills                |
 
 Every mode has a 10 minute clock; when it runs out the mode's best score wins.
+
+## Training range
+
+**TRAINING RANGE** on the main menu opens a practice map with no bots and
+unlimited ammo: static targets at 10, 20, 30 and 40 m, moving targets, pop-ups,
+and a close-quarters corner. Walk onto a weapon stand to switch guns. Hits show
+damage numbers (yellow for headshots) and a panel tracks shots, accuracy,
+headshots and targets down. Step on the orange pad for a 30-second challenge:
+knock down as many targets as you can. Your best is saved.
+
+## Kill cam
+
+When you die, the game replays the last couple of seconds from your killer's
+eyes while you wait to respawn. Every player's machine records a short rolling
+history of what it sees, so it works in solo and multiplayer alike. It can be
+switched off with **Kill cam** in settings.
 
 ## Killstreak announcer
 
@@ -90,17 +107,21 @@ sounds depends on the voices your browser and OS provide.
 | `Tab`                 | scoreboard                                    |
 | `Esc` or `P`          | pause menu                                    |
 
-Prefer `C` for crouching: browsers reserve `Ctrl`+`W` for closing the tab (the game
-asks for confirmation before the tab closes mid-match).
+These are the defaults. **Change controls…** (main menu or pause menu) lets you
+rebind every action to any key or mouse button, with two slots per action; a key
+can only do one thing, so binding it takes it away from whatever had it. `Esc`
+always pauses and the mouse wheel always swaps weapons. Avoid `Ctrl` combos:
+browsers reserve `Ctrl`+`W` for closing the tab (the game asks for confirmation
+before the tab closes mid-match).
 
 Leaning moves your head (and your shots) out sideways, so you can peek and shoot
 around a corner while most of your body stays behind it. It won't push you into
 a wall, and you can't lean while sprinting or sliding. A slide keeps your sprint
 momentum for about a second with a low profile; jumping cancels it.
 
-Sensitivity, field of view, volume, graphics quality, announcer voice, invert-Y,
-mode, map, bots, difficulty, loadout and your multiplayer name are saved to
-`localStorage`.
+Sensitivity, field of view, volume, graphics quality, announcer voice, kill cam,
+invert-Y, key bindings, mode, map, bots, difficulty, loadout, your multiplayer
+name and your training-range best are saved to `localStorage`.
 **Graphics: Low** turns off shadows and fill lights and renders at 75% resolution.
 
 ## Weapons
@@ -212,13 +233,16 @@ index.html            HUD + menu markup
 src/main.js           app flow: menus, pointer lock, pause, lobby, chat, main loop
 src/game.js           match flow, hitscan, grenades, damage, spawning, pickups, streaks
 src/modes.js          game modes: rules, scoring, ranking, HUD text, results
+src/killcam.js        rolling recording + kill cam replay
+src/training.js       training range: targets, stands, challenge, stats
+src/bindings.js       rebindable controls
 src/announcer.js      killstreak call-outs (banner + speech synthesis)
 src/net.js            multiplayer session: host/client protocol
 src/netChar.js        characters driven over the network (interpolated)
 src/transport.js      PeerJS (WebRTC) and local-tab transports
 src/config.js         gameplay tuning, difficulty presets, bot roster
 src/maps/index.js     map registry
-src/maps/*.js         the maps (data only)
+src/maps/*.js         the maps (data only); range.js is the training range
 src/world.js          collision world built from map data (boxes + ramp wedges)
 src/physics.js        character controller (step-up, ground snap, sliding)
 src/navgrid.js        nav grid generation + A*

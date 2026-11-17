@@ -37,6 +37,7 @@ export class Player extends Character {
     this.primary = this.game.settings.primary; // loadout choices apply on (re)spawn
     super.spawnAt(x, y, z, yaw);
     const g = this.game;
+    g.killcam.stop();
     if (g.rules.lives && this.lives === 1 && this.deaths > 0) g.announcer.announce('Last Life');
     this.ads = 0;
     this.scoped = false;
@@ -75,7 +76,7 @@ export class Player extends Character {
 
     // ---- look
     // aiming always wins over sprinting (the sprint picks up again when you let go)
-    const wantAds = input.right && w.reloadT <= 0 && this.switchT <= 0;
+    const wantAds = input.act('aim') && w.reloadT <= 0 && this.switchT <= 0;
     this.ads += ((wantAds ? 1 : 0) - this.ads) * Math.min(1, dt * 14);
     if (this.ads < 0.002) this.ads = 0;
     this.scoped = !!w.def.scope && this.ads > 0.8;
@@ -89,15 +90,15 @@ export class Player extends Character {
 
     // ---- movement input
     let mf = 0, ms = 0;
-    if (input.down('KeyW')) mf += 1;
-    if (input.down('KeyS')) mf -= 1;
-    if (input.down('KeyD')) ms += 1;
-    if (input.down('KeyA')) ms -= 1;
+    if (input.act('forward')) mf += 1;
+    if (input.act('back')) mf -= 1;
+    if (input.act('right')) ms += 1;
+    if (input.act('left')) ms -= 1;
     const ml = Math.hypot(mf, ms);
     if (ml > 0) { mf /= ml; ms /= ml; }
-    const shift = input.down('ShiftLeft') || input.down('ShiftRight');
-    const crouchKey = input.down('KeyC') || input.down('ControlLeft') || input.down('ControlRight');
-    const crouchHit = input.hit('KeyC') || input.hit('ControlLeft') || input.hit('ControlRight');
+    const shift = input.act('sprint');
+    const crouchKey = input.act('crouch');
+    const crouchHit = input.actHit('crouch');
     const speedNow = Math.hypot(this.vel.x, this.vel.z);
 
     // ---- slide: crouch while sprinting
@@ -121,7 +122,7 @@ export class Player extends Character {
         this.vel.z = this.slideZ * this.slideSpeed;
       }
       // ends when it runs out of time or speed, hits something, or you jump out of it
-      if (this.slideT <= 0 || this.slideSpeed < CFG.crouchSpeed + 0.4 || this.hitWall || input.hit('Space')) {
+      if (this.slideT <= 0 || this.slideSpeed < CFG.crouchSpeed + 0.4 || this.hitWall || input.actHit('jump')) {
         this.sliding = false;
         this.slideCd = 0.45;
       }
@@ -129,7 +130,7 @@ export class Player extends Character {
       this.setCrouch(crouchKey);
       // Firing or aiming pauses the sprint for as long as you keep doing it. The short
       // window after each shot stops tap-firing a semi-auto from flickering back to a sprint.
-      const busy = input.left || input.right || w.sinceShot < 0.3 || this.meleeT > 0;
+      const busy = input.act('fire') || input.act('aim') || w.sinceShot < 0.3 || this.meleeT > 0;
       this.sprinting = shift && mf > 0.5 && !this.crouching && !busy && this.ads < 0.3 && this.onGround;
       let speed = CFG.walkSpeed;
       if (this.crouching) speed = CFG.crouchSpeed;
@@ -149,7 +150,7 @@ export class Player extends Character {
     this.eyeH += (eyeTarget - this.eyeH) * Math.min(1, dt * 12);
 
     // ---- lean (Q / E): shifts the head sideways, not through walls
-    const leanIn = (input.down('KeyE') ? 1 : 0) - (input.down('KeyQ') ? 1 : 0);
+    const leanIn = (input.act('leanRight') ? 1 : 0) - (input.act('leanLeft') ? 1 : 0);
     const wantLean = this.sprinting || this.sliding ? 0 : leanIn;
     this.lean += (wantLean - this.lean) * Math.min(1, dt * 11);
     if (Math.abs(this.lean) < 0.002) this.lean = 0;
@@ -165,7 +166,7 @@ export class Player extends Character {
 
     // ---- jump (with a little coyote time and input buffering)
     this.coyote = this.onGround ? 0.1 : this.coyote - dt;
-    this.jumpBuffer = input.hit('Space') ? 0.12 : this.jumpBuffer - dt;
+    this.jumpBuffer = input.actHit('jump') ? 0.12 : this.jumpBuffer - dt;
     const fallV = this.vel.y;
     this.vel.y = Math.max(-CFG.terminalVel, this.vel.y - CFG.gravity * dt);
     if (this.jumpBuffer > 0 && this.coyote > 0) {
@@ -199,14 +200,14 @@ export class Player extends Character {
     }
 
     // ---- weapons: 1 = primary, 2 = pistol, wheel swaps, F = grenade
-    if (input.hit('Digit1')) this.switchWeapon(0);
-    if (input.hit('Digit2')) this.switchWeapon(1);
+    if (input.actHit('primary')) this.switchWeapon(0);
+    if (input.actHit('pistol')) this.switchWeapon(1);
     if (input.wheel !== 0 && this.switchT <= 0) this.switchWeapon(this.weaponIdx === 0 ? 1 : 0);
-    if (input.hit('KeyR')) this.startReload();
-    if (input.hit('KeyF')) this.throwGrenade();
-    if (input.hit('KeyV')) this.knife();
-    if (input.hit('KeyT')) this.game.viewmodel.inspect();
-    this.tryFire(input.left, input.leftPressed, this.ads);
+    if (input.actHit('reload')) this.startReload();
+    if (input.actHit('grenade')) this.throwGrenade();
+    if (input.actHit('knife')) this.knife();
+    if (input.actHit('inspect')) this.game.viewmodel.inspect();
+    this.tryFire(input.act('fire'), input.actHit('fire'), this.ads);
     const aw = this.weapon;
     if (aw.mag === 0 && aw.cooldown <= 0 && this.canReload()) this.startReload(); // empty: reload by itself
     // primary completely dry: fall back to the pistol
@@ -235,7 +236,7 @@ export class Player extends Character {
       switchT: this.switchT,
       mdx: input.mdx, mdy: input.mdy,
       // anything that needs the gun cancels an inspect
-      busy: input.left || input.right || this.sprinting || this.sliding || this.weapon.reloadT > 0
+      busy: input.act('fire') || input.act('aim') || this.sprinting || this.sliding || this.weapon.reloadT > 0
         || this.switchT > 0 || this.meleeT > 0,
     });
   }
@@ -272,6 +273,7 @@ export class Player extends Character {
     const g = this.game, cam = g.camera;
     this.deathT += dt;
     // out of lives: watch the rest of the match from above
+    if (g.killcam.active) return; // the kill cam has the camera
     if (g.isOut(this) && this.deathT > 2.5) { g.orbitCamera(dt, 0.05); return; }
     this.scoped = false;
     this.leanOff = 0; this.lean = 0;
@@ -329,6 +331,7 @@ export class Player extends Character {
   onDeath(killer) {
     this.killer = killer;
     this.deathT = 0;
+    this.game.killcam.begin(killer, this);
     this.ads = 0;
     this.sliding = false;
   }

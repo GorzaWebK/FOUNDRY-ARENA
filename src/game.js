@@ -11,9 +11,13 @@ import { ViewModel } from './viewmodel.js';
 import { Player } from './player.js';
 import { Bot } from './bot.js';
 import { damageAtDistance, GRENADE, KNIFE, makeLoadout, makeSingle } from './weapons.js';
-import { getMode, TEAM_COLORS, GUN_LADDER, gunLevel } from './modes.js';
+import { getMode, TEAM_COLORS, TEAM_NAMES, GUN_LADDER, gunLevel } from './modes.js';
 import { Announcer } from './announcer.js';
+import { KillCam } from './killcam.js';
+import { Range } from './training.js';
 
+export const HILL_TIME = 60; // seconds before the hill moves
+const HILL_COLORS = { [-1]: 0xffffff, 0: TEAM_COLORS[0], 1: TEAM_COLORS[1], 2: 0xffd24d };
 const MULTI_WINDOW = 4; // seconds between kills that still count as a multi-kill
 const MULTI_NAMES = { 2: 'Double Kill', 3: 'Triple Kill', 4: 'Quad Kill' }; // 5+: Mega Kill
 const STREAK_NAMES = { 3: 'Killing Spree', 5: 'Rampage', 7: 'Dominating', 10: 'Unstoppable', 15: 'Godlike', 20: 'Legendary' };
@@ -31,7 +35,7 @@ const _hit = { t: 0, nx: 0, ny: 0, nz: 0 };
 const _ch = { t: 0, head: false };
 
 /** Ray vs. a character's hit volumes (head sphere + body box). */
-function rayChar(ox, oy, oz, dx, dy, dz, c, tMax, out) {
+export function rayChar(ox, oy, oz, dx, dy, dz, c, tMax, out) {
   let best = tMax, head = false, found = false;
   // head
   const lo = c.leanOff; // leaning moves the head sideways
@@ -96,9 +100,14 @@ export class Game {
     this.effects = new Effects(this.scene);
     this.viewmodel = new ViewModel();
     this.announcer = new Announcer(settings, audio, hud);
+    this.killcam = new KillCam(this);
+    this.range = null; // training range state, only on the range map
+    this.lastDt = 1 / 60;
     this.rules = getMode('ffa');
     this.teamScore = [0, 0];
     this.firstBlood = false;
+    this.hill = { idx: 0, t: HILL_TIME, holder: -1, acc: 0 };
+    this.hillFx = null;
     this.pickups = [];
     this.worldObjs = [];
     this.grenades = [];
@@ -195,10 +204,12 @@ export class Game {
     this.teamScore = [0, 0];
     this.firstBlood = false;
     this.time = 0;
-    this.matchTime = CFG.timeLimit;
+    this.matchTime = this.rules.training ? Infinity : CFG.timeLimit;
     this.over = false;
     this.winner = null;
     this.stats = { stuck: 0, shots: 0, kills: 0 };
+    if (this.range) { this.range.dispose(); this.range = null; }
+    if (this.rules.training) this.range = new Range(this);
     this.effects.clear();
     this.hud.reset();
     for (const p of this.pickups) p.reset();
@@ -211,6 +222,8 @@ export class Game {
     this.chars = attract ? [...this.bots] : [p, ...this.remotes, ...this.bots];
     for (const c of this.chars) this.resetScore(c);
     this.assignTeams();
+    if (this.rules.hill) this.resetHill();
+    this.killcam.reset();
     if (this.mode === 'host') this.net.onStart(); // tell clients before anyone spawns
     for (const c of this.chars) this.respawn(c, true);
     if (!attract) this.hud.centerMessage(this.rules.name.toUpperCase(), this.rules.blurb, 3.2, '#ff8a2a');
@@ -243,6 +256,7 @@ export class Game {
     this.bots = [];
     this.mode = 'client';
     this.rules = rules;
+    if (this.range) { this.range.dispose(); this.range = null; }
     this.teamScore = [0, 0];
     this.firstBlood = false;
     this.attract = false;
@@ -254,6 +268,7 @@ export class Game {
     this.clearGrenades();
     this.hud.reset();
     for (const p of this.pickups) p.reset();
+    this.killcam.reset();
     const p = this.player;
     p.alive = false;
     p.respawnAt = Infinity; // wait for the host to place us
@@ -267,6 +282,7 @@ export class Game {
     c.streak = 0; c.multi = 0; c.lastKillT = -99;
     c.gunLevel = 0;
     c.lives = this.rules.lives || 0;
+    c.hillTime = 0;
   }
 
   /** The weapons a character gets on spawning, under the current rules. */
@@ -391,10 +407,11 @@ export class Game {
     this.stats.shots++;
 
     const client = this.mode === 'client';
-    const ends = this.net ? [] : null; // what everyone else needs to draw this shot
+    const ends = []; // what everyone else (and the kill cam) needs to draw this shot
     const claims = client ? [] : null; // "I hit X" reports for the host to check
     const victims = this._victims || (this._victims = []);
     victims.length = 0;
+    let rangeHit = false, rangeHead = false;
     for (let i = 0; i < def.pellets; i++) {
       const a = Math.random() * Math.PI * 2;
       const r = spread * Math.sqrt(Math.random());
@@ -407,7 +424,17 @@ export class Game {
         if (c === shooter || !c.alive) continue;
         if (rayChar(_o.x, _o.y, _o.z, _d.x, _d.y, _d.z, c, tBest, _ch)) { tBest = _ch.t; victim = c; head = _ch.head; }
       }
+      // training range targets
+      const th = this.range && this.range.raycast(_o.x, _o.y, _o.z, _d.x, _d.y, _d.z, tBest, rayChar, _ch);
       const ex = _o.x + _d.x * tBest, ey = _o.y + _d.y * tBest, ez = _o.z + _d.z * tBest;
+      if (th) {
+        const tx = _o.x + _d.x * th.t, ty = _o.y + _d.y * th.t, tz = _o.z + _d.z * th.t;
+        this.range.damage(th.target, damageAtDistance(def, th.t) * (th.head ? CFG.headshotMult : 1), th.head, tx, ty, tz);
+        if (i < 4) fx.hitBurst(tx, ty, tz, _d.x, _d.y, _d.z, th.head ? 0xffd24d : 0xf4f1ea, th.head);
+        fx.tracer(_muz.x, _muz.y, _muz.z, tx, ty, tz);
+        rangeHit = true; rangeHead = rangeHead || th.head;
+        continue;
+      }
       if (victim) {
         const dmg = damageAtDistance(def, tBest) * (head ? CFG.headshotMult : 1);
         let v = victims.find((e) => e.c === victim);
@@ -415,13 +442,13 @@ export class Game {
         v.dmg += dmg;
         v.head = v.head || head;
         if (i < 4) fx.hitBurst(ex, ey, ez, _d.x, _d.y, _d.z, victim.isProtected() ? 0x8fd3ff : victim.color, head);
-        if (ends) ends.push([r2(ex), r2(ey), r2(ez), 2, victim.id, head ? 1 : 0]);
+        ends.push([r2(ex), r2(ey), r2(ez), 2, victim.id, head ? 1 : 0]);
         if (claims) claims.push([victim.id, head ? 1 : 0, r2(tBest)]);
       } else if (hitWorld) {
         fx.impact(ex, ey, ez, _hit.nx, _hit.ny, _hit.nz, i < 3);
         if (i === 0) { _d.set(ex, ey, ez); this.audio.play('impact', _d); }
-        if (ends) ends.push([r2(ex), r2(ey), r2(ez), 1, r2(_hit.nx), r2(_hit.ny), r2(_hit.nz)]);
-      } else if (ends) {
+        ends.push([r2(ex), r2(ey), r2(ez), 1, r2(_hit.nx), r2(_hit.ny), r2(_hit.nz)]);
+      } else {
         ends.push([r2(ex), r2(ey), r2(ez), 0]);
       }
       if (def.pellets === 1 || i % 2 === 0) fx.tracer(_muz.x, _muz.y, _muz.z, ex, ey, ez);
@@ -435,6 +462,8 @@ export class Game {
       this.audio.play(def.id, shooter.pos);
     }
     shooter.onFired(def);
+    if (this.range && shooter.isPlayer) this.range.onShot(rangeHit, rangeHead);
+    this.killcam.shot(shooter.id, def.index, [_muz.x, _muz.y, _muz.z], ends);
 
     if (client) {
       // The host owns health. Report what we hit; show the hit marker right away.
@@ -481,7 +510,7 @@ export class Game {
     }
     if (attacker !== victim) {
       attacker.kills++;
-      if (this.rules.teams && attacker.team >= 0) this.teamScore[attacker.team]++;
+      if (this.rules.teams && !this.rules.hill && attacker.team >= 0) this.teamScore[attacker.team]++;
     }
     this.stats.kills++;
     const weapon = def ? def.name : '?';
@@ -573,6 +602,12 @@ export class Game {
 
   knifeAttack(a) {
     this.audio.play('knife', a.isPlayer ? null : a.pos);
+    if (this.range) {
+      const t = this.range.meleeTarget(a, KNIFE.range);
+      if (t) { this.audio.play('stab'); this.range.damage(t, KNIFE.damage, false, t.pos.x, t.pos.y + 1.2, t.pos.z); }
+      this.range.onShot(!!t, false);
+      return;
+    }
     const v = this.meleeTarget(a, KNIFE.lunge);
     if (v) {
       // just out of reach: lunge in (the move is collision-checked like any other)
@@ -701,6 +736,7 @@ export class Game {
   /** Authoritative detonation: effects + damage to everyone in range and in sight. */
   explode(x, y, z, owner, id) {
     this.showExplosion(x, y, z);
+    if (this.range) this.range.explode(x, y, z, GRENADE.radius, GRENADE.damage);
     if (this.mode === 'host') this.net.onExplode(id, x, y, z);
     this.emitNoise(x, y, z, GRENADE.noise, owner, 'shot');
     const sy = y + 0.3;
@@ -720,6 +756,7 @@ export class Game {
 
   /** What an explosion looks and sounds like (also used by multiplayer clients). */
   showExplosion(x, y, z) {
+    this.killcam.boom(x, y, z);
     let groundY;
     if (this.world.raycast(x, y + 0.3, z, 0, -1, 0, 3, _hit)) groundY = y + 0.3 - _hit.t;
     this.effects.explosion(x, y, z, groundY);
@@ -730,6 +767,102 @@ export class Game {
       const d = Math.hypot(p.pos.x - x, p.pos.y - y, p.pos.z - z);
       if (d < 22) p.shake = Math.min(0.1, p.shake + 0.1 * (1 - d / 22));
     }
+  }
+
+  // ======================================================================
+  // King of the Hill
+  // ======================================================================
+
+  /** The active hill as [x, y, z, r], or null outside King of the Hill. */
+  hillZone() {
+    const hs = this.map.hills;
+    return this.rules.hill && hs && hs.length ? hs[this.hill.idx % hs.length] : null;
+  }
+
+  inHill(c, h = this.hillZone()) {
+    if (!h || !c.alive) return false;
+    return Math.hypot(c.pos.x - h[0], c.pos.z - h[2]) <= h[3] && Math.abs(c.pos.y - h[1]) <= 2.2;
+  }
+
+  resetHill() {
+    const n = this.map.hills.length;
+    this.hill = { idx: (Math.random() * n) | 0, t: HILL_TIME, holder: -1, acc: 0 };
+  }
+
+  moveHill() {
+    const n = this.map.hills.length;
+    let idx = this.hill.idx;
+    while (n > 1 && idx === this.hill.idx) idx = (Math.random() * n) | 0;
+    this.hill.idx = idx;
+    this.hill.t = HILL_TIME;
+    this.hill.holder = -1;
+    this.hill.acc = 0;
+    this.announcer.announce('Hill moved', 'Get to the new zone');
+  }
+
+  /** Authoritative hill logic: who holds it, points, moving it on. */
+  updateHill(dt) {
+    const h = this.hillZone();
+    if (!h || this.over) return;
+    const n = [0, 0];
+    for (const c of this.chars) if (c.team >= 0 && this.inHill(c, h)) n[c.team]++;
+    const holder = n[0] && n[1] ? 2 : n[0] ? 0 : n[1] ? 1 : -1;
+    if (holder !== this.hill.holder) {
+      this.hill.acc = 0;
+      if (holder === 0 || holder === 1) this.hillTaken(holder);
+      this.hill.holder = holder;
+    }
+    if (holder === 0 || holder === 1) {
+      for (const c of this.chars) if (c.team === holder && this.inHill(c, h)) c.hillTime += dt;
+      this.hill.acc += dt;
+      while (this.hill.acc >= 1) { this.hill.acc -= 1; this.teamScore[holder]++; }
+      if (this.rules.won(this)) { this.endMatch(); return; }
+    }
+    this.hill.t -= dt;
+    if (this.hill.t <= 0) this.moveHill();
+  }
+
+  /** A team just took the hill (also called on clients from snapshots). */
+  hillTaken(team) {
+    this.hud.feedNote(`${TEAM_NAMES[team]} team took the hill`, TEAM_COLORS[team]);
+    if (team === this.player.team) this.audio.play('pickup', null, 0.7, 700);
+  }
+
+  /** The glowing ring + light pillar marking the hill. */
+  updateHillFx(time) {
+    const h = !this.attract && this.hillZone();
+    if (!h) { if (this.hillFx) this.hillFx.group.visible = false; return; }
+    if (!this.hillFx) {
+      const group = new THREE.Group();
+      const add = (geo, opacity) => {
+        const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+          color: 0xffffff, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending, toneMapped: false, fog: false,
+        }));
+        group.add(m);
+        return m;
+      };
+      const ring = add(new THREE.RingGeometry(0.93, 1, 48), 0.85);
+      ring.rotation.x = -Math.PI / 2;
+      const disc = add(new THREE.CircleGeometry(1, 48), 0.1);
+      disc.rotation.x = -Math.PI / 2;
+      const pillar = add(new THREE.CylinderGeometry(0.35, 0.35, 1, 16, 1, true), 0.22);
+      this.scene.add(group);
+      this.hillFx = { group, ring, disc, pillar };
+    }
+    const fx = this.hillFx;
+    fx.group.visible = true;
+    fx.group.position.set(h[0], h[1] + 0.04, h[2]);
+    fx.ring.scale.setScalar(h[3]);
+    fx.disc.scale.setScalar(h[3]);
+    fx.pillar.scale.set(1, 40, 1);
+    fx.pillar.position.y = 20;
+    const holder = this.hill.holder;
+    const col = HILL_COLORS[holder] ?? 0xffffff;
+    for (const m of [fx.ring, fx.disc, fx.pillar]) m.material.color.set(col);
+    const pulse = holder === 2 ? 0.5 + 0.5 * Math.sin(time * 10) : 0.8 + 0.2 * Math.sin(time * 3);
+    fx.ring.material.opacity = 0.85 * pulse;
+    fx.pillar.material.opacity = 0.22 * pulse;
   }
 
   /** Let bots within `radius` hear a sound. */
@@ -808,11 +941,16 @@ export class Game {
     this.separate();
     if (this.attract) this.orbitCamera(dt, 0.045);
     else this.player.update(dt, this.input);
+    if (this.range) this.range.update(dt);
     for (const r of this.remotes) r.update(dt);
     for (const b of this.bots) b.update(dt);
     this.updateGrenades(dt);
     this.updatePickups(dt);
+    if (this.rules.hill && !this.attract) this.updateHill(dt);
+    this.updateHillFx(this.time);
     this.effects.update(dt);
+    if (!this.attract) { this.killcam.record(dt); this.killcam.update(dt); }
+    this.lastDt = dt;
 
     const cam = this.camera;
     this.audio.setListener(cam.position.x, cam.position.y, cam.position.z, this.attract ? 0 : this.player.yaw);
@@ -828,7 +966,12 @@ export class Game {
     for (const r of this.remotes) r.update(dt);
     for (const p of this.pickups) p.update(dt, this.time, false);
     this.updateGrenades(dt);
+    if (this.rules.hill) this.hill.t = Math.max(0, this.hill.t - dt); // re-synced by snapshots
+    this.updateHillFx(this.time);
     this.effects.update(dt);
+    this.killcam.record(dt);
+    this.killcam.update(dt);
+    this.lastDt = dt;
     const cam = this.camera;
     this.audio.setListener(cam.position.x, cam.position.y, cam.position.z, this.player.yaw);
     this.hud.update(this, dt);
@@ -846,6 +989,7 @@ export class Game {
 
   render() {
     const r = this.renderer;
+    if (this.killcam.active) this.killcam.apply(this.lastDt);
     r.clear();
     r.render(this.scene, this.camera);
     if (!this.attract && !this.over && this.player.alive) {

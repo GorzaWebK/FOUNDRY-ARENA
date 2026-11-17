@@ -11,6 +11,7 @@
 //   teams          two teams, no friendly fire, team score
 //   gunGame        weapons are handed out by kill count (see GUN_LADDER)
 //   lives          limited lives; nobody respawns after their last
+//   hill           King of the Hill: a scoring zone that moves (see map.hills)
 //   forcePrimary   everyone gets this primary regardless of their loadout
 
 import { WEAPON_BY_ID } from './weapons.js';
@@ -86,6 +87,29 @@ export const MODES = [
       const w = b > r ? 0 : 1;
       const won = game.player.team === w;
       return { won, sub: `${TEAM_NAMES[w]} team won ${score}.${won ? ' Nice work.' : ''}` };
+    },
+  },
+
+  {
+    id: 'koth', name: 'King of the Hill', teams: true, hill: true, scoreLimit: 100,
+    blurb: 'Blue vs Red fight over a zone that moves every minute. Hold it with no enemies inside to score. First to 100.',
+    rank: (chars) => [...chars].sort((a, b) => a.team - b.team || b.hillTime - a.hillTime || byKills(a, b)),
+    won: (game) => game.teamScore[0] >= 100 || game.teamScore[1] >= 100,
+    hud(game) {
+      const mine = Math.max(0, game.player.team), other = 1 - mine;
+      return {
+        left: [TEAM_NAMES[mine].toUpperCase(), game.teamScore[mine], hex(TEAM_COLORS[mine])],
+        right: [TEAM_NAMES[other].toUpperCase(), game.teamScore[other], hex(TEAM_COLORS[other])],
+        sub: 'king of the hill · 100',
+      };
+    },
+    column: { title: 'Hill', value: (c) => `${Math.round(c.hillTime || 0)}s` },
+    result(game) {
+      const [b, r] = game.teamScore;
+      if (b === r) return { won: false, draw: true, sub: `Both teams finished on ${b} points.` };
+      const w = b > r ? 0 : 1;
+      const won = game.player.team === w;
+      return { won, sub: `${TEAM_NAMES[w]} team held the hill, ${Math.max(b, r)}–${Math.min(b, r)}.` };
     },
   },
 

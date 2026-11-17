@@ -1,5 +1,11 @@
 // DOM heads-up display. Only touches the DOM when a value actually changes.
 
+import * as THREE from 'three';
+import { TEAM_COLORS, TEAM_NAMES } from './modes.js';
+
+const _hv = new THREE.Vector3();
+const HILL_TEXT_COL = { [-1]: '#e8e8e8', 0: '#' + TEAM_COLORS[0].toString(16).padStart(6, '0'), 1: '#' + TEAM_COLORS[1].toString(16).padStart(6, '0'), 2: '#ffd24d' };
+
 
 const $ = (id) => document.getElementById(id);
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
@@ -19,10 +25,12 @@ export class Hud {
       sb: $('scoreboard'), sbBody: $('sb-body'), fps: $('fps'), lockHint: $('lock-hint'),
       slotPrim: $('slot-prim'), nade: $('slot-nade'), nadeCount: $('nade-count'), scope: $('scope'),
       chat: $('chat'), chatLog: $('chat-log'), chatHint: $('chat-hint'),
+      hillStatus: $('hill-status'), hillMarker: $('hill-marker'),
       youLabel: $('tb-youlabel'), announce: $('announce'), anMain: $('an-main'), anSub: $('an-sub'),
     };
     this.anT = 0;
     this.chatLines = [];
+    this.reloadKey = 'R';
     this.slots = [...document.querySelectorAll('#slots .slot[data-i]')];
     this.cache = {};
     this.hitT = 0;
@@ -77,7 +85,7 @@ export class Hud {
     this._set('magLow', w.mag <= w.def.magSize * 0.25, (v) => e.mag.classList.toggle('low', v));
     this._set('res', w.reserve, (v) => { e.res.textContent = v === Infinity ? '∞' : v; });
     this._set('wname', w.def.name, (v) => { e.wname.textContent = v; });
-    const rl = w.reloadT > 0 ? 'RELOADING' : w.mag === 0 ? (w.reserve > 0 ? 'PRESS R TO RELOAD' : 'NO AMMO') : '';
+    const rl = w.reloadT > 0 ? 'RELOADING' : w.mag === 0 ? (w.reserve > 0 ? `PRESS ${this.reloadKey} TO RELOAD` : 'NO AMMO') : '';
     this._set('rl', rl, (v) => { e.reload.textContent = v; });
     this._set('slot', p.weaponIdx, (v) => this.slots.forEach((s, i) => s.classList.toggle('on', i === v)));
     for (let i = 0; i < this.slots.length; i++) {
@@ -91,7 +99,7 @@ export class Hud {
     // match info
     const t = Math.max(0, Math.ceil(game.matchTime));
     this._set('time', t, (v) => {
-      e.time.textContent = `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
+      e.time.textContent = Number.isFinite(v) ? `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}` : '∞';
       e.time.classList.toggle('hurry', v <= 30);
     });
     // the top bar's two scores depend on the mode
@@ -125,7 +133,14 @@ export class Hud {
     this._set('prot', prot, (v) => { e.protect.style.opacity = v ? 1 : 0; e.protectFrame.style.opacity = v ? 1 : 0; });
 
     // death overlay
-    this._set('dead', !p.alive, (v) => e.death.classList.toggle('hidden', !v));
+    const kc = game.killcam.active;
+    this._set('dead', !p.alive && !kc, (v) => e.death.classList.toggle('hidden', !v));
+    this._set('kc', kc, (v) => $('killcam').classList.toggle('hidden', !v));
+    if (kc) {
+      this._set('kcWho', game.killcam.killerName, (v) => { $('kc-who').innerHTML = `Watching <b style="color:${hex(game.killcam.killerColor)}">${esc(v)}</b>`; });
+      const left = p.respawnAt - game.time;
+      this._set('kcCount', Number.isFinite(left) ? Math.max(0, Math.ceil(left)) : -1, (v) => { $('kc-count').textContent = v >= 0 ? `Respawning in ${v}` : ''; });
+    }
     if (!p.alive) {
       const left = Math.max(0, p.respawnAt - game.time);
       const out = game.isOut(p);
@@ -160,6 +175,36 @@ export class Hud {
     }
 
     if (this.anT > 0) { this.anT -= dt; if (this.anT <= 0) e.announce.style.opacity = 0; }
+
+    // King of the Hill: status line + a marker pointing at the zone
+    const h = game.hillZone();
+    this._set('hillOn', !!h, (v) => { e.hillStatus.classList.toggle('hidden', !v); });
+    if (h) {
+      const holder = game.hill.holder;
+      const left = Math.max(0, Math.ceil(game.hill.t));
+      const inside = game.inHill(p, h);
+      const what = holder === 2 ? 'CONTESTED' : holder >= 0 ? `${TEAM_NAMES[holder].toUpperCase()} HOLDING` : 'HILL NEUTRAL';
+      const text = `${inside ? 'ON THE HILL · ' : ''}${what} · MOVES IN ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+      this._set('hillText', text, (v) => { e.hillStatus.textContent = v; });
+      this._set('hillCol', holder, (v) => { e.hillStatus.style.color = HILL_TEXT_COL[v]; e.hillMarker.style.color = HILL_TEXT_COL[v]; });
+      this._set('hillIn', inside, (v) => e.hillStatus.classList.toggle('on', v));
+      // marker: on screen where the hill is, or pinned to the edge pointing at it
+      const showMarker = p.alive && !inside;
+      e.hillMarker.classList.toggle('hidden', !showMarker);
+      if (showMarker) {
+        _hv.set(h[0], h[1] + 1.2, h[2]).project(game.camera);
+        let x = _hv.x, y = _hv.y;
+        if (_hv.z > 1) { x = -x; y = -y; } // behind us: flip, then push to the edge
+        const m = Math.max(Math.abs(x), Math.abs(y));
+        if (_hv.z > 1 || m > 0.92) { x = (x / (m || 1)) * 0.92; y = (y / (m || 1)) * 0.92; }
+        const W = window.innerWidth, H = window.innerHeight;
+        e.hillMarker.style.transform = `translate(${((x + 1) / 2) * W}px, ${((1 - y) / 2) * H}px) translate(-50%, -50%)`;
+        const d = Math.round(Math.hypot(p.pos.x - h[0], p.pos.z - h[2]));
+        this._set('hillD', d, (v) => { e.hillMarker.lastChild.textContent = `${v}m`; });
+      }
+    } else {
+      e.hillMarker.classList.add('hidden');
+    }
 
     // chat lines fade out after a while (they come back while the chat box is open)
     for (const c of this.chatLines) {
@@ -212,6 +257,18 @@ export class Hud {
     this.el.feed.append(el);
     this.feedItems.push({ el, life: 6 });
     while (this.feedItems.length > 6) this.feedItems.shift().el.remove();
+  }
+
+  /** Show the player's own key bindings in HUD hints. */
+  setBindHints(label) {
+    this.reloadKey = label('reload').toUpperCase();
+    const b = (sel) => document.querySelector(sel);
+    b('#slots .slot[data-i="0"] b').textContent = label('primary');
+    b('#slots .slot[data-i="1"] b').textContent = label('pistol');
+    b('#slot-nade b').textContent = label('grenade');
+    b('#slot-knife b').textContent = label('knife');
+    this.el.chatHint.textContent = `${label('chat')} to chat`;
+    this.cache.rl = null;
   }
 
   /** Killstreak call-out banner. */

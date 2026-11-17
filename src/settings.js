@@ -3,6 +3,7 @@
 import { DEFAULT_PRIMARY, isPrimary } from './weapons.js';
 import { DEFAULT_MAP, MAPS } from './maps/index.js';
 import { DEFAULT_MODE, MODES } from './modes.js';
+import { defaultBinds, cleanBinds } from './bindings.js';
 
 const KEY = 'foundry-arena-settings-v3';
 
@@ -21,6 +22,8 @@ export const DEFAULTS = {
   map: DEFAULT_MAP,
   mode: DEFAULT_MODE,
   announcer: true, // spoken killstreak call-outs
+  killcam: true,
+  binds: defaultBinds(), // action -> [key, key]
 };
 
 export function loadSettings() {
@@ -40,6 +43,7 @@ export function loadSettings() {
   if (!isPrimary(s.primary)) s.primary = DEFAULT_PRIMARY;
   if (!MAPS.some((m) => m.id === s.map)) s.map = DEFAULT_MAP;
   if (!MODES.some((m) => m.id === s.mode)) s.mode = DEFAULT_MODE;
+  s.binds = cleanBinds(s.binds);
   return s;
 }
 
@@ -63,6 +67,7 @@ export function buildSettingsUI(container, settings, onChange) {
     { key: 'volume', label: 'Volume', min: 0, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' },
     { key: 'quality', label: 'Graphics', options: [['high', 'High'], ['low', 'Low (faster)']] },
     { key: 'announcer', label: 'Announcer voice', check: true },
+    { key: 'killcam', label: 'Kill cam', check: true },
     { key: 'invertY', label: 'Invert Y', check: true },
     { key: 'showFps', label: 'Show FPS', check: true },
   ];

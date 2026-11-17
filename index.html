@@ -57,6 +57,7 @@
         </div>
       </div>
 
+      <div id="killcam" class="hidden"><div class="kc-title">KILL CAM</div><div id="kc-who"></div><div id="kc-count"></div></div>
       <div id="death" class="hidden">
         <div id="death-by">Eliminated by <b id="death-name">Bot</b></div>
         <div id="death-count">Respawning in 3</div>
@@ -68,6 +69,10 @@
       </div>
       <div id="fps" class="hidden"></div>
       <div id="room" class="hidden"></div>
+      <div id="hill-status" class="hidden"></div>
+      <div id="range-panel" class="hidden"></div>
+      <div id="dmg-nums"></div>
+      <div id="hill-marker" class="hidden"><i></i><span></span></div>
       <div id="scope" class="hidden"><i class="sc-h"></i><i class="sc-v"></i></div>
       <div id="chat">
         <div id="chat-log"></div>
@@ -111,21 +116,15 @@
           </div>
           <div class="col">
             <h4>Controls</h4>
-            <ul class="keys">
-              <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</li>
-              <li><kbd>Mouse</kbd> look · <kbd>LMB</kbd> fire · <kbd>RMB</kbd> aim</li>
-              <li><kbd>Space</kbd> jump · <kbd>Shift</kbd> sprint</li>
-              <li><kbd>C</kbd> / <kbd>Ctrl</kbd> crouch · while sprinting: slide</li>
-              <li><kbd>Q</kbd> lean left · <kbd>E</kbd> lean right</li>
-              <li><kbd>F</kbd> grenade · <kbd>V</kbd> knife · <kbd>R</kbd> reload · <kbd>T</kbd> inspect</li>
-              <li><kbd>1</kbd> primary · <kbd>2</kbd> pistol · <kbd>Wheel</kbd> swap</li>
-              <li><kbd>Enter</kbd> chat (multiplayer)</li>
-              <li><kbd>Tab</kbd> scoreboard · <kbd>Esc</kbd> / <kbd>P</kbd> pause</li>
-            </ul>
-            <p class="note">Tip: prefer <kbd>C</kbd> to crouch — browsers reserve <kbd>Ctrl</kbd>+<kbd>W</kbd> for closing the tab.</p>
+            <ul class="keys" id="keys-list"></ul>
+            <button id="btn-controls" class="small-btn">Change controls…</button>
+            <p class="note">Tip: avoid <kbd>Ctrl</kbd> combos — browsers reserve <kbd>Ctrl</kbd>+<kbd>W</kbd> for closing the tab.</p>
           </div>
         </div>
-        <button id="btn-play" class="primary">PLAY SOLO</button>
+        <div class="play-row">
+          <button id="btn-play" class="primary">PLAY SOLO</button>
+          <button id="btn-train">TRAINING RANGE</button>
+        </div>
       </div>
     </div>
 
@@ -152,7 +151,9 @@
         <p id="loadout-note" class="note"></p>
         <h4>Settings</h4>
         <div id="pause-settings"></div>
+        <button id="btn-controls-pause" class="small-btn">Change controls…</button>
         <div class="btn-row">
+          <button id="btn-range-reset" class="hidden">Reset stats</button>
           <button id="btn-bots">Bots: On</button>
           <button id="btn-restart">Restart match</button>
           <button id="btn-quit">Main menu</button>
@@ -170,6 +171,20 @@
         <div class="btn-row">
           <button id="btn-again" class="primary">PLAY AGAIN</button>
           <button id="btn-menu">Main menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================== CONTROLS ============================== -->
+    <div id="controls" class="overlay hidden">
+      <div class="panel">
+        <h2>CONTROLS</h2>
+        <p class="note">Click a slot, then press a key or mouse button. <kbd>Esc</kbd> cancels, <kbd>Backspace</kbd> clears the slot. The mouse wheel always swaps weapons.</p>
+        <div id="binds" class="binds"></div>
+        <p id="binds-note" class="note"></p>
+        <div class="btn-row">
+          <button id="btn-binds-reset">Reset to defaults</button>
+          <button id="btn-binds-done" class="primary">DONE</button>
         </div>
       </div>
     </div>
