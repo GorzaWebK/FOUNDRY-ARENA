@@ -125,6 +125,7 @@
             <ul class="keys" id="keys-list"></ul>
             <button id="btn-controls" class="small-btn">Change controls…</button>
             <p class="note">Tip: avoid <kbd>Ctrl</kbd> combos — browsers reserve <kbd>Ctrl</kbd>+<kbd>W</kbd> for closing the tab.</p>
+            <div class="acct-row"><span class="acct-line">Player ID <b id="acct-id-menu" class="acct-id">—</b></span><button id="btn-account" class="small-btn">Account…</button></div>
           </div>
         </div>
         <div class="play-row">
@@ -191,6 +192,34 @@
           <button id="btn-again" class="primary">PLAY AGAIN</button>
           <button id="btn-menu">Main menu</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ============================== ACCOUNT ============================== -->
+    <div id="account" class="overlay hidden">
+      <div class="panel">
+        <h2>ACCOUNT</h2>
+        <p class="acct-line">Your player ID <b id="acct-id" class="acct-id">—</b> <small id="acct-since"></small></p>
+        <p class="note">Your account is everything this browser has saved: your name, settings, crosshair, loadout,
+          key bindings and training-range best. There's no sign-up. Back it up as an account code and paste it into
+          any browser to carry on there.</p>
+        <h4>Back up</h4>
+        <div class="btn-row">
+          <button id="btn-acct-copy">Copy account code</button>
+          <button id="btn-acct-download">Download backup file</button>
+        </div>
+        <p class="note">Your code changes as you play, so back up again after a session to keep newer progress.
+          Keep it to yourself: anyone with it can load your account.</p>
+        <h4>Import</h4>
+        <textarea id="acct-code" rows="3" placeholder="Paste an account code (starts with FA1.)" spellcheck="false" autocomplete="off"></textarea>
+        <div class="btn-row">
+          <button id="btn-acct-import" class="primary">IMPORT</button>
+          <button id="btn-acct-file">Import from file…</button>
+          <input type="file" id="acct-file" accept=".txt,text/plain" hidden />
+        </div>
+        <p class="note">Importing replaces this browser's account with the one in the code, then reloads the page.</p>
+        <p id="acct-status" class="note"></p>
+        <div class="btn-row"><button id="btn-acct-done">Done</button></div>
       </div>
     </div>
 

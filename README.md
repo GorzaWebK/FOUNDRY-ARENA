@@ -134,6 +134,23 @@ again cancels it.
 Sensitivity, field of view, volume, graphics quality, announcer voice, kill cam,
 invert-Y, crosshair, key bindings, mode, map, bots, difficulty, loadout, your
 multiplayer name and your training-range best are saved to `localStorage`.
+### Your account
+
+Every player gets a random, unique **player ID** (like `FA-7K3M-Q9XD`), shown at
+the bottom of the main menu's Controls column. Your account is everything this
+browser has saved (name, settings, crosshair, loadout, key bindings, training-range
+best). **Account…** lets you:
+
+- **Copy account code**: one code (starting `FA1.`) holding your ID and all of that
+  data. Paste it into **Import** in any browser to carry on there.
+- **Download backup file**: the same code as a `.txt` file; **Import from file…**
+  reads it back.
+
+There's no server or sign-up: the code *is* the account, so keep it private, and
+back up again after playing, since the code changes as your saved data does.
+Importing asks first, replaces that browser's account, then reloads the page. A
+checksum catches codes that were cut short or mistyped.
+
 **Crosshair** (under Settings) sets its colour, line length (0 for a dot only),
 thickness, extra gap, centre dot and outline, with a live preview. The lines
 still spread apart to show your current accuracy.
@@ -266,6 +283,7 @@ src/game.js           match flow, hitscan, grenades, damage, spawning, pickups, 
 src/modes.js          game modes: rules, scoring, ranking, HUD text, results
 src/killcam.js        rolling recording + kill cam replay
 src/smoke.js          smoke grenade clouds (visuals + line-of-sight blocking)
+src/account.js        player ID + account code export / import
 src/training.js       training range: targets, stands, challenge, stats
 src/bindings.js       rebindable controls
 src/announcer.js      killstreak call-outs (banner + speech synthesis)

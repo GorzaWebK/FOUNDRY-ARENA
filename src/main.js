@@ -15,6 +15,7 @@ import { Net, cleanName } from './net.js';
 import { cleanRoomCode } from './transport.js';
 import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
 import { BUILD, BUILD_TIME } from './version.js';
+import { getAccount, exportCode, parseCode, importAccount } from './account.js';
 
 {
   // version stamp on the main menu, so players can compare before joining
@@ -486,6 +487,70 @@ function closeControls() {
   listening = null;
   $('controls').classList.add('hidden');
 }
+// ---------------------------------------------------------------- account (ID + backup / import)
+const account = getAccount();
+$('acct-id-menu').textContent = account.id;
+$('acct-id').textContent = account.id;
+$('acct-since').textContent = account.created ? `since ${account.created}` : '';
+
+function acctStatus(text, kind = '') {
+  const el = $('acct-status');
+  el.textContent = text;
+  el.className = 'note' + (kind ? ' ' + kind : '');
+}
+function openAccount() {
+  acctStatus('');
+  $('acct-code').value = '';
+  $('account').classList.remove('hidden');
+}
+function closeAccount() { $('account').classList.add('hidden'); }
+
+$('btn-account').addEventListener('click', openAccount);
+$('btn-acct-done').addEventListener('click', closeAccount);
+$('btn-acct-copy').addEventListener('click', async () => {
+  try {
+    const code = await exportCode();
+    let ok = false;
+    try { await navigator.clipboard.writeText(code); ok = true; } catch (e) { /* show it instead */ }
+    if (ok) acctStatus('Account code copied. Keep it somewhere safe.', 'ok');
+    else { $('acct-code').value = code; $('acct-code').select(); acctStatus("Couldn't copy automatically. The code is in the box above: copy it from there.", 'err'); }
+  } catch (e) { acctStatus("Couldn't make an account code: " + e.message, 'err'); }
+});
+$('btn-acct-download').addEventListener('click', async () => {
+  try {
+    const code = await exportCode();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([code + '\n'], { type: 'text/plain' }));
+    a.download = `foundry-arena-${account.id}-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    acctStatus('Backup file downloaded.', 'ok');
+  } catch (e) { acctStatus("Couldn't make a backup file: " + e.message, 'err'); }
+});
+async function doImport(text) {
+  let obj;
+  try { obj = await parseCode(text); } catch (e) { acctStatus(e.message || "That code couldn't be read.", 'err'); return; }
+  const same = obj.id === account.id;
+  const msg = same
+    ? `Restore account ${obj.id} from this code (saved ${String(obj.saved || '').slice(0, 10)})? What's saved here now will be replaced.`
+    : `Switch this browser to account ${obj.id}? Account ${account.id} here will be replaced. Back it up first if you want to keep it.`;
+  if (!window.confirm(msg)) return;
+  importAccount(obj);
+  acctStatus(`Imported ${obj.id}. Reloading…`, 'ok');
+  setTimeout(() => location.reload(), 400);
+}
+$('btn-acct-import').addEventListener('click', () => doImport($('acct-code').value));
+$('btn-acct-file').addEventListener('click', () => $('acct-file').click());
+$('acct-file').addEventListener('change', async () => {
+  const f = $('acct-file').files[0];
+  $('acct-file').value = '';
+  if (!f) return;
+  if (f.size > 500000) { acctStatus("That file is too big to be an account backup.", 'err'); return; }
+  doImport(await f.text());
+});
+
 $('btn-controls').addEventListener('click', openControls);
 $('btn-controls-pause').addEventListener('click', openControls);
 $('btn-binds-done').addEventListener('click', closeControls);
@@ -518,10 +583,14 @@ canvas.addEventListener('click', () => {
   if (state === 'playing' && !input.locked) lock().then((ok) => hud.setLockHint(!ok));
 });
 window.addEventListener('keydown', (e) => {
-  const typing = e.target instanceof HTMLInputElement && e.target.type === 'text';
+  const typing = (e.target instanceof HTMLInputElement && e.target.type === 'text') || e.target instanceof HTMLTextAreaElement;
   if (typing) return;
   if (!$('controls').classList.contains('hidden')) {
     if (e.code === 'Escape') closeControls();
+    return;
+  }
+  if (!$('account').classList.contains('hidden')) {
+    if (e.code === 'Escape') closeAccount();
     return;
   }
   const binds = settings.binds;
