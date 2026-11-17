@@ -71,7 +71,8 @@ export class Player extends Character {
     const w = this.weapon;
 
     // ---- look
-    const wantAds = input.right && w.reloadT <= 0 && this.switchT <= 0 && !this.sprinting;
+    // aiming always wins over sprinting (the sprint picks up again when you let go)
+    const wantAds = input.right && w.reloadT <= 0 && this.switchT <= 0;
     this.ads += ((wantAds ? 1 : 0) - this.ads) * Math.min(1, dt * 14);
     if (this.ads < 0.002) this.ads = 0;
     this.scoped = !!w.def.scope && this.ads > 0.8;
@@ -123,7 +124,10 @@ export class Player extends Character {
       }
     } else {
       this.setCrouch(crouchKey);
-      this.sprinting = shift && mf > 0.5 && !this.crouching && this.ads < 0.3 && this.onGround;
+      // Firing or aiming pauses the sprint for as long as you keep doing it. The short
+      // window after each shot stops tap-firing a semi-auto from flickering back to a sprint.
+      const busy = input.left || input.right || w.sinceShot < 0.3;
+      this.sprinting = shift && mf > 0.5 && !this.crouching && !busy && this.ads < 0.3 && this.onGround;
       let speed = CFG.walkSpeed;
       if (this.crouching) speed = CFG.crouchSpeed;
       else if (this.ads > 0.5) speed = CFG.adsSpeed;

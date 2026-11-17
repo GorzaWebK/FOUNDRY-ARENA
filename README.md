@@ -54,7 +54,7 @@ Every push to `main` is built and published to GitHub Pages by
 | Left click            | fire                                          |
 | Right click           | aim down sights / scope                       |
 | `Space`               | jump                                          |
-| `Shift`               | sprint                                        |
+| `Shift`               | sprint (firing or aiming pauses it)           |
 | `C` or `Ctrl`         | crouch — press it **while sprinting to slide** |
 | `Q` / `E`             | lean left / right                             |
 | `F`                   | throw a grenade                               |
