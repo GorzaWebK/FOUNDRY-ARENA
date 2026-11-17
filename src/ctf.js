@@ -151,7 +151,7 @@ export class Ctf {
     const byMe = who === me;
     if (kind === 'take') {
       g.hud.feedNote(`${by} took the ${name} flag`, who ? who.color : col);
-      if (byMe) g.announcer.announce('You have the flag', 'Bring it back to your base');
+      if (byMe) { g.announcer.announce('You have the flag', 'Bring it back to your base'); g.xp(75, 'Flags'); }
       else if (mine) g.announcer.announce('Flag taken', `${by} has your flag`);
       g.audio.play('pickup', null, 0.8, mine ? 300 : 900);
     } else if (kind === 'drop') {
@@ -160,6 +160,7 @@ export class Ctf {
     } else if (kind === 'return') {
       g.hud.feedNote(`${by} returned the ${name} flag`, who ? who.color : col);
       if (mine) g.announcer.announce('Flag returned');
+      if (byMe) g.xp(100, 'Flags');
       g.audio.play('pickup', null, 0.6, 500);
     } else if (kind === 'home') {
       g.hud.feedNote(`The ${name} flag went home`, col);
@@ -167,7 +168,7 @@ export class Ctf {
       g.hud.feedNote(`${by} captured the ${name} flag`, who ? who.color : col);
       g.announcer.announce(mine ? 'Enemy captured' : byMe ? 'Flag captured!' : 'Team captured', mine ? `${by} took your flag home` : '+1 capture');
       g.audio.play(mine ? 'lose' : 'win', null, 0.6);
-      if (byMe && g.forCareer) g.career.cap();
+      if (byMe && g.forCareer) { g.career.cap(); g.xp(400, 'Captures'); }
     }
   }
 

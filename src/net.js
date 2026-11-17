@@ -24,11 +24,13 @@ import * as THREE from 'three';
 import { WEAPONS, WEAPON_BY_ID, KNIFE, GRENADE, NADES, TACTICALS, TACTICAL_BY_ID, isPrimary, damageAtDistance } from './weapons.js';
 import { getMap } from './maps/index.js';
 import { getMode, makeRules } from './modes.js';
+import { tracerColor } from './game.js';
 import { NetChar } from './netChar.js';
 import { getTransport, makeRoomCode, cleanRoomCode } from './transport.js';
 import { BUILD, BUILD_TIME, OLD_CLIENT_MSG, OLD_HOST_MSG } from './version.js';
 import { getAccount, isPlayerId } from './account.js';
 import { SKINS, skinIndex } from './skins.js';
+import { packCosmetics, unpackCosmetics } from './cosmetics.js';
 
 const SNAP_INTERVAL = 1 / 20;
 const SEND_INTERVAL = 1 / 30;
@@ -143,7 +145,7 @@ export class Net {
         this._begin(m);
         resolve();
       };
-      conn.send({ t: 'hello', name: cleanName(name), v: this.version, vt: this.versionTime, pid: this.pid });
+      conn.send({ t: 'hello', name: cleanName(name), v: this.version, vt: this.versionTime, pid: this.pid, cos: this._myCos() });
     });
   }
 
@@ -292,6 +294,7 @@ export class Net {
     const c = new NetChar(g, this.nextId++, name, saved && !used.has(saved.color) ? saved.color : color, false);
     c.conn = conn;
     c.pid = pid;
+    c.setCosmetics(unpackCosmetics(m.cos));
     c.lastSeen = now;
     c.alive = false;
     c.respawnAt = Infinity;
@@ -341,7 +344,21 @@ export class Net {
   }
 
   _roster() {
-    return this.game.chars.map((c) => [c.id, c.name, c.color, c.isHuman ? 0 : 1, c.team]);
+    return this.game.chars.map((c) => [c.id, c.name, c.color, c.isHuman ? 0 : 1, c.team, packCosmetics(c.cos.equipped, c.cos.level, c.cos.prestige)]);
+  }
+
+  /** Our own level + cosmetics, packed for the wire. */
+  _myCos() {
+    const g = this.game, cos = g.ownCosmetics();
+    return packCosmetics(cos.equipped, cos.level, cos.prestige);
+  }
+
+  /** Our cosmetics or level changed: let everyone know. */
+  cosmeticsChanged() {
+    const g = this.game;
+    g.player.cos = g.ownCosmetics();
+    if (this.role === 'host') this.onRosterChanged();
+    else if (this.conn) this.conn.send({ t: 'cos', c: this._myCos() });
   }
 
   _hostMsg(c, m) {
@@ -352,6 +369,13 @@ export class Net {
     else if (m.t === 'k') this._hostKnife(c, m);
     else if (m.t === 'vote') this._vote(c.id, m.i);
     else if (m.t === 'bye') c.leftOnPurpose = true;
+    else if (m.t === 'cos') {
+      const now = performance.now();
+      if (now - (c.lastCosT || 0) < 300) return;
+      c.lastCosT = now;
+      c.setCosmetics(unpackCosmetics(m.c));
+      this.onRosterChanged();
+    }
     else if (m.t === 'c') {
       const now = performance.now();
       const text = cleanChat(m.m);
@@ -636,7 +660,7 @@ export class Net {
     const seen = new Set();
     for (const e of list) {
       if (!Array.isArray(e) || !num(e[0])) continue;
-      const [id, name, color, bot, team] = e;
+      const [id, name, color, bot, team, cos] = e;
       seen.add(id);
       const col = num(color) ? color : 0xffffff;
       if (id === g.player.id) {
@@ -654,6 +678,7 @@ export class Net {
       c.team = num(team) ? team : -1;
       c.color = col;
       c.model.setColor(col, c.name);
+      if (Array.isArray(cos)) c.setCosmetics(unpackCosmetics(cos));
     }
     for (const r of [...g.remotes]) if (!seen.has(r.id)) g.removeRemote(r);
     this.hooks.onRoster();
@@ -866,7 +891,7 @@ export class Net {
         const l = Math.hypot(dx, dy, dz) || 1;
         if (i < 4) fx.hitBurst(e[0], e[1], e[2], dx / l, dy / l, dz / l, v ? (v.isProtected() ? 0x8fd3ff : v.color) : 0xffffff, !!e[5]);
       }
-      if (def.pellets === 1 || i % 2 === 0) fx.tracer(mx, my, mz, e[0], e[1], e[2]);
+      if (def.pellets === 1 || i % 2 === 0) fx.tracer(mx, my, mz, e[0], e[1], e[2], tracerColor(shooter));
     }
     g.audio.play(def.id, shooter ? shooter.pos : { x: mx, y: my, z: mz });
     if (shooter && shooter.model) shooter.model.muzzleFlash();

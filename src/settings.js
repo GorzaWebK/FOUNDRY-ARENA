@@ -126,7 +126,8 @@ export function buildSettingsUI(container, settings, onChange) {
   const xh = document.createElement('details');
   xh.className = 'xh-group';
   xh.innerHTML = '<summary>Crosshair</summary><div class="xh-preview"><div class="xh"><i class="ch-dot"></i><i class="ch-l ch-top"></i>'
-    + '<i class="ch-l ch-bottom"></i><i class="ch-l ch-left"></i><i class="ch-l ch-right"></i></div></div>';
+    + '<i class="ch-l ch-bottom"></i><i class="ch-l ch-left"></i><i class="ch-l ch-right"></i>'
+    + '<i class="ch-ring"></i><i class="ch-chev ch-chev-l"></i><i class="ch-chev ch-chev-r"></i></div></div>';
   const syncers = [];
   for (const r of rows) {
     const row = document.createElement('label');

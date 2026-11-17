@@ -19,9 +19,10 @@
       <div id="smokehaze"></div>
 
       <div id="crosshair" class="xh">
-        <i class="ch-dot"></i><i class="ch-l ch-top"></i><i class="ch-l ch-bottom"></i><i class="ch-l ch-left"></i><i class="ch-l ch-right"></i>
+        <i class="ch-dot"></i><i class="ch-l ch-top"></i><i class="ch-l ch-bottom"></i><i class="ch-l ch-left"></i><i class="ch-l ch-right"></i><i class="ch-ring"></i><i class="ch-chev ch-chev-l"></i><i class="ch-chev ch-chev-r"></i>
       </div>
       <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+      <div id="xp-pop"></div>
       <div id="cook" class="hidden"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" /><circle id="cook-arc" cx="20" cy="20" r="16" /></svg><span id="cook-t">2.3</span></div>
       <div id="dmg"></div>
 
@@ -130,10 +131,11 @@
           <div class="foot-btns">
             <button id="btn-open-settings" class="small-btn">Settings</button>
             <button id="btn-open-controls" class="small-btn">Controls</button>
+            <button id="btn-custom" class="small-btn accent">Customize</button>
             <button id="btn-career" class="small-btn">Career</button>
             <button id="btn-account" class="small-btn">Account…</button>
           </div>
-          <p class="foot-meta"><span class="acct-line" title="Your player ID">ID <b id="acct-id-menu" class="acct-id">—</b></span><span id="version-note"></span></p>
+          <p class="foot-meta"><span id="lvl-chip" class="lvl-chip"></span><span class="acct-line" title="Your player ID">ID <b id="acct-id-menu" class="acct-id">—</b></span><span id="version-note"></span></p>
         </div>
       </div>
     </div>
@@ -199,6 +201,7 @@
       <div class="panel">
         <h2 id="end-title">VICTORY</h2>
         <p id="end-sub" class="tag"></p>
+        <div id="end-xp" class="end-xp"></div>
         <div class="end-cols">
           <div>
             <table class="final"><thead><tr><th>#</th><th class="l">Player</th><th>Kills</th><th>Deaths</th></tr></thead><tbody id="end-body"></tbody></table>
@@ -215,6 +218,24 @@
         <div class="btn-row">
           <button id="btn-again" class="primary">PLAY AGAIN</button>
           <button id="btn-menu">Main menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================== CUSTOMIZE ============================== -->
+    <div id="custom" class="overlay hidden">
+      <div class="panel">
+        <h2>CUSTOMIZE</h2>
+        <div id="custom-level" class="custom-level"></div>
+        <div class="custom-body">
+          <div id="custom-slots" class="custom-slots"></div>
+          <div id="custom-items" class="custom-items"></div>
+        </div>
+        <p class="note">Everything here is looks only. Earn XP from kills, captures, hill time, awards and finishing matches;
+          every level unlocks something. Your level and unlocks are part of your account.</p>
+        <div class="btn-row">
+          <button id="btn-prestige" class="hidden">Prestige…</button>
+          <button id="btn-custom-done" class="primary">DONE</button>
         </div>
       </div>
     </div>

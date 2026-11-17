@@ -5,6 +5,7 @@ import { CFG } from './config.js';
 import { makeLoadout, SWITCH_TIME, GRENADE, KNIFE, DEFAULT_PRIMARY, DEFAULT_TACTICAL, TACTICAL_BY_ID } from './weapons.js';
 import { gunLevel } from './modes.js';
 import { hasHeadroom } from './physics.js';
+import { DEFAULT_EQUIPPED } from './cosmetics.js';
 
 export class Character {
   constructor(game, id, name, color, isPlayer) {
@@ -57,6 +58,7 @@ export class Character {
     this.tacDef = TACTICAL_BY_ID[this.tacId];
     this.tactical = this.tacDef.start;
     this.skins = {}; // weapon id -> skin id (cosmetic)
+    this.cos = { level: 1, prestige: 0, equipped: { ...DEFAULT_EQUIPPED } }; // level + unlocked cosmetics
     this.cook = null; // { def, t }: a grenade in hand with its pin pulled
     this.blindUntil = 0; // flashbanged until this game time
     this.grenadeT = 0; // throw cooldown
@@ -201,6 +203,16 @@ export class Character {
   hasAmmo(idx) {
     const w = this.weapons[idx];
     return !!w && (w.mag > 0 || w.reserve > 0);
+  }
+
+  /** Level + equipped cosmetics (others see the shared ones). */
+  setCosmetics(cos) {
+    this.cos = cos;
+    if (this.model) {
+      this.model.setTagStyle(cos.equipped.tag, cos.level, cos.prestige);
+      this.model.setLook(cos.equipped);
+    }
+    if (this.onCosmetics) this.onCosmetics();
   }
 
   /** The skin this character's `weaponId` wears. */

@@ -17,6 +17,8 @@ import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
 import { BUILD, BUILD_TIME } from './version.js';
 import { getAccount, exportCode, parseCode, importAccount } from './account.js';
 import { SKINS, SKIN_KILLS, skinSwatchCss, skinUnlocked } from './skins.js';
+import { SLOTS, ITEMS, itemOf, itemUnlocked, unlocksAt } from './cosmetics.js';
+import { XP, levelFromXp, MAX_LEVEL } from './progress.js';
 
 {
   // version stamp on the main menu, so players can compare before joining
@@ -557,6 +559,124 @@ function openAccount() {
 }
 function closeAccount() { $('account').classList.add('hidden'); }
 
+// ---------------------------------------------------------------- XP, levels, customize
+const fmt = (n) => n.toLocaleString('en-GB');
+game.progress.onXp = (amount) => { if (state === 'playing') hud.xpPop(amount); };
+// your own-screen cosmetics: knife finish, weapon charm, crosshair shape
+game.onCosmetics = (eq) => {
+  game.viewmodel.setKnife(itemOf('knife', eq.knife));
+  game.viewmodel.setCharm(eq.charm);
+  for (const el of document.querySelectorAll('.xh')) {
+    el.className = el.className.replace(/\bshape-\w+/g, '').trim() + (eq.xhShape !== 'cross' ? ` shape-${eq.xhShape}` : '');
+  }
+};
+game.applyCosmetics();
+game.progress.onLevelUp = (level) => {
+  const unlocked = unlocksAt(level).map((u) => u.item.name);
+  game.announcer.announce(`Level ${level}`, unlocked.length ? `Unlocked: ${unlocked.slice(0, 3).join(', ')}${unlocked.length > 3 ? '…' : ''}` : '');
+  cosmeticsChanged();
+};
+
+/** Our look or level changed: our character and everyone in the room need to know. */
+function cosmeticsChanged() {
+  game.player.cos = game.ownCosmetics();
+  if (net.active) net.cosmeticsChanged();
+  renderLevelChip();
+}
+
+function renderLevelChip() {
+  const pr = game.progress, info = pr.info;
+  const pct = info.need ? Math.round((info.into / info.need) * 100) : 100;
+  $('lvl-chip').innerHTML = `${pr.prestige ? `<span class="pr">★${pr.prestige}</span>` : ''}Level ${pr.level}`
+    + `<span class="bar" title="${info.need ? `${fmt(info.into)} / ${fmt(info.need)} XP` : 'Max level'}"><i style="width:${pct}%"></i></span>`;
+}
+renderLevelChip();
+
+function renderEndXp() {
+  const pr = game.progress, el = $('end-xp');
+  const total = pr.matchTotal();
+  if (!total) { el.innerHTML = ''; return; }
+  const before = levelFromXp(pr.startXp || 0).level;
+  const info = pr.info;
+  const pct = info.need ? Math.round((info.into / info.need) * 100) : 100;
+  const up = pr.level > before ? `<span class="xp-up">Level ${before} → ${pr.level}!</span>` : `<span>Level ${pr.level}</span>`;
+  el.innerHTML = `<div class="xp-line"><b>+${fmt(total)} XP</b>${up}<span class="bar"><i style="width:${pct}%"></i></span>`
+    + `<small>${info.need ? `${fmt(info.into)} / ${fmt(info.need)}` : 'MAX'}</small></div>`
+    + `<div class="xp-parts">${pr.match.map(([k, v]) => `${k} +${fmt(v)}`).join(' · ')}</div>`;
+}
+
+let customSlot = 'title';
+function swatchFor(slot, item) {
+  const sw = document.createElement('div');
+  sw.className = 'sw';
+  const hexc = (c) => '#' + c.toString(16).padStart(6, '0');
+  if (item.css) sw.style.background = item.css;
+  else if (item.color !== undefined) sw.style.background = hexc(item.color);
+  else if (item.blade !== undefined) sw.style.background = `linear-gradient(100deg, ${hexc(item.handle)} 0 35%, ${hexc(item.blade)} 35%)`;
+  else sw.style.background = 'rgba(255,255,255,0.05)';
+  if (slot === 'title') sw.textContent = item.name;
+  if (slot === 'tag') {
+    const s = item.id;
+    sw.textContent = settings.name || 'Player';
+    sw.style.color = s === 'gold' ? '#ffe08a' : s === 'prestige' ? '#e6ccff' : s === 'plain' ? '#fff' : '#ff9a4a';
+    if (s === 'glow') sw.style.textShadow = '0 0 8px #ff8a2a';
+    if (s === 'frame' || s === 'gold' || s === 'prestige' || s === 'glow') sw.style.boxShadow = `inset 0 0 0 2px ${s === 'gold' ? '#ffd24d' : s === 'prestige' ? '#c77dff' : '#ff8a2a'}`;
+    if (s === 'stripe') sw.style.background = 'repeating-linear-gradient(60deg, rgba(255,138,42,0.25) 0 6px, transparent 6px 14px), rgba(10,14,20,0.6)';
+  }
+  return sw;
+}
+
+function renderCustom() {
+  const pr = game.progress, info = pr.info, eq = pr.equipped();
+  const pct = info.need ? Math.round((info.into / info.need) * 100) : 100;
+  $('custom-level').innerHTML = `<span class="big">${pr.prestige ? '★' + pr.prestige + ' · ' : ''}${pr.level}</span>`
+    + `<span class="bar"><i style="width:${pct}%"></i></span>`
+    + `<small>${info.need ? `${fmt(info.into)} / ${fmt(info.need)} XP to level ${pr.level + 1}` : 'Max level'} · ${fmt(pr.xp)} XP total</small>`;
+  const slots = $('custom-slots');
+  slots.textContent = '';
+  for (const s of SLOTS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = s.id === customSlot ? 'on' : '';
+    b.textContent = s.name;
+    const n = ITEMS[s.id].filter((i) => itemUnlocked(i, pr.level, pr.prestige)).length;
+    const sm = document.createElement('small'); sm.textContent = `${n}/${ITEMS[s.id].length}`;
+    b.append(sm);
+    b.addEventListener('click', () => { customSlot = s.id; renderCustom(); });
+    slots.append(b);
+  }
+  const grid = $('custom-items');
+  grid.textContent = '';
+  for (const item of ITEMS[customSlot]) {
+    const open = itemUnlocked(item, pr.level, pr.prestige);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'citem' + (eq[customSlot] === item.id ? ' on' : '') + (open ? '' : ' locked');
+    b.append(swatchFor(customSlot, item));
+    const nm = document.createElement('div'); nm.className = 'nm';
+    nm.textContent = customSlot === 'title' ? '' : item.name; // a title's swatch already says it
+    const req = document.createElement('small');
+    req.textContent = open ? (eq[customSlot] === item.id ? 'equipped' : '') : item.prestige ? `Prestige ${item.prestige}` : `Level ${item.level}`;
+    nm.append(req);
+    b.append(nm);
+    b.addEventListener('click', () => {
+      if (!pr.equip(customSlot, item.id)) return;
+      audio.play('ui');
+      cosmeticsChanged();
+      game.applyCosmetics();
+      renderCustom();
+    });
+    grid.append(b);
+  }
+  $('btn-prestige').classList.toggle('hidden', !pr.canPrestige());
+}
+$('btn-custom').addEventListener('click', () => { renderCustom(); $('custom').classList.remove('hidden'); });
+$('btn-custom-done').addEventListener('click', () => $('custom').classList.add('hidden'));
+$('btn-prestige').addEventListener('click', () => {
+  if (!window.confirm(`Prestige now? You go back to level 1 with a prestige badge (★${game.progress.prestige + 1}). Unlocks from levels come back as you level up again; prestige items, weapon skins and career stats stay.`)) return;
+  if (game.progress.doPrestige()) { audio.play('win'); cosmeticsChanged(); game.applyCosmetics(); renderCustom(); }
+});
+
 // ---------------------------------------------------------------- match rules
 function renderRules() {
   const mode = getMode(settings.mode), r = settings.rules;
@@ -720,6 +840,7 @@ async function doImport(text) {
     : `Switch this browser to account ${obj.id}? Account ${account.id} here will be replaced. Back it up first if you want to keep it.`;
   if (!window.confirm(msg)) return;
   game.career.frozen = true; // don't let this page save over the imported stats
+  game.progress.frozen = true;
   importAccount(obj);
   acctStatus(`Imported ${obj.id}. Reloading…`, 'ok');
   setTimeout(() => location.reload(), 400);
@@ -787,6 +908,10 @@ window.addEventListener('keydown', (e) => {
       return;
     }
   }
+  if (!$('custom').classList.contains('hidden')) {
+    if (e.code === 'Escape') $('custom').classList.add('hidden');
+    return;
+  }
   if (!$('rules').classList.contains('hidden')) {
     if (e.code === 'Escape') $('rules').classList.add('hidden');
     return;
@@ -818,7 +943,7 @@ window.addEventListener('resize', () => game.resize());
 window.addEventListener('beforeunload', (e) => {
   if (state === 'playing' || state === 'paused') { e.preventDefault(); e.returnValue = ''; }
 });
-window.addEventListener('pagehide', () => { net.leave(false); game.career.flush(); });
+window.addEventListener('pagehide', () => { net.leave(false); game.career.flush(); game.progress.flush(); });
 
 game.onMatchEnd = () => {
   const res = game.rules.result(game);
@@ -827,7 +952,15 @@ game.onMatchEnd = () => {
   if (game.forCareer && game.matchPlayT >= 20 && !game.careerCounted) {
     game.careerCounted = true;
     game.career.match(game.rules.id, won);
+    // XP for finishing, winning and any awards you picked up
+    const pr = game.progress;
+    pr.add(XP.matchPlayed, 'Match played');
+    if (won) pr.add(XP.matchWon, 'Victory');
+    const mine = (game.awards || []).filter((a) => a[1] === game.player.name).length;
+    if (mine) pr.add(XP.award * mine, 'Awards');
   }
+  game.progress.save();
+  renderEndXp();
   $('end-title').textContent = res.draw ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT';
   $('end-title').style.color = res.draw ? '#ffd24d' : won ? '#5dff9a' : '#ff6b6b';
   $('end-sub').textContent = `${game.rules.name}: ${res.sub}`;

@@ -157,6 +157,23 @@ kills, time played, and kills with each weapon. The training range and the menu
 background don't count, and a match only counts once you've played 20 seconds
 of it. Career stats are part of your account, so they move with your account code.
 
+### XP, levels and Customize
+
+Matches earn XP (the training range doesn't): 100 a kill, plus bonuses for
+headshots, knife and grenade kills, long shots (40 m+) and streaks, 75 for taking
+a flag, 100 for returning one, 400 for a capture, 4 a second on the hill, 150 per
+end-of-match award, 200 for finishing a match and 300 more for winning. XP pops up
+by the crosshair, and the end screen shows the total, the breakdown and your
+progress to the next level.
+
+There are 50 levels, and every level unlocks something in **Customize** (main
+menu toolbar). It's all looks, nothing that changes how the game plays: titles,
+name-tag styles, calling cards (shown on the kill cam when you get someone),
+helmets, armour colours, shoulder pads, tracer colours, kill effects, grenade and
+knife finishes, weapon charms and crosshair shapes. Other players see your level,
+title, name tag, calling card, gear, tracers, grenades and kill effects. Your
+level and unlocks are saved with your account.
+
 ### Weapon skins
 
 Every gun has five camos: Woodland, Desert, Arctic, Crimson and Tiger. A gun's
@@ -327,6 +344,8 @@ src/killcam.js        rolling recording + kill cam replay
 src/ctf.js            Capture the Flag: flags, rules, flag models
 src/career.js         career stats (local, part of the account)
 src/skins.js          weapon camos: patterns, unlocks, colours
+src/progress.js       XP, levels, prestige, equipped cosmetics
+src/cosmetics.js      the unlock catalogue (what each level gives) + network form
 src/smoke.js          smoke grenade clouds (visuals + line-of-sight blocking)
 src/account.js        player ID + account code export / import
 src/training.js       training range: targets, stands, challenge, stats

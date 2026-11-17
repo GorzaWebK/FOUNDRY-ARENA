@@ -48,6 +48,37 @@ function makeArm(side) {
   return g;
 }
 
+/** A small charm on a chain (pivot at the top of the chain). */
+function buildCharm(id) {
+  const g = new THREE.Group();
+  const chain = std(0xb8bec6, 0.3, 0.9);
+  bx(g, 0.003, 0.03, 0.003, chain, 0, -0.015, 0);
+  const body = new THREE.Group();
+  body.position.y = -0.04;
+  g.add(body);
+  if (id === 'dice') {
+    bx(body, 0.018, 0.018, 0.018, std(0xf2f2f2, 0.4, 0), 0, 0, 0);
+    for (const [x, y] of [[0, 0], [0.005, 0.005], [-0.005, -0.005]]) bx(body, 0.0035, 0.0035, 0.0035, std(0x111111, 0.6, 0), 0.0092, x, y);
+  } else if (id === 'dogtag') {
+    bx(body, 0.004, 0.026, 0.016, std(0xc8cdd2, 0.25, 0.9), 0, -0.004, 0);
+  } else if (id === 'star') {
+    const m = std(0xffd24d, 0.35, 0.6);
+    bx(body, 0.004, 0.024, 0.008, m, 0, 0, 0);
+    bx(body, 0.004, 0.008, 0.024, m, 0, 0, 0);
+    bx(body, 0.004, 0.016, 0.016, m, 0, 0, 0, 0.785);
+  } else if (id === 'duck') {
+    const y = std(0xffd23a, 0.6, 0);
+    bx(body, 0.016, 0.014, 0.022, y, 0, -0.004, 0);
+    bx(body, 0.012, 0.012, 0.012, y, 0, 0.008, -0.008);
+    bx(body, 0.008, 0.004, 0.008, std(0xff8a2a, 0.6, 0), 0, 0.007, -0.017);
+  } else if (id === 'crown') {
+    const m = std(0xd4a52a, 0.3, 0.8);
+    bx(body, 0.02, 0.008, 0.02, m, 0, -0.006, 0);
+    for (const [x, z] of [[0.007, 0.007], [-0.007, 0.007], [0.007, -0.007], [-0.007, -0.007]]) bx(body, 0.004, 0.01, 0.004, m, x, 0.002, z);
+  }
+  return g;
+}
+
 function buildKnife() {
   const g = new THREE.Group();
   const blade = std(0xd9dee4, 0.25, 0.85), handle = std(0x23262b, 0.8, 0), guard = std(0x55606c, 0.5, 0.5);
@@ -55,6 +86,7 @@ function buildKnife() {
   bx(g, 0.012, 0.016, 0.05, blade, 0, 0.01, -0.235, 0.6); // tip
   bx(g, 0.05, 0.016, 0.018, guard, 0, 0, -0.012);
   bx(g, 0.026, 0.03, 0.11, handle, 0, -0.002, 0.05);
+  g.userData.blade = blade; g.userData.handle = handle;
   bx(g, 0.07, 0.07, 0.09, std(GLOVE, 0.9, 0), 0, -0.01, 0.06);
   bx(g, 0.066, 0.066, 0.36, std(SLEEVE, 0.9, 0), 0.02, -0.06, 0.26, 0.25);
   return g;
@@ -83,6 +115,7 @@ export class ViewModel {
     for (const id of Object.keys(VIEW)) {
       const mats = makeMaterials(); // each gun gets its own, so each can wear its own skin
       const spec = buildGun(id, mats);
+      spec.id = id;
       spec.mats = mats;
       spec.skin = 'none';
       const v = VIEW[id];
@@ -196,6 +229,32 @@ export class ViewModel {
     if (def.id === 'shotgun') { this.delayedEject = 0.44; this.puff(3); }
     else if (def.id === 'sniper') { this.delayedEject = 0.5; this.puff(3); }
     else this.pendingEject++;
+  }
+
+  /** Knife finish from Customize. */
+  setKnife(item) {
+    const { blade, handle } = this.knife.userData;
+    blade.color.set(item.blade);
+    handle.color.set(item.handle);
+    blade.emissive.set(item.glow ? item.blade : 0x000000);
+    blade.emissiveIntensity = item.glow ? 0.8 : 0;
+  }
+
+  /** A little charm hanging off every gun (or none). */
+  setCharm(id) {
+    if (id === this.charmId) return;
+    this.charmId = id;
+    for (const m of Object.values(this.models)) {
+      if (m.charm) { m.group.remove(m.charm); m.charm = null; }
+      if (id === 'none') continue;
+      const c = buildCharm(id);
+      // on a short chain off the side that faces you, by the receiver
+      const half = (m.id === 'lmg' ? 0.034 : m.id === 'pistol' ? 0.018 : 0.028);
+      c.position.set(m.points.center.x - half - 0.004, m.points.center.y + 0.065, m.points.center.z + 0.03);
+      c.scale.setScalar(1.35);
+      m.group.add(c);
+      m.charm = c;
+    }
   }
 
   /** Paint a gun in a skin ('none' = factory finish). */
@@ -422,6 +481,13 @@ export class ViewModel {
       const t = s.switchT / SWITCH_TIME;
       p.y -= t * t * 0.3;
       rx -= t * 0.7;
+    }
+
+    // charms swing with your movement
+    if (m.charm) {
+      this.charmSwing = (this.charmSwing || 0) + ((-this.swayX * 9 + bx_ * 18) - (this.charmSwing || 0)) * Math.min(1, dt * 6);
+      m.charm.rotation.z = this.charmSwing + Math.sin(this.bob * 0.5) * 0.08;
+      m.charm.rotation.x = -this.kickZ * 4;
     }
 
     this.root.position.copy(p);

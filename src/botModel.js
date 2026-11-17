@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { nameTexture, flashTexture } from './textures.js';
 import { worldGun } from './gunModels.js';
+import { itemOf } from './cosmetics.js';
 
 const GUN_SCALE = 0.95;
 const HAND = new THREE.Vector3(0.14, 0.4, -0.38); // right hand, in upper-body space
@@ -51,7 +52,10 @@ export class BotModel {
     part(this.upper, 0.3, 0.3, 0.16, dark, 0, 0.36, 0.2); // backpack
     this.head = part(this.upper, 0.27, 0.27, 0.27, skin, 0, 0.76, 0);
     part(this.upper, 0.29, 0.1, 0.06, visor, 0, 0.78, -0.13);
-    part(this.upper, 0.29, 0.08, 0.29, body, 0, 0.9, 0); // helmet top
+    this.helmetTop = part(this.upper, 0.29, 0.08, 0.29, body, 0, 0.9, 0); // helmet top
+    this.look = new THREE.Group(); // unlockable gear: helmet, shoulder pads, armour vest
+    this.upper.add(this.look);
+    this.lookKey = '';
     // arms reaching forward to the gun
     const armR = part(this.upper, 0.13, 0.13, 0.5, body, 0.27, 0.42, -0.2);
     armR.rotation.y = 0.25;
@@ -121,8 +125,68 @@ export class BotModel {
     this.mats[0].color.copy(c);
     this.mats[1].color.copy(c).multiplyScalar(0.45);
     this.mats[3].emissive.copy(c);
+    this.redrawTag();
+  }
+
+  /** Put on the gear from a player's equipped cosmetics. */
+  setLook(eq) {
+    const key = `${eq.helmet}|${eq.shoulders}|${eq.armour}`;
+    if (key === this.lookKey) return;
+    this.lookKey = key;
+    for (const m of this.look.children) if (m.material && m.material !== this.mats[3]) m.material.dispose();
+    this.look.clear();
+    const lam = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
+    const gearC = 0x2e3238, gold = 0xc9a227;
+    const add = (w, h, d, mat, x, y, z) => part(this.look, w, h, d, mat, x, y, z);
+    // armour vest over the chest
+    const arm = itemOf('armour', eq.armour);
+    if (arm.color !== undefined) {
+      const vest = lam(arm.color);
+      add(0.51, 0.4, 0.3, vest, 0, 0.38, 0);
+      add(0.2, 0.12, 0.05, lam(new THREE.Color(arm.color).multiplyScalar(0.7)), -0.1, 0.42, -0.16); // pouches
+      add(0.2, 0.12, 0.05, lam(new THREE.Color(arm.color).multiplyScalar(0.7)), 0.1, 0.42, -0.16);
+    }
+    // shoulder pads
+    if (eq.shoulders !== 'none') {
+      const big = eq.shoulders === 'plates';
+      const m = lam(big ? 0x6f7883 : gearC);
+      add(big ? 0.2 : 0.15, big ? 0.1 : 0.07, big ? 0.27 : 0.22, m, 0.29, 0.62, 0);
+      add(big ? 0.2 : 0.15, big ? 0.1 : 0.07, big ? 0.27 : 0.22, m, -0.29, 0.62, 0);
+    }
+    // helmet
+    const h = eq.helmet;
+    this.helmetTop.visible = h === 'none';
+    if (h === 'cap') {
+      const m = lam(gearC);
+      add(0.3, 0.08, 0.3, m, 0, 0.9, 0);
+      add(0.26, 0.025, 0.14, m, 0, 0.865, -0.2); // brim
+    } else if (h === 'combat' || h === 'visor' || h === 'tactical') {
+      const m = lam(h === 'tactical' ? 0x3a4030 : 0x4a5240);
+      add(0.34, 0.16, 0.34, m, 0, 0.91, 0);
+      add(0.36, 0.05, 0.36, m, 0, 0.86, 0); // rim
+      if (h === 'visor') add(0.32, 0.12, 0.04, lam(0x1a2a3a, { emissive: 0x3a6a9a, emissiveIntensity: 0.6 }), 0, 0.8, -0.165);
+      if (h === 'tactical') {
+        add(0.3, 0.06, 0.05, lam(0x111111, { emissive: 0x2aff8a, emissiveIntensity: 0.5 }), 0, 0.95, -0.17); // goggles up
+        add(0.04, 0.05, 0.2, lam(gearC), 0.18, 0.9, 0); // side rails
+        add(0.04, 0.05, 0.2, lam(gearC), -0.18, 0.9, 0);
+      }
+    } else if (h === 'crown') {
+      const m = lam(gold, { emissive: 0x5a4000, emissiveIntensity: 0.4 });
+      add(0.31, 0.07, 0.31, m, 0, 0.93, 0);
+      for (const [x, z] of [[0.12, 0.12], [-0.12, 0.12], [0.12, -0.12], [-0.12, -0.12], [0, -0.14], [0, 0.14]]) add(0.05, 0.09, 0.05, m, x, 1.0, z);
+    }
+  }
+
+  /** Name tag style + level badge (from the player's cosmetics). */
+  setTagStyle(style, level, prestige) {
+    if (style === this.tagStyle && level === this.tagLevel && prestige === this.tagPrestige) return;
+    this.tagStyle = style; this.tagLevel = level; this.tagPrestige = prestige;
+    this.redrawTag();
+  }
+
+  redrawTag() {
     this.tag.material.map.dispose();
-    this.tag.material.map = nameTexture(name, color);
+    this.tag.material.map = nameTexture(this.name, this.color, this.tagStyle || 'plain', this.tagLevel || 0, this.tagPrestige || 0);
     this.tag.material.needsUpdate = true;
   }
 

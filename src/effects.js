@@ -215,6 +215,30 @@ export class Effects {
     if (groundY !== undefined) this.decal(x, groundY, z, 0, 1, 0, 3.2);
   }
 
+  /** Unlockable kill effects, on top of the usual burst. */
+  killFx(kind, x, y, z) {
+    const n = this.lowDetail ? 14 : 30;
+    if (kind === 'sparks') {
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, sp = 3 + Math.random() * 7;
+        this._spawn(x, y + 1, z, Math.cos(a) * sp, 2 + Math.random() * 5, Math.sin(a) * sp, 0.25 + Math.random() * 0.3, 0.03 + Math.random() * 0.03, i % 2 ? 0xfff0b0 : 0xffffff, 1);
+      }
+      this.glow(x, y + 1, z, 3, 0xffe2a0);
+    } else if (kind === 'pixels') {
+      const cols = [0x4fe3ff, 0xff5cf0, 0x5dff9a, 0xffd24d];
+      for (let i = 0; i < n * 0.6; i++) {
+        const a = Math.random() * Math.PI * 2, sp = 0.5 + Math.random() * 2;
+        this._spawn(x + Math.cos(a) * 0.3, y + 0.4 + Math.random() * 1.4, z + Math.sin(a) * 0.3, Math.cos(a) * sp, 0.5 + Math.random() * 1.5, Math.sin(a) * sp, 0.6 + Math.random() * 0.5, 0.09 + Math.random() * 0.06, cols[i % cols.length], 0.15);
+      }
+    } else if (kind === 'confetti') {
+      const cols = [0xff4d4d, 0xffd24d, 0x4fc3f7, 0x5dff9a, 0xff5cf0, 0xffffff];
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3;
+        this._spawn(x, y + 1.6, z, Math.cos(a) * sp, 3 + Math.random() * 3, Math.sin(a) * sp, 1.2 + Math.random() * 0.8, 0.04 + Math.random() * 0.03, cols[i % cols.length], 0.25);
+      }
+    }
+  }
+
   /** Flashbang: a white burst and a blinding light, no fire. */
   flashBang(x, y, z) {
     for (let i = 0; i < 30; i++) {

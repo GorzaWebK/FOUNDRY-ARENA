@@ -18,6 +18,7 @@ import { BotModel } from './botModel.js';
 import { GRENADE, FLASH, SMOKE, TACTICALS } from './weapons.js';
 import { FLAG_STATE } from './ctf.js';
 import { SKINS } from './skins.js';
+import { randomCosmetics } from './cosmetics.js';
 
 export const STATE = {
   PATROL: 'patrol',
@@ -71,6 +72,7 @@ export class Bot extends Character {
     this.lastStuckPos = new THREE.Vector3();
     this.thinkT = Math.random() * 0.12;
     this.ctfRole = id % 3 === 0 ? 'defend' : 'attack'; // Capture the Flag job
+    this.setCosmetics(randomCosmetics());
     this.nextObjT = 0;
     this.resetAI();
   }

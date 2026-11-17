@@ -225,23 +225,65 @@ export function holeTexture() {
 }
 
 /** Name tag sprite texture. */
-export function nameTexture(name, color) {
+/**
+ * A name tag: the name over a plate, the player's colour along the bottom, a
+ * level badge on the left, and a style unlocked by levelling up.
+ */
+export function nameTexture(name, color, style = 'plain', level = 0, prestige = 0) {
   const c = document.createElement('canvas');
   c.width = 256; c.height = 64;
   const ctx = c.getContext('2d');
-  ctx.font = '700 34px system-ui, "Segoe UI", Arial, sans-serif';
+  const col = '#' + new THREE.Color(color).getHexString();
+  ctx.font = '700 32px system-ui, "Segoe UI", Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const w = Math.min(240, ctx.measureText(name).width + 34);
-  ctx.fillStyle = 'rgba(10,14,20,0.6)';
+  const badge = level > 0 ? 34 : 0;
+  const w = Math.min(248, ctx.measureText(name).width + 34 + badge);
+  const x0 = 128 - w / 2;
+  // plate
+  ctx.fillStyle = 'rgba(10,14,20,0.62)';
   ctx.beginPath();
-  ctx.roundRect(128 - w / 2, 10, w, 44, 10);
+  ctx.roundRect(x0, 10, w, 44, 10);
   ctx.fill();
-  ctx.fillStyle = '#' + new THREE.Color(color).getHexString();
-  ctx.fillRect(128 - w / 2, 48, w, 4);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(name, 128, 31);
+  if (style === 'stripe') {
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = col + '40';
+    for (let x = x0 - 40; x < x0 + w + 40; x += 16) { ctx.beginPath(); ctx.moveTo(x, 54); ctx.lineTo(x + 8, 54); ctx.lineTo(x + 28, 10); ctx.lineTo(x + 20, 10); ctx.fill(); }
+    ctx.restore();
+  }
+  const gold = style === 'gold', prest = style === 'prestige';
+  if (style === 'frame' || gold || prest || style === 'glow') {
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = gold ? '#ffd24d' : prest ? '#c77dff' : col;
+    if (style === 'glow') { ctx.shadowColor = col; ctx.shadowBlur = 10; }
+    ctx.beginPath(); ctx.roundRect(x0 + 1.5, 11.5, w - 3, 41, 9); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  ctx.fillStyle = gold ? '#ffd24d' : col;
+  ctx.fillRect(x0 + 6, 48, w - 12, 4);
+  // level badge
+  if (badge) {
+    ctx.fillStyle = prestige ? '#7a3fd0' : 'rgba(255,255,255,0.14)';
+    ctx.beginPath(); ctx.roundRect(x0 + 6, 16, 28, 30, 6); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '800 17px system-ui, "Segoe UI", Arial, sans-serif';
+    ctx.fillText(prestige ? '\u2605' + level : String(level), x0 + 20, 31, 26);
+  }
+  // name
+  ctx.font = '700 32px system-ui, "Segoe UI", Arial, sans-serif';
+  if (style === 'glow') { ctx.shadowColor = col; ctx.shadowBlur = 12; }
+  ctx.fillStyle = gold ? '#ffe08a' : prest ? '#e6ccff' : style === 'plain' ? '#ffffff' : col === '#ffffff' ? '#ffffff' : lighten(col);
+  ctx.fillText(name, 128 + badge / 2, 31, w - badge - 20);
+  ctx.shadowBlur = 0;
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
+}
+
+/** A lighter version of a #rrggbb colour, so coloured names stay readable. */
+function lighten(hex) {
+  const c = new THREE.Color(hex);
+  c.lerp(new THREE.Color(0xffffff), 0.35);
+  return '#' + c.getHexString();
 }

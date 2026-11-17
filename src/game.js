@@ -15,6 +15,9 @@ import { SmokeClouds } from './smoke.js';
 import { applyCrosshair } from './settings.js';
 import { Career } from './career.js';
 import { Ctf } from './ctf.js';
+import { Progress, XP } from './progress.js';
+import { itemOf } from './cosmetics.js';
+import { weaponIdOf } from './career.js';
 import { SKIN_GUNS, SKIN_BY_ID, skinUnlocked } from './skins.js';
 import { getMode, makeRules, MODES, TEAM_COLORS, TEAM_NAMES, GUN_LADDER, gunLevel } from './modes.js';
 import { MAPS, getMap } from './maps/index.js';
@@ -23,6 +26,9 @@ import { KillCam } from './killcam.js';
 import { Range } from './training.js';
 
 export const HILL_TIME = 60; // seconds before the hill moves
+
+/** A shooter's tracer colour (an unlockable). */
+export const tracerColor = (c) => itemOf('tracer', c && c.cos ? c.cos.equipped.tracer : 'default').color;
 export const VOTE_TIME = 30; // multiplayer: seconds to vote before the next match starts by itself
 const HILL_COLORS = { [-1]: 0xffffff, 0: TEAM_COLORS[0], 1: TEAM_COLORS[1], 2: 0xffd24d };
 const MULTI_WINDOW = 4; // seconds between kills that still count as a multi-kill
@@ -111,6 +117,8 @@ export class Game {
     this.announcer = new Announcer(settings, audio, hud);
     this.killcam = new KillCam(this);
     this.career = new Career(); // the player at this keyboard
+    this.progress = new Progress(); // XP, level, prestige and equipped cosmetics
+    this.hillXpT = 0;
     this.matchPlayT = 0; // seconds you've actually played this match (career: did you take part?)
     this.range = null; // training range state, only on the range map
     this.lastDt = 1 / 60;
@@ -129,6 +137,7 @@ export class Game {
     this.loadMap(map);
 
     this.player = new Player(this);
+    this.player.cos = this.ownCosmetics();
     this.bots = [];
     this.remotes = []; // multiplayer: characters driven over the network
     this.chars = [];
@@ -228,6 +237,7 @@ export class Game {
     this.winner = null;
     this.awards = []; this.voteOptions = null; this.votes = new Map(); this.voteDeadline = 0;
     this.matchPlayT = 0; this.careerCounted = false;
+    if (!attract) { this.progress.newMatch(); this.hillXpT = 0; }
     this.stats = { stuck: 0, shots: 0, kills: 0 };
     if (this.range) { this.range.dispose(); this.range = null; }
     if (this.rules.training) this.range = new Range(this);
@@ -289,6 +299,7 @@ export class Game {
     this.winner = null;
     this.awards = []; this.voteOptions = null; this.votes = new Map(); this.voteDeadline = 0; this.voteCounts = [];
     this.matchPlayT = 0; this.careerCounted = false;
+    this.progress.newMatch(); this.hillXpT = 0;
     this.effects.clear();
     this.clearGrenades();
     this.hud.reset();
@@ -450,6 +461,22 @@ export class Game {
     this.remotes = [];
   }
 
+  /** Your level + equipped cosmetics, as others should see them. */
+  ownCosmetics() {
+    const pr = this.progress;
+    return { level: pr.level, prestige: pr.prestige, equipped: pr.equipped() };
+  }
+
+  /** Apply your own local-only cosmetics (crosshair shape, knife, charm...). */
+  applyCosmetics() {
+    if (this.onCosmetics) this.onCosmetics(this.progress.equipped());
+  }
+
+  /** XP for something you did in a match that counts. */
+  xp(amount, label) {
+    if (this.forCareer && !this.over) this.progress.add(amount, label);
+  }
+
   /** The skins you've picked that you've also unlocked. */
   ownSkins() {
     const out = {}, picked = this.settings.skins || {};
@@ -464,6 +491,14 @@ export class Game {
   applyOwnSkins() {
     this.player.skins = this.ownSkins();
     for (const id of SKIN_GUNS) this.viewmodel.setSkin(id, this.player.skins[id] || 'none');
+  }
+
+  /** King of the Hill: XP for every second you spend holding the hill. */
+  hillXp() {
+    if (!this.rules.hill || this.attract) return;
+    const t = Math.floor(this.player.hillTime || 0);
+    if (t > this.hillXpT) this.xp((t - this.hillXpT) * XP.hillSecond, 'Hill time');
+    this.hillXpT = t;
   }
 
   /** Does what happens now count towards your career stats? */
@@ -578,7 +613,7 @@ export class Game {
       } else {
         ends.push([r2(ex), r2(ey), r2(ez), 0]);
       }
-      if (def.pellets === 1 || i % 2 === 0) fx.tracer(_muz.x, _muz.y, _muz.z, ex, ey, ez);
+      if (def.pellets === 1 || i % 2 === 0) fx.tracer(_muz.x, _muz.y, _muz.z, ex, ey, ez, tracerColor(shooter));
     }
 
     shooter.protectedUntil = 0; // attacking ends spawn protection
@@ -667,6 +702,8 @@ export class Game {
   presentKill(victim, attacker, head, weapon) {
     victim.onDeath(attacker);
     this.effects.deathBurst(victim.pos.x, victim.pos.y, victim.pos.z, victim.color);
+    const kfx = attacker !== victim && attacker.cos ? attacker.cos.equipped.killfx : 'default';
+    if (kfx !== 'default') this.effects.killFx(kfx, victim.pos.x, victim.pos.y, victim.pos.z);
     this.audio.play('death', victim.isPlayer ? null : victim.pos);
 
     // Streaks and multi-kills, tracked on every machine from the kills it sees.
@@ -686,8 +723,21 @@ export class Game {
     if (this.forCareer) {
       const me = this.player;
       if (attacker === me && victim !== me) {
-        this.career.kill(weapon, head, me.pos.distanceTo(victim.pos));
+        const dist = me.pos.distanceTo(victim.pos);
+        this.career.kill(weapon, head, dist);
         this.career.streak(me.streak);
+        if (!this.sameTeam(victim, me)) {
+          // XP for the kill and how it was done
+          const wid = weaponIdOf(weapon);
+          this.xp(XP.kill, 'Kills');
+          if (wid === 'knife') this.xp(XP.knife, 'Knife kills');
+          else if (wid === 'grenade') this.xp(XP.grenade, 'Grenade kills');
+          else {
+            if (head) this.xp(XP.headshot, 'Headshots');
+            if (dist >= 40) this.xp(XP.longshot, 'Long shots');
+          }
+          if (me.streak >= 3) this.xp(XP.streak, 'Streaks');
+        }
       }
       if (victim === me) this.career.death();
     }
@@ -812,6 +862,7 @@ export class Game {
     mesh.visible = true;
     mesh.material.color.set(def.color);
     mesh.material.emissive.set(def.kind === 'frag' ? 0xff2200 : def.kind === 'flash' ? 0xffffff : 0x66ff99);
+    if (def.kind === 'frag' && owner && owner.cos) mesh.material.color.set(itemOf('nade', owner.cos.equipped.nade).color);
     this.scene.add(mesh);
     const g = { id, owner, def, x: o[0], y: o[1], z: o[2], vx: v[0], vy: v[1], vz: v[2], fuse, mesh, resting: false, bounceT: 0 };
     this.grenades.push(g);
@@ -1187,6 +1238,7 @@ export class Game {
     if (this.rules.hill && !this.attract) this.updateHill(dt);
     if (this.ctf && !this.attract) this.ctf.update(dt);
     if (this.ctf) this.ctf.updateVisuals(dt, this.time);
+    this.hillXp();
     this.updateHillFx(this.time);
     this.effects.update(dt);
     this.smokes.update(dt);
@@ -1209,6 +1261,7 @@ export class Game {
     this.updateGrenades(dt);
     if (this.rules.hill) this.hill.t = Math.max(0, this.hill.t - dt); // re-synced by snapshots
     if (this.ctf) this.ctf.updateVisuals(dt, this.time);
+    this.hillXp();
     this.updateHillFx(this.time);
     this.effects.update(dt);
     this.smokes.update(dt);

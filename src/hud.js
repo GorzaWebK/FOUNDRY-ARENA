@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { TEAM_COLORS, TEAM_NAMES } from './modes.js';
 import { FLAG_STATE } from './ctf.js';
+import { itemOf } from './cosmetics.js';
 
 const _hv = new THREE.Vector3();
 const HILL_TEXT_COL = { [-1]: '#e8e8e8', 0: '#' + TEAM_COLORS[0].toString(16).padStart(6, '0'), 1: '#' + TEAM_COLORS[1].toString(16).padStart(6, '0'), 2: '#ffd24d' };
@@ -10,6 +11,8 @@ const HILL_TEXT_COL = { [-1]: '#e8e8e8', 0: '#' + TEAM_COLORS[0].toString(16).pa
 
 const $ = (id) => document.getElementById(id);
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
+/** Small level badge for the scoreboard (★ = prestige). */
+const lvBadge = (c) => (c.cos ? `<span class="lv${c.cos.prestige ? ' pr' : ''}">${c.cos.prestige ? '★' : ''}${c.cos.level}</span>` : '');
 const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 
 export class Hud {
@@ -181,7 +184,15 @@ export class Hud {
     }
     this._set('kc', kc, (v) => $('killcam').classList.toggle('hidden', !v));
     if (kc) {
-      this._set('kcWho', game.killcam.killerName, (v) => { $('kc-who').innerHTML = `Watching <b style="color:${hex(game.killcam.killerColor)}">${esc(v)}</b>`; });
+      this._set('kcWho', game.killcam.killerName, (v) => {
+        const k = game.charById(game.killcam.killerId);
+        const cos = k && k.cos;
+        const card = itemOf('card', cos ? cos.equipped.card : 'steel');
+        const el = $('kc-who');
+        el.style.background = card.css;
+        el.innerHTML = `<span class="kc-plate">Killed by <b style="color:${hex(game.killcam.killerColor)}">${esc(v)}</b>`
+          + (cos ? `<small>Level ${cos.prestige ? '★' + cos.prestige + ' · ' : ''}${cos.level} · ${esc(itemOf('title', cos.equipped.title).name)}</small>` : '') + '</span>';
+      });
       const left = p.respawnAt - game.time;
       this._set('kcCount', Number.isFinite(left) ? Math.max(0, Math.ceil(left)) : -1, (v) => { $('kc-count').textContent = v >= 0 ? `Respawning in ${v}` : ''; });
     }
@@ -219,6 +230,7 @@ export class Hud {
     }
 
     if (this.anT > 0) { this.anT -= dt; if (this.anT <= 0) e.announce.style.opacity = 0; }
+    if (this.xpT > 0) { this.xpT -= dt; if (this.xpT <= 0) $('xp-pop').style.opacity = 0; }
 
     // Capture the Flag: status line + a marker on each flag
     const ctf = game.ctf;
@@ -311,6 +323,18 @@ export class Hud {
     h.className = kill ? 'kill' : head ? 'head' : '';
     h.style.opacity = 1;
     this.hitT = kill ? 0.3 : 0.18;
+  }
+
+  /** "+120 XP" by the crosshair; quick gains add up into one number. */
+  xpPop(amount) {
+    const el = $('xp-pop');
+    this.xpSum = (this.xpT > 0 ? this.xpSum || 0 : 0) + amount;
+    this.xpT = 1.6;
+    el.textContent = `+${this.xpSum} XP`;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+    el.style.opacity = 1;
   }
 
   /** Flashbanged: `amount` 0..1, for `dur` seconds. */
@@ -441,7 +465,8 @@ export class Hud {
     if (head.innerHTML !== headHtml) head.innerHTML = headHtml;
     tbody.innerHTML = rows.map((c, i) => (
       `<tr class="${c.isPlayer ? 'me' : ''}${c.alive ? '' : ' dead'}"><td>${i + 1}</td>`
-      + `<td class="l"><i style="background:${hex(c.color)}"></i>${esc(c.name)}</td>`
+      + `<td class="l"><i style="background:${hex(c.color)}"></i>${lvBadge(c)}${esc(c.name)}`
+      + `<small class="sb-title">${esc(itemOf('title', c.cos ? c.cos.equipped.title : 'recruit').name)}</small></td>`
       + `${col ? `<td>${esc(col.value(c))}</td>` : ''}<td>${c.kills}</td><td>${c.deaths}</td></tr>`
     )).join('');
   }
