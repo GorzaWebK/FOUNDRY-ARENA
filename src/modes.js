@@ -22,8 +22,9 @@
 import { WEAPON_BY_ID } from './weapons.js';
 import { CFG } from './config.js';
 
-export const TEAM_COLORS = [0x3d8bff, 0xff4d4d];
-export const TEAM_NAMES = ['Blue', 'Red'];
+// the two crews: cobalt blue and furnace orange-red
+export const TEAM_COLORS = [0x3f7fd0, 0xe2552a];
+export const TEAM_NAMES = ['Cobalt', 'Furnace'];
 export const GUN_LADDER = ['lmg', 'rifle', 'smg', 'shotgun', 'sniper', 'pistol'];
 export const KILLS_PER_GUN = 2;
 const GUN_WIN = (GUN_LADDER.length - 1) * KILLS_PER_GUN + 1; // one kill with the last gun wins
@@ -71,12 +72,12 @@ function killLimitMode(base) {
 export const MODES = [
   killLimitMode({
     id: 'ffa', name: 'Deathmatch', scoreLimit: 20,
-    desc: (r) => `Free-for-all. First to ${r.scoreLimit} kills, or the most kills after ${mins(r)}.`,
+    desc: (r) => `Everyone for themselves. First to ${r.scoreLimit} kills, or most kills after ${mins(r)}.`,
   }),
 
   {
     id: 'tdm', name: 'Team Deathmatch', scoreLimit: 40, teams: true,
-    desc: (r) => `Blue vs Red. First team to ${r.scoreLimit} kills wins. ${r.friendlyFire ? 'Friendly fire is on.' : 'No friendly fire.'}`,
+    desc: (r) => `Cobalt against Furnace. First crew to ${r.scoreLimit} kills.${r.friendlyFire ? ' Friendly fire is on.' : ''}`,
     limit: { key: 'scoreLimit', label: 'Team kill limit', unit: 'kills', options: [10, 20, 30, 40, 50, 75, 100] },
     rank: (chars) => [...chars].sort((a, b) => a.team - b.team || byKills(a, b)),
     won: (game) => game.teamScore[0] >= game.rules.scoreLimit || game.teamScore[1] >= game.rules.scoreLimit,
@@ -101,7 +102,7 @@ export const MODES = [
 
   {
     id: 'koth', name: 'King of the Hill', teams: true, hill: true, scoreLimit: 100,
-    desc: (r) => `Blue vs Red fight over a zone that moves every minute. Hold it with no enemies inside to score. First to ${r.scoreLimit}.`,
+    desc: (r) => `Hold the marked ground with nobody else on it. It moves every minute. First to ${r.scoreLimit}.`,
     limit: { key: 'scoreLimit', label: 'Points to win', unit: 'points', options: [50, 75, 100, 150, 200, 300] },
     rank: (chars) => [...chars].sort((a, b) => a.team - b.team || b.hillTime - a.hillTime || byKills(a, b)),
     won: (game) => game.teamScore[0] >= game.rules.scoreLimit || game.teamScore[1] >= game.rules.scoreLimit,
@@ -110,7 +111,7 @@ export const MODES = [
       return {
         left: [TEAM_NAMES[mine].toUpperCase(), game.teamScore[mine], hex(TEAM_COLORS[mine])],
         right: [TEAM_NAMES[other].toUpperCase(), game.teamScore[other], hex(TEAM_COLORS[other])],
-        sub: `king of the hill · ${game.rules.scoreLimit}`,
+        sub: `first to ${game.rules.scoreLimit}`,
       };
     },
     column: { title: 'Hill', value: (c) => `${Math.round(c.hillTime || 0)}s` },
@@ -125,7 +126,7 @@ export const MODES = [
 
   {
     id: 'ctf', name: 'Capture the Flag', teams: true, ctf: true, scoreLimit: 3,
-    desc: (r) => `Blue vs Red. Grab the enemy flag and carry it home while yours is safe at your base. First to ${r.scoreLimit} captures.`,
+    desc: (r) => `Take their flag home while yours is still on its stand. First to ${r.scoreLimit}.`,
     limit: { key: 'scoreLimit', label: 'Captures to win', unit: 'captures', options: [1, 2, 3, 5, 7, 10] },
     rank: (chars) => [...chars].sort((a, b) => a.team - b.team || (b.caps || 0) - (a.caps || 0) || byKills(a, b)),
     won: (game) => game.teamScore[0] >= game.rules.scoreLimit || game.teamScore[1] >= game.rules.scoreLimit,
@@ -134,7 +135,7 @@ export const MODES = [
       return {
         left: [TEAM_NAMES[mine].toUpperCase(), game.teamScore[mine], hex(TEAM_COLORS[mine])],
         right: [TEAM_NAMES[other].toUpperCase(), game.teamScore[other], hex(TEAM_COLORS[other])],
-        sub: `capture the flag · ${game.rules.scoreLimit}`,
+        sub: `first to ${game.rules.scoreLimit} caps`,
       };
     },
     column: { title: 'Caps', value: (c) => c.caps || 0 },
@@ -149,7 +150,7 @@ export const MODES = [
 
   {
     id: 'gungame', name: 'Gun Game', gunGame: true,
-    desc: () => `Every ${KILLS_PER_GUN} kills swap you to the next gun: LMG, rifle, SMG, shotgun, sniper, pistol. One pistol kill wins.`,
+    desc: () => `A new gun every ${KILLS_PER_GUN} kills, all the way down to the Hammer. One pistol kill wins.`,
     rank: (chars) => [...chars].sort(byKills),
     won: (game) => game.chars.some((c) => c.kills >= GUN_WIN),
     hud(game) {
@@ -172,7 +173,7 @@ export const MODES = [
 
   {
     id: 'lms', name: 'Last One Standing', lives: 5,
-    desc: (r) => `${plural(r.lives, 'life')} each. Lose ${r.lives === 1 ? 'it' : 'them all'} and you are out. The last player alive wins.`.replace('lifes', 'lives'),
+    desc: (r) => `${r.lives === 1 ? 'One life' : `${r.lives} lives`} each. Last one standing takes it.`,
     limit: { key: 'lives', label: 'Lives', unit: 'lives', options: [1, 2, 3, 5, 7, 10] },
     rank: (chars) => [...chars].sort((a, b) => b.lives - a.lives || byKills(a, b)),
     // only ends early when somebody was actually eliminated down to one survivor
@@ -193,7 +194,7 @@ export const MODES = [
 
   killLimitMode({
     id: 'snipers', name: 'Snipers Only', scoreLimit: 15, forcePrimary: 'sniper',
-    desc: (r) => `Free-for-all with sniper rifles and pistols only. First to ${r.scoreLimit} kills.`,
+    desc: (r) => `Spires and Hammers only. First to ${r.scoreLimit} kills.`,
   }),
 ];
 
@@ -247,5 +248,5 @@ export function customSummary(r) {
   if (c.ff) out.push('friendly fire');
   if (!c.pickups) out.push('no pickups');
   if (c.hardcore) out.push('hardcore');
-  return 'Custom: ' + out.join(' · ');
+  return 'Custom: ' + out.join(', ');
 }

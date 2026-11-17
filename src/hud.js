@@ -88,13 +88,13 @@ export class Hud {
       e.hpNum.textContent = v;
       e.hpBar.style.width = Math.min(100, (v / game.maxHealth) * 100) + '%';
       e.hpNum.classList.toggle('low', v <= 30);
-      e.hpBar.style.background = v <= 30 ? '#ff5a5a' : '#5dff9a';
+      e.hpBar.style.background = v <= 30 ? '#ff6b1a' : '#e9e4da';
     });
     this._set('ar', Math.ceil(p.armor), (v) => { e.arNum.textContent = v; e.arBar.style.width = v + '%'; });
     this._set('mag', w.mag, (v) => { e.mag.textContent = v; });
     this._set('magLow', w.mag <= w.def.magSize * 0.25, (v) => e.mag.classList.toggle('low', v));
     this._set('res', w.reserve, (v) => { e.res.textContent = v === Infinity ? '∞' : v; });
-    this._set('wname', w.def.name, (v) => { e.wname.textContent = v; });
+    this._set('wname', w.def.name, (v) => { e.wname.textContent = v; $('ammo-cls').textContent = w.def.cls || ''; });
     const rl = w.reloadT > 0 ? 'RELOADING' : w.mag === 0 ? (w.reserve > 0 ? `PRESS ${this.reloadKey} TO RELOAD` : 'NO AMMO') : '';
     this._set('rl', rl, (v) => { e.reload.textContent = v; });
     this._set('slot', p.weaponIdx, (v) => this.slots.forEach((s, i) => s.classList.toggle('on', i === v)));
@@ -102,6 +102,7 @@ export class Hud {
       this._set('se' + i, !p.hasAmmo(i), (v) => this.slots[i].classList.toggle('empty', v));
     }
     this._set('prim', p.weapons[0].def.name, (v) => { e.slotPrim.textContent = v; });
+    this._set('side', p.weapons[1] ? p.weapons[1].def.name : '', (v) => { $('slot-side').textContent = v; });
     this._set('nades', p.grenades, (v) => { e.nadeCount.textContent = v; e.nade.classList.toggle('empty', v === 0); });
     this._set('tacN', p.tacDef.short, (v) => { e.tacName.textContent = v; });
     this._set('tacs', p.tactical, (v) => { e.tacCount.textContent = v; e.tac.classList.toggle('empty', v === 0); });
@@ -177,7 +178,7 @@ export class Hud {
       const who = t ? `${t.id}|${t.name}|${t.color}|${Math.max(0, Math.ceil(t.health))}|${t.lives}` : 'overhead';
       this._set('specWho', who, () => {
         $('spec-who').innerHTML = t
-          ? `Spectating <b style="color:${hex(t.color)}">${esc(t.name)}</b><small>${Math.max(0, Math.ceil(t.health))} HP · ${t.lives} ${t.lives === 1 ? 'life' : 'lives'}</small>`
+          ? `Watching <b style="color:${hex(t.color)}">${esc(t.name)}</b><small>${Math.max(0, Math.ceil(t.health))} HP, ${t.lives} ${t.lives === 1 ? 'life' : 'lives'} left</small>`
           : 'Overhead view';
       });
       this._set('specKeys', this.specKeys, (v) => { $('spec-keys').textContent = v; });
@@ -191,7 +192,7 @@ export class Hud {
         const el = $('kc-who');
         el.style.background = card.css;
         el.innerHTML = `<span class="kc-plate">Killed by <b style="color:${hex(game.killcam.killerColor)}">${esc(v)}</b>`
-          + (cos ? `<small>Level ${cos.prestige ? '★' + cos.prestige + ' · ' : ''}${cos.level} · ${esc(itemOf('title', cos.equipped.title).name)}</small>` : '') + '</span>';
+          + (cos ? `<small>${cos.prestige ? '★' + cos.prestige + ' ' : ''}Lv ${cos.level} ${esc(itemOf('title', cos.equipped.title).name)}</small>` : '') + '</span>';
       });
       const left = p.respawnAt - game.time;
       this._set('kcCount', Number.isFinite(left) ? Math.max(0, Math.ceil(left)) : -1, (v) => { $('kc-count').textContent = v >= 0 ? `Respawning in ${v}` : ''; });
@@ -200,7 +201,7 @@ export class Hud {
       const left = Math.max(0, p.respawnAt - game.time);
       const out = game.isOut(p);
       this._set('dc', out ? 'out' : Math.ceil(left), (v) => {
-        e.deathCount.textContent = v === 'out' ? 'Out of lives — spectating until the next match'
+        e.deathCount.textContent = v === 'out' ? 'Out of lives. Watching until the next round.'
           : Number.isFinite(v) ? `Respawning in ${v}` : 'Waiting for the host…';
       });
       this._set('dn', p.killer ? p.killer.name : '', (v) => { e.deathName.textContent = v; e.deathName.style.color = p.killer ? hex(p.killer.color) : ''; });
@@ -252,12 +253,12 @@ export class Hud {
     if (ctf) {
       const st = (f) => (f.state === FLAG_STATE.HOME ? 'HOME'
         : f.state === FLAG_STATE.CARRIED ? `TAKEN BY ${(f.carrier ? f.carrier.name : '?').toUpperCase()}`
-          : `DROPPED · BACK IN ${Math.max(0, Math.ceil(f.returnT))}s`);
+          : `DOWN, BACK IN ${Math.max(0, Math.ceil(f.returnT))}s`);
       const mine = ctf.flags[Math.max(0, p.team)], theirs = ctf.flags[1 - Math.max(0, p.team)];
       const carrying = theirs.carrier === p;
       const text = carrying
-        ? (mine.state === FLAG_STATE.HOME ? 'YOU HAVE THE FLAG · TAKE IT TO YOUR BASE' : 'YOU HAVE THE FLAG · YOUR FLAG MUST BE HOME TO SCORE')
-        : `YOUR FLAG: ${st(mine)} · ENEMY FLAG: ${st(theirs)}`;
+        ? (mine.state === FLAG_STATE.HOME ? 'FLAG IN HAND. GET IT HOME.' : 'FLAG IN HAND. YOURS HAS TO BE HOME TO SCORE.')
+        : `OURS ${st(mine)}     THEIRS ${st(theirs)}`;
       e.hillStatus.classList.remove('hidden');
       this._set('hillText', text, (v) => { e.hillStatus.textContent = v; });
       this._set('hillCol', carrying ? 'c' : mine.state === FLAG_STATE.HOME ? 'h' : 'x', (v) => { e.hillStatus.style.color = v === 'c' ? '#ffd24d' : v === 'h' ? '#e8e8e8' : '#ff6b6b'; });
@@ -271,7 +272,7 @@ export class Hud {
       const left = Math.max(0, Math.ceil(game.hill.t));
       const inside = game.inHill(p, h);
       const what = holder === 2 ? 'CONTESTED' : holder >= 0 ? `${TEAM_NAMES[holder].toUpperCase()} HOLDING` : 'HILL NEUTRAL';
-      const text = `${inside ? 'ON THE HILL · ' : ''}${what} · MOVES IN ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+      const text = `${inside ? 'ON THE HILL     ' : ''}${what}     MOVES ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
       this._set('hillText', text, (v) => { e.hillStatus.textContent = v; });
       this._set('hillCol', holder, (v) => { e.hillStatus.style.color = HILL_TEXT_COL[v]; e.hillMarker.style.color = HILL_TEXT_COL[v]; });
       this._set('hillIn', inside, (v) => e.hillStatus.classList.toggle('on', v));
@@ -375,7 +376,7 @@ export class Hud {
   /** Show the player's own key bindings in HUD hints. */
   setBindHints(label) {
     this.reloadKey = label('reload').toUpperCase();
-    this.specKeys = `Out of lives · ${label('fire')}: next player · ${label('aim')}: previous · ${label('jump')}: overhead view`;
+    this.specKeys = `${label('fire')} next     ${label('aim')} previous     ${label('jump')} overhead`;
     const b = (sel) => document.querySelector(sel);
     b('#slots .slot[data-i="0"] b').textContent = label('primary');
     b('#slots .slot[data-i="1"] b').textContent = label('pistol');

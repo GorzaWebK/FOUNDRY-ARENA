@@ -1,5 +1,15 @@
 // App bootstrap: menus, pointer lock, pause, multiplayer lobby, chat, main loop.
 
+// fonts are bundled with the game (no outside font server to wait for)
+import '@fontsource/barlow-condensed/latin-500.css';
+import '@fontsource/barlow-condensed/latin-600.css';
+import '@fontsource/barlow-condensed/latin-700.css';
+import '@fontsource/barlow-condensed/latin-800.css';
+import '@fontsource/barlow/latin-400.css';
+import '@fontsource/barlow/latin-500.css';
+import '@fontsource/barlow/latin-600.css';
+import '@fontsource/barlow/latin-700.css';
+import '@fontsource/saira-stencil-one/latin-400.css';
 import './style.css';
 import { MAPS, getMap } from './maps/index.js';
 import { MODES, getMode, makeRules, customSummary, TIME_OPTIONS, HARDCORE_HEALTH } from './modes.js';
@@ -24,7 +34,8 @@ import { XP, levelFromXp, MAX_LEVEL } from './progress.js';
   // version stamp on the main menu, so players can compare before joining
   const el = document.getElementById('version-note');
   const day = BUILD_TIME ? BUILD_TIME.slice(0, 10) : '';
-  if (el) el.textContent = 'Version ' + BUILD + (day ? ' · ' + day : '');
+  if (el) el.textContent = 'Build ' + BUILD;
+  if (el && day) el.title = `Built ${day}`;
 }
 
 const $ = (id) => document.getElementById(id);
@@ -174,7 +185,7 @@ function buildLoadoutUI(container) {
       settings.primary = id;
       saveSettings(settings);
       syncLoadout();
-      if (state === 'paused') $('pause-hint').textContent = `${def.name} selected — you'll have it when you next respawn.`;
+      if (state === 'paused') $('pause-hint').textContent = `${def.name} is ready on your next spawn.`;
     });
     container.append(b);
     loadoutButtons.push([id, b]);
@@ -192,7 +203,7 @@ function buildTacUI(container) {
       settings.tactical = id;
       saveSettings(settings);
       syncLoadout();
-      if (state === 'paused') $('pause-hint').textContent = `${def.name} selected — you'll have it when you next respawn.`;
+      if (state === 'paused') $('pause-hint').textContent = `${def.name} is ready on your next spawn.`;
     });
     container.append(b);
     tacButtons.push([id, b]);
@@ -242,7 +253,7 @@ function inviteLink() {
 function updateRoomUi() {
   const on = net.active;
   const n = net.humanCount;
-  const label = on ? `ROOM ${net.code} · ${n} player${n === 1 ? '' : 's'}` : '';
+  const label = on ? `ROOM ${net.code}   ${n} PLAYER${n === 1 ? '' : 'S'}` : '';
   $('room').textContent = label;
   $('room').classList.toggle('hidden', !on);
   $('room-box').classList.toggle('hidden', !on);
@@ -317,7 +328,7 @@ async function startTraining() {
   audio.setVolume(settings.volume);
   game.newMatch({ botCount: 1, bots: false, difficulty: settings.difficulty, map: RANGE_MAP, rules: TRAINING });
   setState('playing');
-  hud.centerMessage('TRAINING RANGE', 'Walk onto a stand to swap guns · step on the orange pad for the 30s challenge', 4, '#ff8a2a');
+  hud.centerMessage('TRAINING RANGE', 'Stands swap your gun. The orange pad starts a 30 second run.', 4, '#ff6b1a');
   const ok = await lock();
   if (!ok && state === 'playing') hud.setLockHint(true);
 }
@@ -415,7 +426,7 @@ async function rejoin(code, reason) {
     await new Promise((r) => setTimeout(r, 3000));
   }
   if (token === rejoinToken && !net.active) {
-    setMpStatus(`Couldn't get back into room ${code}. The host may have left. Press Join to try again — your score is kept for 3 minutes.`, true);
+    setMpStatus(`Couldn't get back into room ${code}. The host may have left. Press Join to retry. Your score holds for 3 minutes.`, true);
   }
 }
 
@@ -436,8 +447,8 @@ function pause() {
   $('pause-hint').textContent = net.active ? 'The match keeps running while this menu is open.' : '';
   $('copy-note').textContent = '';
   const r = game.rules;
-  $('loadout-note').textContent = r.gunGame ? 'Gun Game hands out the weapons — your pick applies in other modes.'
-    : r.forcePrimary ? 'Snipers Only: everyone has a sniper rifle — your pick applies in other modes.' : '';
+  $('loadout-note').textContent = r.gunGame ? 'Gun Game hands out the guns. Your pick waits for the next mode.'
+    : r.forcePrimary ? 'Snipers Only: everyone carries a Spire.' : '';
   syncMatchPickers();
   setState('paused');
 }
@@ -447,7 +458,7 @@ async function resume() {
   audio.resume();
   const ok = await lock();
   if (ok) setState('playing');
-  else $('pause-hint').textContent = 'Could not capture the mouse yet — click Resume again.';
+  else $('pause-hint').textContent = 'Mouse not captured yet. Click Resume again.';
 }
 
 // ---------------------------------------------------------------- controls (rebinding)
@@ -457,18 +468,19 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 /** Main-menu summary of the current controls. */
 function renderKeysList() {
   const k = (a) => `<kbd>${esc(label(a))}</kbd>`;
-  $('keys-list').innerHTML = [
-    `${k('forward')}${k('left')}${k('back')}${k('right')} move`,
-    `<kbd>Mouse</kbd> look · ${k('fire')} fire · ${k('aim')} aim`,
-    `${k('jump')} jump · ${k('sprint')} sprint`,
-    `${k('crouch')} crouch · while sprinting: slide`,
-    `${k('leanLeft')} lean left · ${k('leanRight')} lean right`,
-    `${k('grenade')} grenade (hold to cook) · ${k('tactical')} flash / smoke`,
-    `${k('knife')} knife · ${k('reload')} reload · ${k('inspect')} inspect`,
-    `${k('primary')} primary · ${k('pistol')} pistol · <kbd>Wheel</kbd> swap`,
-    `${k('chat')} chat (multiplayer)`,
-    `${k('scoreboard')} scoreboard · <kbd>Esc</kbd> / ${k('pause')} pause`,
-  ].map((l) => `<li>${l}</li>`).join('');
+  const rows = [
+    [`${k('forward')}${k('left')}${k('back')}${k('right')}`, 'Move'],
+    ['<kbd>Mouse</kbd>', 'Look'],
+    [k('fire'), 'Fire'], [k('aim'), 'Aim down sights'],
+    [k('jump'), 'Jump'], [k('sprint'), 'Sprint'],
+    [k('crouch'), 'Crouch, or slide while sprinting'],
+    [`${k('leanLeft')}${k('leanRight')}`, 'Lean left / right'],
+    [k('grenade'), 'Frag. Hold to cook'], [k('tactical'), 'Flash or smoke'],
+    [k('knife'), 'Knife'], [k('reload'), 'Reload'], [k('inspect'), 'Inspect'],
+    [`${k('primary')}${k('pistol')}<kbd>Wheel</kbd>`, 'Primary / pistol / swap'],
+    [k('chat'), 'Chat'], [k('scoreboard'), 'Scoreboard'], [`<kbd>Esc</kbd>${k('pause')}`, 'Pause'],
+  ];
+  $('keys-list').innerHTML = rows.map(([keys, what]) => `<li><span class="kk">${keys}</span><span>${what}</span></li>`).join('');
 }
 
 let listening = null; // [action, slot] waiting for a key
@@ -602,7 +614,7 @@ function renderEndXp() {
   const up = pr.level > before ? `<span class="xp-up">Level ${before} → ${pr.level}!</span>` : `<span>Level ${pr.level}</span>`;
   el.innerHTML = `<div class="xp-line"><b>+${fmt(total)} XP</b>${up}<span class="bar"><i style="width:${pct}%"></i></span>`
     + `<small>${info.need ? `${fmt(info.into)} / ${fmt(info.need)}` : 'MAX'}</small></div>`
-    + `<div class="xp-parts">${pr.match.map(([k, v]) => `${k} +${fmt(v)}`).join(' · ')}</div>`;
+    + `<div class="xp-parts">${pr.match.map(([k, v]) => `<span>${k} <b>+${fmt(v)}</b></span>`).join('')}</div>`;
 }
 
 let customSlot = 'title';
@@ -629,9 +641,9 @@ function swatchFor(slot, item) {
 function renderCustom() {
   const pr = game.progress, info = pr.info, eq = pr.equipped();
   const pct = info.need ? Math.round((info.into / info.need) * 100) : 100;
-  $('custom-level').innerHTML = `<span class="big">${pr.prestige ? '★' + pr.prestige + ' · ' : ''}${pr.level}</span>`
+  $('custom-level').innerHTML = `<span class="big">${pr.prestige ? '<em>★' + pr.prestige + '</em>' : ''}${pr.level}</span>`
     + `<span class="bar"><i style="width:${pct}%"></i></span>`
-    + `<small>${info.need ? `${fmt(info.into)} / ${fmt(info.need)} XP to level ${pr.level + 1}` : 'Max level'} · ${fmt(pr.xp)} XP total</small>`;
+    + `<small>${info.need ? `${fmt(info.into)} / ${fmt(info.need)} XP to level ${pr.level + 1}` : 'Max level'}</small>`;
   const slots = $('custom-slots');
   slots.textContent = '';
   for (const s of SLOTS) {
@@ -963,7 +975,7 @@ game.onMatchEnd = () => {
   game.progress.save();
   renderEndXp();
   $('end-title').textContent = res.draw ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT';
-  $('end-title').style.color = res.draw ? '#ffd24d' : won ? '#5dff9a' : '#ff6b6b';
+  $('end-title').style.color = res.draw ? '#e9e4da' : won ? '#ffb04a' : '#8e949b';
   $('end-sub').textContent = `${game.rules.name}: ${res.sub}`;
   hud.renderScores(game, $('end-body'));
   renderAwards();
@@ -1033,7 +1045,7 @@ function renderVote() {
     });
     box.append(b);
   });
-  $('vote-title').textContent = net.active ? '— everyone votes' : '— pick one';
+  $('vote-title').textContent = net.active ? 'everyone votes' : 'pick one';
   updateVoteNote();
 }
 
@@ -1042,10 +1054,10 @@ function updateVoteNote() {
   if (!game.voteOptions || !game.voteOptions.length) { el.textContent = ''; return; }
   if (net.active && game.voteDeadline) {
     const left = Math.max(0, Math.ceil((game.voteDeadline - performance.now()) / 1000));
-    const txt = `Starts in ${left}s${net.role === 'host' ? ' — or press Start next match' : ''}. Most votes wins.`;
+    const txt = `Starts in ${left}s. Most votes wins.${net.role === 'host' ? ' Or start it now.' : ''}`;
     if (el.textContent !== txt) el.textContent = txt;
   } else if (!net.active) {
-    el.textContent = 'Then press Play again.';
+    el.textContent = '';
   }
 }
 
@@ -1108,7 +1120,13 @@ try {
 
 game.applySettings();
 startAttract();
-if (params.get('join')) setMpStatus(`Invited to room ${codeInput.value} — pick a name and press Join.`);
+// name tags are drawn on canvases: redraw them once the bundled font has arrived
+if (document.fonts && document.fonts.load) {
+  document.fonts.load('700 34px "Barlow Condensed"').then(() => {
+    for (const c of new Set([...game.chars, ...game.bots, ...game.remotes])) if (c.model) c.model.redrawTag();
+  }).catch(() => {});
+}
+if (params.get('join')) setMpStatus(`Invited to room ${codeInput.value}. Pick a name and press Join.`);
 requestAnimationFrame(frame);
 
 // handy for debugging / automated tests

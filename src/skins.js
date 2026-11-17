@@ -138,7 +138,7 @@ export function skinUnlocked(career, weaponId, id, progress = null) {
 
 /** Why a skin is locked, for tooltips. */
 export function skinLockText(career, weaponId, id, progress, gunName) {
-  if (id === 'gold') return `Gold — level ${GOLD_LEVEL} and ${GOLD_KILLS} ${gunName} kills (${career.weaponKills(weaponId)}/${GOLD_KILLS})`;
-  if (id === 'diamond') return 'Diamond — get Gold on every gun';
-  return `${SKIN_BY_ID[id].name} — ${Math.max(0, SKIN_KILLS - career.weaponKills(weaponId))} more ${gunName} kills to unlock`;
+  if (id === 'gold') return `Gold: level ${GOLD_LEVEL} and ${GOLD_KILLS} ${gunName} kills (${career.weaponKills(weaponId)}/${GOLD_KILLS})`;
+  if (id === 'diamond') return 'Diamond: Gold on every gun';
+  return `${SKIN_BY_ID[id].name}: ${Math.max(0, SKIN_KILLS - career.weaponKills(weaponId))} more ${gunName} kills`;
 }

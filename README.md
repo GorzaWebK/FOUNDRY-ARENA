@@ -1,5 +1,13 @@
 # Foundry Arena
 
+*Six crews. Six yards. Nobody clocks off until the whistle.*
+
+An arena shooter with its own look: tempered steel and safety orange, stencil
+type, a crew of bots named for the shop floor (Slag, Rivet, Cinder, Anvil, Flux…)
+and two teams, **Cobalt** and **Furnace**. Every gun has a name: the **Kestrel**
+rifle, **Wasp** SMG, **Breaker** shotgun, **Spire** sniper, **Ironside** LMG and
+the **Hammer** pistol everyone carries.
+
 A complete browser first-person shooter: you, your friends and AI bots in a
 free-for-all deathmatch. Play solo, or host a room and share the code.
 Three.js for rendering, Vite for tooling, plain JavaScript modules.
@@ -44,9 +52,9 @@ The pause menu's **Next match** section changes mode and map between matches.
 | Mode                  | How it works                                                                  |
 | --------------------- | ----------------------------------------------------------------------------- |
 | **Deathmatch**        | free-for-all; first to 20 kills, or most kills after 10 minutes               |
-| **King of the Hill**  | Blue vs Red over a zone that moves every minute; a team scores a point a second while it holds the zone with no enemies inside. First to 100. A light pillar marks the zone and a HUD marker points to it |
-| **Team Deathmatch**   | Blue vs Red, no friendly fire; first team to 40 kills. Humans are spread across both teams and bots fill the rest |
-| **Capture the Flag**  | Blue vs Red, a flag at each base. Touch the enemy flag to take it and carry it to your own base while your flag is at home to score; first to 3 captures. A carrier who dies drops the flag: their team can pick it back up, and yours sends it home with a touch (or it goes home by itself after 20 s). Markers show where both flags are; you spawn on your own side. Bots attack, defend, escort carriers and hunt anyone who has their flag |
+| **King of the Hill**  | Cobalt vs Furnace over a zone that moves every minute; a team scores a point a second while it holds the zone with no enemies inside. First to 100. A light pillar marks the zone and a HUD marker points to it |
+| **Team Deathmatch**   | Cobalt vs Furnace, no friendly fire; first team to 40 kills. Humans are spread across both teams and bots fill the rest |
+| **Capture the Flag**  | Cobalt vs Furnace, a flag at each base. Touch the enemy flag to take it and carry it to your own base while your flag is at home to score; first to 3 captures. A carrier who dies drops the flag: their team can pick it back up, and yours sends it home with a touch (or it goes home by itself after 20 s). Markers show where both flags are; you spawn on your own side. Bots attack, defend, escort carriers and hunt anyone who has their flag |
 | **Gun Game**          | every 2 kills hand you the next gun: LMG → rifle → SMG → shotgun → sniper → pistol. One pistol kill wins. Unlimited reserve ammo |
 | **Last One Standing** | 5 lives each, no respawns after that; the last player alive wins. Once you're out you spectate the survivors over their shoulder (fire / aim to cycle, jump for the overhead view); players joining mid-round watch until the next one |
 | **Snipers Only**      | free-for-all with sniper rifles and pistols; first to 15 kills                |
@@ -91,10 +99,9 @@ switched off with **Kill cam** in settings.
 Your multi-kills (Double, Triple, Quad, Mega Kill within 4 seconds of each other)
 and streaks (Killing Spree at 3, Rampage 5, Dominating 7, Unstoppable 10, Godlike 15,
 Legendary 20), plus First Blood and Shutdown (ending someone's streak), get a big
-banner and a spoken call-out. Other players' big streaks show up in the kill feed.
-The voice uses the browser's built-in speech synthesis, so no audio files are
-needed; it can be switched off with **Announcer voice** in settings, and how it
-sounds depends on the voices your browser and OS provide.
+banner and a sting. Other players' big streaks show up in the kill feed. Turn on
+**Spoken call-outs** in settings to also hear them read out (the browser's
+text-to-speech, so how it sounds depends on your browser and OS).
 
 ## Rules
 
@@ -218,12 +225,12 @@ still spread apart to show your current accuracy.
 
 | Weapon        | Mag / reserve | Damage  | Notes                                               |
 | ------------- | ------------- | ------- | --------------------------------------------------- |
-| Assault rifle | 30 / 90       | 15      | full auto all-rounder; spread blooms as you hold fire |
-| SMG           | 32 / 128      | 12      | fastest fire rate, accurate on the move, weak at range |
-| Shotgun       | 6 / 24        | 8 × 10  | wide spread, falls off quickly with distance         |
-| Sniper rifle  | 3 / 21        | 80      | bolt action; scoped shots are pinpoint, hip fire is not |
-| LMG           | 60 / 120      | 17      | huge belt, heavy: slower movement, long reload       |
-| Pistol        | 12 / ∞        | 25      | everyone's sidearm                                   |
+| Kestrel (assault rifle) | 30 / 90 | 15      | full auto all-rounder; spread blooms as you hold fire |
+| Wasp (SMG)    | 32 / 128      | 12      | fastest fire rate, accurate on the move, weak at range |
+| Breaker (shotgun) | 6 / 24    | 8 × 10  | wide spread, falls off quickly with distance         |
+| Spire (sniper rifle) | 3 / 21 | 80      | bolt action; scoped shots are pinpoint, hip fire is not |
+| Ironside (LMG) | 60 / 120     | 17      | huge belt, heavy: slower movement, long reload       |
+| Hammer (pistol) | 12 / ∞      | 25      | everyone's sidearm                                   |
 | Grenade       | 2 (max 3)     | up to 130 | 2.3 s fuse, bounces, 7.5 m blast; walls block it; hurts you too |
 | Flashbang     | 2             | —       | 1.6 s fuse; whites out the game view (your HUD stays visible on top) and muffles sound for up to 3.6 s for anyone who can see it (much less if they're facing away). Bots lose track of you while blinded |
 | Smoke         | 2             | —       | 1.2 s fuse; a 4.6 m cloud for 15 s that nobody (bots included) can see through. Bullets still go through it |

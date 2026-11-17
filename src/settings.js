@@ -22,7 +22,7 @@ export const DEFAULTS = {
   tactical: DEFAULT_TACTICAL, // 'flash' | 'smoke'
   map: DEFAULT_MAP,
   mode: DEFAULT_MODE,
-  announcer: true, // spoken killstreak call-outs
+  announcer: false, // spoken (text-to-speech) killstreak call-outs; the banner and sting play either way
   killcam: true,
   leanToggle: true, // tap Q / E to lean instead of holding
   rules: { limits: {}, time: 0, ff: false, pickups: true, hardcore: false }, // custom match rules (limits per mode)
@@ -110,7 +110,7 @@ export function buildSettingsUI(container, settings, onChange) {
     { key: 'fov', label: 'Field of view', min: 70, max: 120, step: 1, fmt: (v) => v + '°' },
     { key: 'volume', label: 'Volume', min: 0, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' },
     { key: 'quality', label: 'Graphics', options: [['high', 'High'], ['low', 'Low (faster)']] },
-    { key: 'announcer', label: 'Announcer voice', check: true },
+    { key: 'announcer', label: 'Spoken call-outs', check: true },
     { key: 'killcam', label: 'Kill cam', check: true },
     { key: 'leanToggle', label: 'Toggle lean', check: true },
     { key: 'invertY', label: 'Invert Y', check: true },

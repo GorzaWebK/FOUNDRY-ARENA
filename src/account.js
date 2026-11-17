@@ -97,7 +97,7 @@ export async function parseCode(text) {
   const code = String(text || '').replace(/\s+/g, '');
   if (!code) throw new Error('Paste your account code first.');
   const m = /^FA1\.([zj][A-Za-z0-9_-]+)\.([0-9a-f]{8})$/.exec(code);
-  if (!m) throw new Error("That isn't an account code. It should start with FA1. — copy the whole thing.");
+  if (!m) throw new Error("That isn't an account code. It starts with FA1. Copy all of it.");
   if (fnv(m[1]) !== m[2]) throw new Error('That code is damaged or incomplete. Copy the whole code again.');
   let bytes = fromB64url(m[1].slice(1));
   if (m[1][0] === 'z') {

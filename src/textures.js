@@ -234,7 +234,7 @@ export function nameTexture(name, color, style = 'plain', level = 0, prestige = 
   c.width = 256; c.height = 64;
   const ctx = c.getContext('2d');
   const col = '#' + new THREE.Color(color).getHexString();
-  ctx.font = '700 32px system-ui, "Segoe UI", Arial, sans-serif';
+  ctx.font = '700 34px "Barlow Condensed", "Arial Narrow", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const badge = level > 0 ? 34 : 0;
@@ -267,11 +267,11 @@ export function nameTexture(name, color, style = 'plain', level = 0, prestige = 
     ctx.fillStyle = prestige ? '#7a3fd0' : 'rgba(255,255,255,0.14)';
     ctx.beginPath(); ctx.roundRect(x0 + 6, 16, 28, 30, 6); ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.font = '800 17px system-ui, "Segoe UI", Arial, sans-serif';
+    ctx.font = '800 19px "Barlow Condensed", "Arial Narrow", sans-serif';
     ctx.fillText(prestige ? '\u2605' + level : String(level), x0 + 20, 31, 26);
   }
   // name
-  ctx.font = '700 32px system-ui, "Segoe UI", Arial, sans-serif';
+  ctx.font = '700 34px "Barlow Condensed", "Arial Narrow", sans-serif';
   if (style === 'glow') { ctx.shadowColor = col; ctx.shadowBlur = 12; }
   ctx.fillStyle = gold ? '#ffe08a' : prest ? '#e6ccff' : style === 'plain' ? '#ffffff' : col === '#ffffff' ? '#ffffff' : lighten(col);
   ctx.fillText(name, 128 + badge / 2, 31, w - badge - 20);

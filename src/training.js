@@ -360,7 +360,7 @@ export class Range {
       this.best = n;
       try { localStorage.setItem(BEST_KEY, String(n)); } catch (e) { /* no storage */ }
     }
-    this.game.announcer.announce(record ? 'New Record' : 'Time', `${n} targets down · ${this.accuracy()}% accuracy${record ? '' : ` · best ${this.best}`}`);
+    this.game.announcer.announce(record ? 'New Record' : 'Time', `${n} down, ${this.accuracy()}% accuracy${record ? '' : `. Best ${this.best}`}`);
     this.challenge = null;
   }
 
@@ -382,10 +382,10 @@ export class Range {
     const s = this.stats, ch = this.challenge;
     let head;
     if (ch && ch.count > 0) head = `<b class="rp-live">CHALLENGE STARTING…</b>`;
-    else if (ch) head = `<b class="rp-live">CHALLENGE ${Math.ceil(ch.t)}s · ${ch.down} down</b>`;
-    else head = `<b>CHALLENGE</b> step on the orange pad · best ${this.best}`;
+    else if (ch) head = `<b class="rp-live">RUN ${Math.ceil(ch.t)}s   ${ch.down} DOWN</b>`;
+    else head = `<b>30 SECOND RUN</b> step on the orange pad. Best ${this.best}`;
     const hp = s.hits ? Math.round((100 * s.heads) / s.hits) : 0;
-    const text = `${head}<br>Shots ${s.shots} · Hits ${s.hits} · Accuracy ${this.accuracy()}%<br>Headshots ${s.heads} (${hp}%) · Targets down ${s.down}`;
+    const text = `${head}<br>Shots ${s.shots}   Hits ${s.hits}   Accuracy ${this.accuracy()}%<br>Headshots ${s.heads} (${hp}%)   Targets down ${s.down}`;
     if (text !== this.panelText) { this.panelText = text; this.panel.innerHTML = text; }
   }
 }

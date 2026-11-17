@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Foundry Arena</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23101418'/><path d='M16 5v8M16 19v8M5 16h8M19 16h8' stroke='%23ff8a2a' stroke-width='3' stroke-linecap='round'/></svg>" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='8' fill='%23121518'/><path d='M32 6 55 19.3v25.4L32 58 9 44.7V19.3Z' fill='none' stroke='%23ff6b1a' stroke-width='5' stroke-linejoin='round'/><path d='M32 19c6.5 9 10 14 10 19.5a10 10 0 0 1-20 0C22 33 25.5 28 32 19Z' fill='%23ff6b1a'/></svg>" />
   </head>
   <body>
     <canvas id="game"></canvas>
@@ -36,27 +36,27 @@
       <div id="toast"></div>
       <div id="center-msg"><div id="cm-main"></div><div id="cm-sub"></div></div>
       <div id="announce"><div id="an-main"></div><div id="an-sub"></div></div>
-      <div id="protect-label">SPAWN PROTECTION</div>
+      <div id="protect-label">SHIELDED</div>
       <div id="lock-hint" class="hidden">Click to capture the mouse</div>
 
       <div id="vitals">
         <div class="vital">
-          <span class="v-icon v-hp">✚</span><span id="hp-num">100</span>
+          <span class="v-icon v-hp">HP</span><span id="hp-num">100</span>
           <div class="bar"><div id="hp-bar"></div></div>
         </div>
         <div class="vital">
-          <span class="v-icon v-ar">⛨</span><span id="ar-num">0</span>
+          <span class="v-icon v-ar">ARMOR</span><span id="ar-num">0</span>
           <div class="bar"><div id="ar-bar"></div></div>
         </div>
       </div>
 
       <div id="ammo">
-        <div id="ammo-name">Assault Rifle</div>
+        <div id="ammo-name">Kestrel</div><div id="ammo-cls">Assault rifle</div>
         <div id="ammo-count"><span id="ammo-mag">30</span><span class="sep">/</span><span id="ammo-res">60</span></div>
         <div id="reload-hint"></div>
         <div id="slots">
           <div class="slot" data-i="0"><b>1</b> <span id="slot-prim">Rifle</span></div>
-          <div class="slot" data-i="1"><b>2</b> Pistol</div>
+          <div class="slot" data-i="1"><b>2</b> <span id="slot-side">Hammer</span></div>
           <div class="slot nade" id="slot-nade"><b>F</b> Grenade × <span id="nade-count">2</span></div>
           <div class="slot nade" id="slot-tac"><b>G</b> <span id="tac-name">Flash</span> × <span id="tac-count">2</span></div>
           <div class="slot" id="slot-knife"><b>V</b> Knife</div>
@@ -85,7 +85,7 @@
       <div id="scope" class="hidden"><i class="sc-h"></i><i class="sc-v"></i></div>
       <div id="chat">
         <div id="chat-log"></div>
-        <input type="text" id="chat-input" class="hidden" maxlength="140" placeholder="Message everyone — Enter to send" autocomplete="off" spellcheck="false" />
+        <input type="text" id="chat-input" class="hidden" maxlength="140" placeholder="Say something. Enter sends." autocomplete="off" spellcheck="false" />
         <div id="chat-hint" class="hidden">Enter to chat</div>
       </div>
     </div>
@@ -93,8 +93,8 @@
     <!-- ============================== MAIN MENU ============================== -->
     <div id="menu" class="overlay">
       <div class="panel wide menu-panel">
-        <h1>FOUNDRY <span>ARENA</span></h1>
-        <p class="tag">Arena shooter · play solo against bots, or host a room for your friends</p>
+        <h1 class="logo"><svg class='emblem' viewBox='0 0 64 64' aria-hidden='true'><path d='M32 3 57 17.5v29L32 61 7 46.5v-29Z' fill='none' stroke='currentColor' stroke-width='5' stroke-linejoin='round'/><path d='M32 17c7 10 11 15.5 11 21.5a11 11 0 0 1-22 0C21 32.5 25 27 32 17Z' fill='currentColor'/><path d='M27.5 39.5a4.5 4.5 0 0 0 4.5 4.5' fill='none' stroke='#1a1208' stroke-width='2.6' stroke-linecap='round'/></svg><span class="wm"><span class="wm-main">FOUNDRY</span><span class="wm-sub">ARENA</span></span></h1>
+        <p class="tag">Six crews. Six yards. Nobody clocks off until the whistle.</p>
         <div class="menu-grid">
           <section class="card">
             <h4>Match</h4>
@@ -110,7 +110,7 @@
           <section class="card">
             <h4 class="h-with-btn">Loadout <button id="btn-skins" class="link-btn">Weapon skins…</button></h4>
             <div id="menu-loadout" class="loadout"></div>
-            <p class="note">Plus a pistol, 2 grenades and 2 flashbangs or smokes.</p>
+            <p class="note">Every kit carries a Hammer pistol, two frags and your pick of flash or smoke.</p>
           </section>
           <section class="card">
             <h4>Play with friends</h4>
@@ -154,7 +154,7 @@
       <div class="panel">
         <h2>CONTROLS</h2>
         <ul class="keys" id="keys-list"></ul>
-        <p class="note">Tip: avoid <kbd>Ctrl</kbd> combos — browsers reserve <kbd>Ctrl</kbd>+<kbd>W</kbd> for closing the tab.</p>
+        <p class="note">Keep clear of <kbd>Ctrl</kbd> combos. <kbd>Ctrl</kbd>+<kbd>W</kbd> closes the tab.</p>
         <div class="btn-row">
           <button id="btn-controls">Change controls…</button>
           <button id="btn-keys-done" class="primary">DONE</button>
@@ -178,9 +178,9 @@
           <label class="row"><span>Mode</span><select id="pause-mode"></select><output></output></label>
           <div class="mode-line"><p id="pause-mode-blurb" class="note"></p><button id="btn-rules-pause" class="small-btn">Rules…</button></div>
           <label class="row"><span>Map</span><select id="pause-map"></select><output></output></label>
-          <p class="note">Press <b>Restart match</b> to play it.</p>
+          <p class="note">Takes effect on <b>Restart match</b>.</p>
         </div>
-        <h4 class="h-with-btn">Loadout <small>— applies on your next respawn</small> <button id="btn-skins-pause" class="link-btn">Weapon skins…</button></h4>
+        <h4 class="h-with-btn">Loadout <small>next spawn</small> <button id="btn-skins-pause" class="link-btn">Weapon skins…</button></h4>
         <div id="pause-loadout" class="loadout compact"></div>
         <div id="pause-tac" class="loadout compact tac"></div>
         <p id="loadout-note" class="note"></p>
@@ -209,12 +209,12 @@
           <div>
             <h4>Awards</h4>
             <div id="end-awards" class="awards"></div>
-            <h4>Next match <small id="vote-title">— pick one</small></h4>
+            <h4>Next match <small id="vote-title">pick one</small></h4>
             <div id="vote-opts" class="vote"></div>
             <p id="vote-note" class="note"></p>
           </div>
         </div>
-        <p id="end-wait" class="note hidden">The next match starts when the timer runs out, or sooner if the host starts it.</p>
+        <p id="end-wait" class="note hidden">Next match starts when the clock runs out, or when the host says so.</p>
         <div class="btn-row">
           <button id="btn-again" class="primary">PLAY AGAIN</button>
           <button id="btn-menu">Main menu</button>
@@ -231,8 +231,7 @@
           <div id="custom-slots" class="custom-slots"></div>
           <div id="custom-items" class="custom-items"></div>
         </div>
-        <p class="note">Everything here is looks only. Earn XP from kills, captures, hill time, awards and finishing matches;
-          every level unlocks something. Your level and unlocks are part of your account.</p>
+        <p class="note">Every level unlocks something. Looks only: none of it touches the guns.</p>
         <div class="btn-row">
           <button id="btn-prestige" class="hidden">Prestige…</button>
           <button id="btn-custom-done" class="primary">DONE</button>
@@ -246,7 +245,7 @@
         <h2>MATCH RULES</h2>
         <p class="tag" id="rules-mode"></p>
         <div id="rules-rows"></div>
-        <p class="note">Rules apply to the next match you start. In multiplayer they're the host's, and everyone plays by them.</p>
+        <p class="note">For the next match. In a room, the host's rules go for everyone.</p>
         <div class="btn-row">
           <button id="btn-rules-reset">Standard rules</button>
           <button id="btn-rules-done" class="primary">DONE</button>
@@ -261,9 +260,8 @@
         <p class="acct-line">Player ID <b id="career-id" class="acct-id">—</b></p>
         <div id="career-grid" class="career-grid"></div>
         <h4>Kills and skins by weapon</h4>
-        <table class="career-weapons"><thead><tr><th class="l">Weapon</th><th>Kills</th><th class="l prog-h">Skins <small>(camos at 50 kills · Gold at level 20 + 150 kills · Diamond for Gold on every gun)</small></th></tr></thead><tbody id="career-weapons"></tbody></table>
-        <p class="note">Counts every match you play, solo or multiplayer (not the training range). It's part of your account, so
-          it comes with you when you import your account code.</p>
+        <table class="career-weapons"><thead><tr><th class="l">Weapon</th><th>Kills</th><th class="l prog-h">Skins <small>camos at 50 kills, Gold at level 20 and 150, Diamond with Gold on all six</small></th></tr></thead><tbody id="career-weapons"></tbody></table>
+        <p class="note">Every match counts, solo or in a room. The range doesn't.</p>
         <div class="btn-row">
           <button id="btn-career-reset">Reset career…</button>
           <button id="btn-career-done" class="primary">DONE</button>
@@ -287,13 +285,13 @@
         <p class="note">Your code changes as you play, so back up again after a session to keep newer progress.
           Keep it to yourself: anyone with it can load your account.</p>
         <h4>Import</h4>
-        <textarea id="acct-code" rows="3" placeholder="Paste an account code (starts with FA1.)" spellcheck="false" autocomplete="off"></textarea>
+        <textarea id="acct-code" rows="3" placeholder="Paste a code that starts FA1." spellcheck="false" autocomplete="off"></textarea>
         <div class="btn-row">
           <button id="btn-acct-import" class="primary">IMPORT</button>
           <button id="btn-acct-file">Import from file…</button>
           <input type="file" id="acct-file" accept=".txt,text/plain" hidden />
         </div>
-        <p class="note">Importing replaces this browser's account with the one in the code, then reloads the page.</p>
+        <p class="note">Importing swaps this browser over to that account and reloads.</p>
         <p id="acct-status" class="note"></p>
         <div class="btn-row"><button id="btn-acct-done">Done</button></div>
       </div>
@@ -303,7 +301,7 @@
     <div id="controls" class="overlay hidden">
       <div class="panel">
         <h2>CONTROLS</h2>
-        <p class="note">Click a slot, then press a key or mouse button. <kbd>Esc</kbd> cancels, <kbd>Backspace</kbd> clears the slot. The mouse wheel always swaps weapons.</p>
+        <p class="note">Click a slot, then press the key. <kbd>Esc</kbd> cancels, <kbd>Backspace</kbd> clears. The wheel always swaps guns.</p>
         <div id="binds" class="binds"></div>
         <p id="binds-note" class="note"></p>
         <div class="btn-row">

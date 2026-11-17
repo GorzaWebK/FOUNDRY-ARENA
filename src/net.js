@@ -318,7 +318,7 @@ export class Net {
     if (!g.over && !spectate) g.respawn(c, true);
     this.broadcast({ t: 'roster', r: this._roster() }, conn);
     if (saved) this.system(`${name} rejoined with their score`);
-    else this.system(spectate ? `${name} joined — they'll play from the next round` : `${name} joined`);
+    else this.system(spectate ? `${name} joined. They play from the next round.` : `${name} joined`);
     this.hooks.onRoster();
     return c;
   }
@@ -339,7 +339,7 @@ export class Net {
     }
     g.removeRemote(c);
     this.broadcast({ t: 'roster', r: this._roster() });
-    if (!quiet) this.system(kept ? `${c.name} lost connection — they keep their score if they rejoin within 3 minutes` : `${c.name} left`);
+    if (!quiet) this.system(kept ? `${c.name} dropped. Their score holds for 3 minutes.` : `${c.name} left`);
     this.hooks.onRoster();
   }
 

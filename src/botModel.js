@@ -1,6 +1,7 @@
 // Low-poly humanoid made of boxes, with a name tag and simple procedural animation.
 
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { nameTexture, flashTexture } from './textures.js';
 import { worldGun } from './gunModels.js';
 import { itemOf } from './cosmetics.js';
@@ -11,9 +12,17 @@ const HAND = new THREE.Vector3(0.14, 0.4, -0.38); // right hand, in upper-body s
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const SHIELD = new THREE.SphereGeometry(1, 24, 16);
 
+const geoCache = new Map();
+/** A bevelled box of this size (shared between everyone). */
+function rbox(w, h, d) {
+  const key = `${w},${h},${d}`;
+  let g = geoCache.get(key);
+  if (!g) { g = new RoundedBoxGeometry(w, h, d, 2, Math.min(w, h, d) * 0.22); geoCache.set(key, g); }
+  return g;
+}
+
 function part(parent, w, h, d, mat, x, y, z) {
-  const m = new THREE.Mesh(BOX, mat);
-  m.scale.set(w, h, d);
+  const m = new THREE.Mesh(rbox(w, h, d), mat);
   m.position.set(x, y, z);
   m.castShadow = true;
   parent.add(m);
@@ -22,13 +31,18 @@ function part(parent, w, h, d, mat, x, y, z) {
 
 export class BotModel {
   constructor(name, color) {
+    // A crew member: dark work suit, steel plate armour, and the player's colour
+    // only on the accents (visor, shoulder caps, chest band, helmet stripe, pack light),
+    // in the same bevelled, lit style as the guns they carry.
     const c = new THREE.Color(color);
-    const body = new THREE.MeshLambertMaterial({ color: c });
-    const dark = new THREE.MeshLambertMaterial({ color: c.clone().multiplyScalar(0.45) });
-    const skin = new THREE.MeshLambertMaterial({ color: 0x9aa3ad });
-    const visor = new THREE.MeshLambertMaterial({ color: 0x101418, emissive: c, emissiveIntensity: 0.9 });
-    const gun = new THREE.MeshLambertMaterial({ color: 0x23262b });
-    this.mats = [body, dark, skin, visor, gun];
+    const accent = new THREE.MeshStandardMaterial({ color: c, roughness: 0.55, metalness: 0.15 });
+    const accentDark = new THREE.MeshStandardMaterial({ color: c.clone().multiplyScalar(0.45), roughness: 0.7, metalness: 0.1 });
+    const suit = new THREE.MeshStandardMaterial({ color: 0x2b3137, roughness: 0.88, metalness: 0.02 });
+    const visor = new THREE.MeshStandardMaterial({ color: 0x0c1014, emissive: c, emissiveIntensity: 1.1, roughness: 0.25, metalness: 0.4 });
+    const gun = new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.6, metalness: 0.3 });
+    const plate = new THREE.MeshStandardMaterial({ color: 0x4a525b, roughness: 0.55, metalness: 0.45 });
+    const suitDark = new THREE.MeshStandardMaterial({ color: 0x1b1f23, roughness: 0.9, metalness: 0.02 });
+    this.mats = [accent, accentDark, suit, visor, gun, plate, suitDark];
     this.name = name;
     this.color = color;
 
@@ -36,31 +50,40 @@ export class BotModel {
     this.tilt = new THREE.Group(); // falls over on death
     this.group.add(this.tilt);
 
-    // legs (pivot at the hip)
+    // legs (pivot at the hip): suit, a knee plate, a boot
     this.legL = new THREE.Group(); this.legL.position.set(-0.12, 0.88, 0);
     this.legR = new THREE.Group(); this.legR.position.set(0.12, 0.88, 0);
-    part(this.legL, 0.17, 0.88, 0.2, dark, 0, -0.44, 0);
-    part(this.legR, 0.17, 0.88, 0.2, dark, 0, -0.44, 0);
+    for (const leg of [this.legL, this.legR]) {
+      part(leg, 0.17, 0.74, 0.2, suit, 0, -0.37, 0);
+      part(leg, 0.14, 0.12, 0.05, plate, 0, -0.42, -0.11); // knee
+      part(leg, 0.19, 0.14, 0.27, suitDark, 0, -0.81, -0.03); // boot
+    }
     this.tilt.add(this.legL, this.legR);
 
     // upper body (pivot at the waist so it can pitch with the aim)
     this.upper = new THREE.Group();
     this.upper.position.y = 0.9;
     this.tilt.add(this.upper);
-    part(this.upper, 0.48, 0.6, 0.27, body, 0, 0.3, 0);
-    part(this.upper, 0.5, 0.14, 0.29, dark, 0, 0.02, 0);
-    part(this.upper, 0.3, 0.3, 0.16, dark, 0, 0.36, 0.2); // backpack
-    this.head = part(this.upper, 0.27, 0.27, 0.27, skin, 0, 0.76, 0);
-    part(this.upper, 0.29, 0.1, 0.06, visor, 0, 0.78, -0.13);
-    this.helmetTop = part(this.upper, 0.29, 0.08, 0.29, body, 0, 0.9, 0); // helmet top
+    part(this.upper, 0.46, 0.58, 0.26, suit, 0, 0.3, 0); // torso
+    part(this.upper, 0.5, 0.36, 0.3, plate, 0, 0.4, 0); // chest plate
+    part(this.upper, 0.51, 0.05, 0.31, accent, 0, 0.5, 0); // team band across the plate
+    part(this.upper, 0.5, 0.1, 0.29, suitDark, 0, 0.04, 0); // belt
+    part(this.upper, 0.3, 0.32, 0.16, plate, 0, 0.38, 0.21); // backpack
+    part(this.upper, 0.22, 0.04, 0.05, visor, 0, 0.55, 0.3); // pack light
+    this.head = part(this.upper, 0.25, 0.26, 0.26, suitDark, 0, 0.76, 0); // hood
+    part(this.upper, 0.27, 0.09, 0.05, visor, 0, 0.78, -0.13); // visor
+    this.helmetTop = part(this.upper, 0.3, 0.1, 0.3, plate, 0, 0.9, 0); // helmet
+    part(this.upper, 0.06, 0.105, 0.31, accent, 0, 0.9, 0); // helmet stripe
+    // arms reaching forward to the gun, team colour on the shoulder caps
+    const armR = part(this.upper, 0.12, 0.12, 0.5, suit, 0.27, 0.42, -0.2);
+    armR.rotation.y = 0.25;
+    const armL = part(this.upper, 0.12, 0.12, 0.55, suit, -0.2, 0.4, -0.28);
+    armL.rotation.y = -0.55;
+    part(this.upper, 0.15, 0.1, 0.18, accent, 0.27, 0.56, 0);
+    part(this.upper, 0.15, 0.1, 0.18, accent, -0.27, 0.56, 0);
     this.look = new THREE.Group(); // unlockable gear: helmet, shoulder pads, armour vest
     this.upper.add(this.look);
     this.lookKey = '';
-    // arms reaching forward to the gun
-    const armR = part(this.upper, 0.13, 0.13, 0.5, body, 0.27, 0.42, -0.2);
-    armR.rotation.y = 0.25;
-    const armL = part(this.upper, 0.13, 0.13, 0.55, body, -0.2, 0.4, -0.28);
-    armL.rotation.y = -0.55;
     // weapons: one in the hands, the other stowed (pistol on the hip, or primary on the back)
     this.heldMount = new THREE.Group();
     this.heldMount.position.copy(HAND);
@@ -135,7 +158,7 @@ export class BotModel {
     this.lookKey = key;
     for (const m of this.look.children) if (m.material && m.material !== this.mats[3]) m.material.dispose();
     this.look.clear();
-    const lam = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
+    const lam = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.25, ...extra });
     const gearC = 0x2e3238, gold = 0xc9a227;
     const add = (w, h, d, mat, x, y, z) => part(this.look, w, h, d, mat, x, y, z);
     // armour vest over the chest

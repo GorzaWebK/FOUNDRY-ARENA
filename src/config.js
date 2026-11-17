@@ -58,18 +58,20 @@ export const DIFFICULTY = {
 };
 
 // Colours handed to human players in multiplayer, in join order (host first).
-export const HUMAN_COLORS = [0x4fc3f7, 0x9cff57, 0xff8fd8, 0xffffff, 0xffb86b, 0xa7a2ff, 0x5dffd9, 0xfff275];
+// paint codes: everyone wears a yard colour, so no two look alike and none look out of place
+export const HUMAN_COLORS = [0x4a90b8, 0x8fb04a, 0xe9e4da, 0xd9a21b, 0x3f9a8a, 0xc96f4a, 0x8a7ac0, 0xb8b0a0];
 export const MAX_HUMANS = 8;
 
 export const BOT_ROSTER = [
-  { name: 'Viper', color: 0xe5484d },
-  { name: 'Rook', color: 0xf5a524 },
-  { name: 'Nova', color: 0xb44dff },
-  { name: 'Ghost', color: 0xe8e8ee },
-  { name: 'Blitz', color: 0xffe14d },
-  { name: 'Echo', color: 0x2ecc71 },
-  { name: 'Tank', color: 0xff7a1a },
-  { name: 'Jinx', color: 0xff5fa8 },
-  { name: 'Raze', color: 0x1fd1c1 },
-  { name: 'Onyx', color: 0x6b7cff },
+  // the night shift
+  { name: 'Slag', color: 0xd9622b },
+  { name: 'Rivet', color: 0xc9c2b6 },
+  { name: 'Cinder', color: 0xb33a32 },
+  { name: 'Anvil', color: 0x5b7fa6 },
+  { name: 'Flux', color: 0xd9a21b },
+  { name: 'Ingot', color: 0x8a9a5b },
+  { name: 'Bellows', color: 0x3f9a8a },
+  { name: 'Tongs', color: 0x9a7a5a },
+  { name: 'Kiln', color: 0xe0855a },
+  { name: 'Quench', color: 0x4a90b8 },
 ];
