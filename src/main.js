@@ -16,7 +16,7 @@ import { cleanRoomCode } from './transport.js';
 import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
 import { BUILD, BUILD_TIME } from './version.js';
 import { getAccount, exportCode, parseCode, importAccount } from './account.js';
-import { SKINS, SKIN_KILLS, skinSwatchCss, skinUnlocked } from './skins.js';
+import { SKINS, SKIN_KILLS, skinSwatchCss, skinUnlocked, skinLockText } from './skins.js';
 import { SLOTS, ITEMS, itemOf, itemUnlocked, unlocksAt } from './cosmetics.js';
 import { XP, levelFromXp, MAX_LEVEL } from './progress.js';
 
@@ -771,11 +771,12 @@ function renderCareer() {
       for (const sk of SKINS) {
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'swatch' + (sk.id === current && skinUnlocked(game.career, id, sk.id) ? ' on' : '') + (skinUnlocked(game.career, id, sk.id) ? '' : ' locked');
+        const ok = skinUnlocked(game.career, id, sk.id, game.progress);
+        b.className = 'swatch' + (sk.id === current && ok ? ' on' : '') + (ok ? '' : ' locked') + (sk.special ? ' special' : '');
         b.style.background = skinSwatchCss(sk.id);
-        b.title = sk.id === 'none' || open ? sk.name : `${sk.name} — ${SKIN_KILLS - n} more ${name} kills to unlock`;
+        b.title = ok ? sk.name : skinLockText(game.career, id, sk.id, game.progress, name);
         b.addEventListener('click', () => {
-          if (!skinUnlocked(game.career, id, sk.id)) return;
+          if (!ok) return;
           if (sk.id === 'none') delete settings.skins[id]; else settings.skins[id] = sk.id;
           saveSettings(settings);
           game.applyOwnSkins();

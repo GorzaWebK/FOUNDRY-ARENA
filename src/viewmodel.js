@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { flashTexture, glowTexture } from './textures.js';
 import { SWITCH_TIME } from './weapons.js';
 import { buildGun, makeMaterials, PALETTE } from './gunModels.js';
-import { SKINNED, camoTexture } from './skins.js';
+import { SKINNED, SKIN_BY_ID, camoTexture } from './skins.js';
 
 const GLOVE = 0x3a3f47, SLEEVE = 0x34475c;
 const std = (color, rough = 0.6, metal = 0.1) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal });
@@ -263,14 +263,27 @@ export class ViewModel {
     if (!m || m.skin === skin) return;
     m.skin = skin;
     const tex = skin && skin !== 'none' ? camoTexture(skin) : null;
+    const special = !!(SKIN_BY_ID[skin] && SKIN_BY_ID[skin].special);
+    // gold / diamond cover the metal too, and shine
+    for (const key of ['metal', 'metalLight']) {
+      const mat = m.mats[key];
+      if (!mat || SKINNED.includes(key) && !special) continue;
+      mat.map = special ? tex : null;
+      mat.color.set(special ? 0xffffff : PALETTE[key][0]);
+      mat.metalness = special ? 0.85 : PALETTE[key][2];
+      mat.roughness = special ? 0.22 : PALETTE[key][1];
+      mat.needsUpdate = true;
+    }
     for (const key of SKINNED) {
       const mat = m.mats[key];
       if (!mat) continue;
       mat.map = tex;
       // under a camo the material is near-white (the pattern carries the colour);
       // lighter parts stay a touch lighter so the shapes still read
-      if (tex) mat.color.set(key === 'polymerLight' || key === 'metalLight' ? 0xffffff : 0xdedede);
+      if (tex) mat.color.set(key === 'polymerLight' || key === 'metalLight' || special ? 0xffffff : 0xdedede);
       else mat.color.set(PALETTE[key][0]);
+      mat.metalness = special ? 0.85 : PALETTE[key][2];
+      mat.roughness = special ? 0.22 : PALETTE[key][1];
       mat.needsUpdate = true;
     }
   }

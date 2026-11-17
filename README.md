@@ -174,6 +174,11 @@ knife finishes, weapon charms and crosshair shapes. Other players see your level
 title, name tag, calling card, gear, tracers, grenades and kill effects. Your
 level and unlocks are saved with your account.
 
+At level 50 you can **Prestige** (in Customize): back to level 1 with a prestige
+star next to your level (★1, ★2… up to 10). Level unlocks come back as you level
+up again; prestige-only items (the Reborn and Immortal titles, the Prestige name
+tag, the Gilded calling card), weapon skins and career stats are kept.
+
 ### Weapon skins
 
 Every gun has five camos: Woodland, Desert, Arctic, Crimson and Tiger. A gun's
@@ -182,6 +187,10 @@ Pick them under **Weapon skins…** (next to Loadout, or in Career): each gun
 shows its swatches, your progress towards 50, and which one you're wearing.
 Skins show on your gun in first person and on your character, other players
 see them in multiplayer, and some bots run camos too.
+
+Two mastery camos sit on top: **Gold** for a gun once you're level 20 (or have
+prestiged) and have 150 kills with it, and **Diamond** (for any gun) once every
+gun has Gold. Both cover the whole gun, metal included, and shine.
 
 ### Your account
 

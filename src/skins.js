@@ -5,6 +5,8 @@
 import * as THREE from 'three';
 
 export const SKIN_KILLS = 50;
+export const GOLD_KILLS = 150; // plus level 20 (or any prestige)
+export const GOLD_LEVEL = 20;
 export const SKIN_GUNS = ['pistol', 'rifle', 'smg', 'shotgun', 'sniper', 'lmg'];
 
 export const SKINS = [
@@ -14,7 +16,11 @@ export const SKINS = [
   { id: 'arctic', name: 'Arctic', colors: ['#e8eef2', '#b6c2ca', '#8995a0', '#ffffff'] },
   { id: 'crimson', name: 'Crimson', colors: ['#7c1616', '#b42b2b', '#2a0b0b', '#dc4c3c'] },
   { id: 'tiger', name: 'Tiger', colors: ['#e07c18', '#1b1b1b', '#f0a040', '#2b2b2b'], stripes: true },
+  // mastery camos: these cover the metal too, and shine
+  { id: 'gold', name: 'Gold', colors: ['#d4a52a', '#f5d66e', '#8a6510', '#ffe9a0'], special: 'gold' },
+  { id: 'diamond', name: 'Diamond', colors: ['#bfe9ff', '#ffffff', '#6fb8e6', '#e6f7ff'], special: 'diamond' },
 ];
+export const COMMON_SKINS = SKINS.filter((s) => s.colors && !s.special);
 export const SKIN_BY_ID = Object.fromEntries(SKINS.map((s) => [s.id, s]));
 export const skinIndex = (id) => Math.max(0, SKINS.findIndex((s) => s.id === id));
 
@@ -34,7 +40,32 @@ export function camoTexture(id) {
   const [base, ...rest] = skin.colors;
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, s, s);
-  if (skin.stripes) {
+  if (skin.special === 'gold') {
+    // brushed gold with soft highlights
+    const g = ctx.createLinearGradient(0, 0, s, s);
+    g.addColorStop(0, '#b8860b'); g.addColorStop(0.3, '#f5d66e'); g.addColorStop(0.55, '#c9971c'); g.addColorStop(0.8, '#ffe9a0'); g.addColorStop(1, '#a87a10');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 140; i++) {
+      ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.08})`;
+      ctx.fillRect(0, Math.random() * s, s, 1);
+    }
+  } else if (skin.special === 'diamond') {
+    // faceted: a grid of triangles in icy blues and whites
+    const n = 6, w = s / n;
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      for (let k = 0; k < 2; k++) {
+        ctx.fillStyle = skin.colors[(i * 3 + j * 5 + k * 2 + ((Math.random() * 2) | 0)) % skin.colors.length];
+        ctx.beginPath();
+        if (k === 0) { ctx.moveTo(i * w, j * w); ctx.lineTo((i + 1) * w, j * w); ctx.lineTo(i * w, (j + 1) * w); }
+        else { ctx.moveTo((i + 1) * w, j * w); ctx.lineTo((i + 1) * w, (j + 1) * w); ctx.lineTo(i * w, (j + 1) * w); }
+        ctx.fill();
+      }
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= n; i++) { ctx.beginPath(); ctx.moveTo(i * w, 0); ctx.lineTo(0, i * w); ctx.stroke(); ctx.beginPath(); ctx.moveTo(s, i * w); ctx.lineTo(i * w, s); ctx.stroke(); }
+  } else if (skin.stripes) {
     // tiger: ragged diagonal stripes
     ctx.fillStyle = skin.colors[1];
     for (let i = -4; i < 12; i++) {
@@ -75,6 +106,8 @@ export function skinSwatchCss(id) {
   const skin = SKIN_BY_ID[id];
   if (!skin || !skin.colors) return 'linear-gradient(135deg, #272b30 0%, #454b53 60%, #3a3f47 100%)';
   const [a, b, c] = skin.colors;
+  if (skin.special === 'gold') return 'linear-gradient(135deg, #b8860b, #f5d66e 40%, #c9971c 65%, #ffe9a0)';
+  if (skin.special === 'diamond') return 'linear-gradient(135deg, #6fb8e6 0 25%, #ffffff 25% 40%, #bfe9ff 40% 70%, #e6f7ff 70%)';
   return skin.stripes
     ? `repeating-linear-gradient(60deg, ${a} 0 7px, ${b} 7px 11px)`
     : `radial-gradient(circle at 25% 30%, ${b} 0 22%, transparent 23%), radial-gradient(circle at 70% 65%, ${c} 0 20%, transparent 21%), radial-gradient(circle at 80% 20%, ${b} 0 12%, transparent 13%), ${a}`;
@@ -83,12 +116,29 @@ export function skinSwatchCss(id) {
 /** The skin colour standing in for the pattern on a palette key (third-person guns). */
 export function skinColor(id, key) {
   const skin = SKIN_BY_ID[id];
-  if (!skin || !skin.colors || !SKINNED.includes(key)) return null;
+  if (!skin || !skin.colors) return null;
+  if (skin.special && (key === 'metal' || key === 'metalLight')) return skin.colors[key === 'metal' ? 0 : 1];
+  if (!SKINNED.includes(key)) return null;
   const i = { polymer: 0, polymerLight: 1, olive: 0, tan: 2, wood: 0, woodDark: 1, metalLight: 3 }[key] || 0;
   return skin.colors[skin.stripes && key === 'polymer' ? 0 : i];
 }
 
-/** Is skin `id` usable on `weaponId` with this career? */
-export function skinUnlocked(career, weaponId, id) {
-  return id === 'none' || career.weaponKills(weaponId) >= SKIN_KILLS;
+/** Gold on `weaponId`: level 20 (or any prestige) and 150 kills with it. */
+export function goldUnlocked(career, progress, weaponId) {
+  return (progress.level >= GOLD_LEVEL || progress.prestige > 0) && career.weaponKills(weaponId) >= GOLD_KILLS;
+}
+
+/** Is skin `id` usable on `weaponId` with this career (and level)? */
+export function skinUnlocked(career, weaponId, id, progress = null) {
+  if (id === 'none') return true;
+  if (id === 'gold') return !!progress && goldUnlocked(career, progress, weaponId);
+  if (id === 'diamond') return !!progress && SKIN_GUNS.every((w) => goldUnlocked(career, progress, w));
+  return career.weaponKills(weaponId) >= SKIN_KILLS;
+}
+
+/** Why a skin is locked, for tooltips. */
+export function skinLockText(career, weaponId, id, progress, gunName) {
+  if (id === 'gold') return `Gold — level ${GOLD_LEVEL} and ${GOLD_KILLS} ${gunName} kills (${career.weaponKills(weaponId)}/${GOLD_KILLS})`;
+  if (id === 'diamond') return 'Diamond — get Gold on every gun';
+  return `${SKIN_BY_ID[id].name} — ${Math.max(0, SKIN_KILLS - career.weaponKills(weaponId))} more ${gunName} kills to unlock`;
 }

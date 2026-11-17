@@ -17,7 +17,7 @@ import { moveBody } from './physics.js';
 import { BotModel } from './botModel.js';
 import { GRENADE, FLASH, SMOKE, TACTICALS } from './weapons.js';
 import { FLAG_STATE } from './ctf.js';
-import { SKINS } from './skins.js';
+import { COMMON_SKINS } from './skins.js';
 import { randomCosmetics } from './cosmetics.js';
 
 export const STATE = {
@@ -121,7 +121,7 @@ export class Bot extends Character {
     this.tacId = TACTICALS[(Math.random() * TACTICALS.length) | 0];
     // some bots run a camo or two
     this.skins = {};
-    for (const id of [this.primary, 'pistol']) if (Math.random() < 0.3) this.skins[id] = SKINS[1 + ((Math.random() * (SKINS.length - 1)) | 0)].id;
+    for (const id of [this.primary, 'pistol']) if (Math.random() < 0.3) this.skins[id] = COMMON_SKINS[(Math.random() * COMMON_SKINS.length) | 0].id;
     super.spawnAt(x, y, z, yaw);
     this.resetAI();
     this.lastStuckPos.copy(this.pos);

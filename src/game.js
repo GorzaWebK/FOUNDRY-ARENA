@@ -482,7 +482,7 @@ export class Game {
     const out = {}, picked = this.settings.skins || {};
     for (const id of SKIN_GUNS) {
       const k = picked[id];
-      if (k && SKIN_BY_ID[k] && skinUnlocked(this.career, id, k)) out[id] = k;
+      if (k && SKIN_BY_ID[k] && skinUnlocked(this.career, id, k, this.progress)) out[id] = k;
     }
     return out;
   }

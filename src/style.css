@@ -456,6 +456,7 @@ h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .swatches { display: flex; align-items: center; gap: 4px; }
 .swatch { width: 26px; height: 18px; padding: 0; border-radius: 4px; border: 2px solid transparent; cursor: pointer; }
 .swatch.on { border-color: var(--accent); box-shadow: 0 0 0 1px #000 inset; }
+.swatch.special { margin-left: 4px; }
 .swatch.locked { opacity: 0.3; cursor: not-allowed; filter: grayscale(0.4); }
 .swatches .prog { font: 11px var(--mono); color: var(--dim); margin-left: 4px; }
 .h-with-btn { display: flex; align-items: baseline; gap: 6px; }
