@@ -219,7 +219,7 @@ jumping and holding the trigger widen the cone; crouching and aiming tighten it.
 | **Foundry**  | 80 × 80   | mixed arena: plaza, bunker, balcony, sniper walkway        |
 | **Span**     | 100 × 48  | two raised bases joined by a long bridge; long sight lines |
 | **Cloister** | 52 × 52   | tight courtyard with a covered walkway and catwalk ring    |
-| **Depot**    | 72 × 48   | three-storey warehouse: shelving aisles, a mezzanine ring at 4 m, a catwalk at 8 m |
+| **Depot**    | 72 × 48   | roofed three-storey warehouse (skylights): shelving aisles, a mezzanine ring at 4 m, a catwalk at 8 m |
 | **Skyline**  | 80 × 60   | rooftops over a street: bridges, long stairs and short gaps you can jump |
 | **Dockyard** | 88 × 56   | container yard: sheds with sniper roofs, stacks to climb, a crane walkway |
 

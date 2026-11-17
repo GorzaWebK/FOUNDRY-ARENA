@@ -1,4 +1,4 @@
-// "DEPOT" — a three-storey warehouse. Shelving aisles on the ground floor, a
+// "DEPOT" — a roofed, three-storey warehouse. Shelving aisles on the ground floor, a
 // mezzanine ring around the walls at 4 m, and a high catwalk at 8 m across the
 // middle, reached from towers at each end. Fights happen on every level.
 // See arena.js for the format and editing tips.
@@ -10,13 +10,22 @@ const stairs = (min, max, dir, steps, mat = 'ramp') => ({ type: 'stairs', min, m
 const sp = (x, y, z) => [x, y, z, Math.round((Math.atan2(x, z) * 180) / Math.PI)];
 
 const solids = [
-  // shell: tall walls, no roof (just beams)
+  // shell: tall walls, roof beams and a roof with three long skylights
   box([-36, -1, -24], [36, 0, 24], 'floor'),
-  box([-37, 0, -25], [37, 14, -24], 'wall'),
-  box([-37, 0, 24], [37, 14, 25], 'wall'),
-  box([-37, 0, -24], [-36, 14, 24], 'wall'),
-  box([36, 0, -24], [37, 14, 24], 'wall'),
+  box([-37, 0, -25], [37, 15, -24], 'wall'),
+  box([-37, 0, 24], [37, 15, 25], 'wall'),
+  box([-37, 0, -24], [-36, 15, 24], 'wall'),
+  box([36, 0, -24], [37, 15, 24], 'wall'),
   ...[-18, -6, 6, 18].map((z) => box([-36, 13, z - 0.3], [36, 13.6, z + 0.3], 'metalDark')),
+  box([-36, 14, -24], [36, 14.6, -13], 'roof'),
+  box([-36, 14, -9], [36, 14.6, -2], 'roof'),
+  box([-36, 14, 2], [36, 14.6, 9], 'roof'),
+  box([-36, 14, 13], [36, 14.6, 24], 'roof'),
+  ...[[-13, -9], [-2, 2], [9, 13]].flatMap(([z0, z1]) => [
+    box([-36, 14, z0], [-28, 14.6, z1], 'roof'), box([28, 14, z0], [36, 14.6, z1], 'roof'),
+    // skylight frames
+    ...[-14, 0, 14].map((x) => box([x - 0.15, 14, z0], [x + 0.15, 14.6, z1], 'metalDark')),
+  ]),
 
   // ---------------------------------------------------------------- mezzanine ring (y 4)
   box([-36, 3.5, -24], [36, 4, -18], 'metal'),
@@ -89,6 +98,7 @@ export default {
     ramp: { color: '#6f7a86', tex: 'plates', scale: 2 },
     metal: { color: '#7d8a98', tex: 'plates', scale: 2 },
     metalDark: { color: '#4f5864', tex: 'plates', scale: 2 },
+    roof: { color: '#7b838c', tex: 'corrugated', scale: 4 },
     crate: { color: '#b98a4e', tex: 'crate' },
     orange: { color: '#c9742f', tex: 'plates', scale: 2 },
     green: { color: '#5d8a5a', tex: 'plates', scale: 2 },
@@ -103,13 +113,21 @@ export default {
     fogFar: 200,
   },
 
+  // the roof makes it an indoor map: work lights hung from the beams fill it in
   lights: [
     { pos: [0, 3, -21], color: '#ffe2b0', intensity: 26, distance: 16 },
     { pos: [0, 3, 21], color: '#ffe2b0', intensity: 26, distance: 16 },
     { pos: [-33, 3, 0], color: '#a0c8ff', intensity: 24, distance: 14 },
     { pos: [33, 3, 0], color: '#ffc890', intensity: 24, distance: 14 },
     { pos: [0, 7, 0], color: '#ffffff', intensity: 20, distance: 18 },
+    { pos: [-18, 12, -12], color: '#fff1d6', intensity: 60, distance: 24 },
+    { pos: [18, 12, 12], color: '#fff1d6', intensity: 60, distance: 24 },
+    { pos: [18, 12, -12], color: '#fff1d6', intensity: 60, distance: 24 },
+    { pos: [-18, 12, 12], color: '#fff1d6', intensity: 60, distance: 24 },
   ],
+
+  // menu background camera: circle inside, under the roof
+  orbit: { r: 21, h: 11, lookY: 1 },
 
   solids,
 

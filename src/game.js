@@ -1223,10 +1223,12 @@ export class Game {
   orbitCamera(dt, speed) {
     this.orbit = (this.orbit || 0.6) + dt * speed;
     const cam = this.camera;
-    const R = this.orbitR;
-    cam.position.set(Math.cos(this.orbit) * R, R * 0.56, Math.sin(this.orbit) * R);
+    // a map can set its own path (e.g. under a roof): { r, h, lookY }
+    const o = this.map.orbit;
+    const R = o ? o.r : this.orbitR;
+    cam.position.set(Math.cos(this.orbit) * R, o ? o.h : R * 0.56, Math.sin(this.orbit) * R);
     cam.rotation.set(0, 0, 0);
-    cam.lookAt(0, -4, 0);
+    cam.lookAt(0, o ? o.lookY : -4, 0);
     if (Math.abs(cam.fov - 55) > 0.01) { cam.fov = 55; cam.updateProjectionMatrix(); }
   }
 
