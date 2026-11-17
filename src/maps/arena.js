@@ -162,28 +162,28 @@ export default {
   // textures in textures.js; `scale` is world units per texture repeat
   // (omit for "fit to face").
   materials: {
-    floor: { color: '#8d939c', tex: 'tiles', scale: 4 },
-    wall: { color: '#6f7a88', tex: 'concrete', scale: 5 },
-    concrete: { color: '#a9afb6', tex: 'concrete', scale: 4 },
-    plaza: { color: '#b9a98e', tex: 'tiles', scale: 2 },
-    pillar: { color: '#8f98a3', tex: 'concrete', scale: 3 },
-    ramp: { color: '#7f8894', tex: 'plates', scale: 2 },
-    metal: { color: '#9aa7b5', tex: 'plates', scale: 2 },
-    metalDark: { color: '#59626e', tex: 'plates', scale: 2 },
+    floor: { color: '#8a857e', tex: 'tiles', scale: 4 },
+    wall: { color: '#6a625b', tex: 'concrete', scale: 5 },
+    concrete: { color: '#a8a196', tex: 'concrete', scale: 4 },
+    plaza: { color: '#b49a78', tex: 'tiles', scale: 2 },
+    pillar: { color: '#857c72', tex: 'concrete', scale: 3 },
+    ramp: { color: '#7c766e', tex: 'plates', scale: 2 },
+    metal: { color: '#9a958e', tex: 'plates', scale: 2 },
+    metalDark: { color: '#4d4a47', tex: 'plates', scale: 2 },
     crate: { color: '#b98a4e', tex: 'crate' },
-    blue: { color: '#4f7fb8', tex: 'plates', scale: 3 },
-    orange: { color: '#c9742f', tex: 'plates', scale: 3 },
-    green: { color: '#5d9a6a', tex: 'plates', scale: 3 },
-    sand: { color: '#c2ad84', tex: 'concrete', scale: 4 },
+    blue: { color: '#3f6f9c', tex: 'plates', scale: 3 },
+    orange: { color: '#c25f22', tex: 'plates', scale: 3 },
+    green: { color: '#5a7f55', tex: 'plates', scale: 3 },
+    sand: { color: '#bfa377', tex: 'concrete', scale: 4 },
   },
 
   sky: {
-    top: '#3f78c9',
-    horizon: '#c9dcef',
+    top: '#4a6fa8',
+    horizon: '#e6c9a2',
     sunDir: [-0.45, 0.72, 0.52],
-    sunColor: '#fff2d6',
-    fogNear: 70,
-    fogFar: 260,
+    sunColor: '#ffe0b8',
+    fogNear: 60,
+    fogFar: 230,
   },
 
   // Small fill lights for the roofed areas (no shadows).
@@ -192,6 +192,14 @@ export default {
     { pos: [-36, 2.0, 0], color: '#a8ffc8', intensity: 26, distance: 16 },
     { pos: [0, 2.8, -36.5], color: '#a0c8ff', intensity: 26, distance: 18 },
   ],
+
+  // set dressing (decor.js): warm foundry, molten-orange accents
+  decor: {
+    accent: '#ff6b1a', trim: '#26231f', pipe: '#7d756c', pipe2: '#a4482a', cable: '#141414', bracket: '#34302c',
+    hazard: true, pipes: true, cables: true,
+    signs: [['POUR\nFLOOR', 'stencil'], ['HOT METAL', 'hazard'], ['BAY 1', 'stencil'], ['CASTING', 'plate'], ['KEEP CLEAR', 'hazard'], ['BAY 2', 'stencil'], ['LADLE\nROUTE', 'plate']],
+    barrels: 8, barrelColors: ['#8c3a2b', '#3d4a57', '#6b5a2e'],
+  },
 
   solids,
 

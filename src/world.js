@@ -37,12 +37,98 @@ export class World {
     this._stamp = 0;
     for (const s of map.solids) this._addSolid(s);
     this._buildGrid();
+    // props (oil drums) tucked into corners: generated from the map, the same on
+    // every machine, and solid like any other cover
+    this.props = [];
+    if (map.decor && map.decor.barrels) { this._placeProps(map.decor.barrels); if (this.props.length) this._buildGrid(); }
     // what each material sounds like underfoot: a map can say (materials[m].surface),
     // otherwise it follows from the texture
     this.surfaces = {};
     for (const [name, def] of Object.entries(map.materials || {})) {
       this.surfaces[name] = def.surface || SURFACE_BY_TEX[def.tex] || (/sand|dirt|gravel/.test(name) ? 'sand' : 'concrete');
     }
+  }
+
+  /** Is any movement collider inside this box? (`except`: one to ignore) */
+  blocked(x0, y0, z0, x1, y1, z1, except = null) {
+    const out = this._blkQ || (this._blkQ = []);
+    this.query(x0, y0, z0, x1, y1, z1, out);
+    for (const c of out) {
+      if (c === except) continue;
+      if (c.x1 > x0 && c.x0 < x1 && c.y1 > y0 && c.y0 < y1 && c.z1 > z0 && c.z0 < z1) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Drums in open corners of big floors: a cell with a tall wall on one x side and
+   * one z side, open on the other two, away from spawns, pickups, objectives and
+   * anything you'd climb. Seeded by the map id, so it's the same everywhere.
+   */
+  _placeProps(max) {
+    const map = this.map, b = this.bounds;
+    let seed = 0;
+    for (const ch of map.id) seed = (Math.imul(seed ^ ch.charCodeAt(0), 2654435761) + 1) >>> 0;
+    const rand = () => { seed = (Math.imul(seed ^ (seed >>> 15), 2246822507) + 0x9e3779b9) >>> 0; return seed / 4294967296; };
+    const keep = [
+      ...map.spawns, ...map.pickups.map((p) => p.pos), ...(map.flags || []), ...(map.hills || []), ...(map.pois || []),
+    ].map((p) => [p[0], p[1], p[2]]);
+    const out = [];
+    const cands = [];
+    for (let z = Math.ceil(b.minZ) + 0.5; z < b.maxZ; z += 1) {
+      for (let x = Math.ceil(b.minX) + 0.5; x < b.maxX; x += 1) {
+        // the floor here: the highest top under the cell centre with headroom above it
+        this.query(x - 0.01, -2, z - 0.01, x + 0.01, 12, z + 0.01, out);
+        let floor = null;
+        for (const c of out) {
+          if (x < c.x0 || x > c.x1 || z < c.z0 || z > c.z1) continue;
+          if ((c.x1 - c.x0) * (c.z1 - c.z0) < 30) continue; // big floors only (not catwalks or crates)
+          if (!floor || c.y1 > floor.y1) floor = c;
+        }
+        if (!floor) continue;
+        const y = floor.y1;
+        if (this.blocked(x - 0.45, y + 0.02, z - 0.45, x + 0.45, y + 2.3, z + 0.45)) continue;
+        const wall = (dx, dz) => this.blocked(x + dx - 0.2, y + 1.4, z + dz - 0.2, x + dx + 0.2, y + 2.4, z + dz + 0.2);
+        const wx = wall(-1, 0) ? -1 : wall(1, 0) ? 1 : 0;
+        const wz = wall(0, -1) ? -1 : wall(0, 1) ? 1 : 0;
+        if (!wx || !wz) continue;
+        // open the other way, so a drum never closes off a gap
+        if (this.blocked(x - wx * 2 - 0.4, y + 0.02, z - wz * 2 - 0.4, x - wx * 2 + 0.4, y + 2, z - wz * 2 + 0.4)) continue;
+        if (this.blocked(x - wx - 0.45, y + 0.02, z - 0.45, x - wx + 0.45, y + 2, z + 0.45)) continue;
+        if (this.blocked(x - 0.45, y + 0.02, z - wz - 0.45, x + 0.45, y + 2, z - wz + 0.45)) continue;
+        // nothing low nearby (steps, ramps, crates): keep climbing routes as they are
+        this.query(x - 2.5, y + 0.05, z - 2.5, x + 2.5, y + 1.6, z + 2.5, out);
+        if (out.some((c) => c.y0 <= y + 0.05 && c.y1 > y + 0.05 && c.y1 < y + 1.8)) continue;
+        if (keep.some((p) => Math.hypot(p[0] - x, p[2] - z) < 4 && Math.abs(p[1] - y) < 3)) continue;
+        cands.push({ x, y, z, wx, wz });
+      }
+    }
+    // shuffle, then take spaced-out picks
+    for (let i = cands.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [cands[i], cands[j]] = [cands[j], cands[i]]; }
+    const placed = [];
+    for (const c of cands) {
+      if (placed.length >= max) break;
+      if (placed.some((p) => Math.hypot(p.x - c.x, p.z - c.z) < 9)) continue;
+      placed.push(c);
+      // snug into the corner
+      const px = c.x + c.wx * 0.08, pz = c.z + c.wz * 0.08;
+      this._addProp(px, c.y, pz, rand);
+      // sometimes a second drum along the longer wall
+      if (rand() < 0.5) {
+        const alongX = rand() < 0.5;
+        const nx = alongX ? px - c.wx * 0.82 : px, nz = alongX ? pz : pz - c.wz * 0.82;
+        if (!this.blocked(nx - 0.4, c.y + 0.02, nz - 0.4, nx + 0.4, c.y + 2, nz + 0.4)) this._addProp(nx, c.y, nz, rand);
+      }
+    }
+  }
+
+  _addProp(x, y, z, rand) {
+    const r = 0.38, h = 0.95;
+    const c = mk(x - r, y, z - r, x + r, y + h, z + r);
+    c.mat = 'barrel';
+    this.colliders.push(c);
+    this.rayShapes.push(c);
+    this.props.push({ kind: 'barrel', x, y, z, r, h, v: rand(), spin: rand() * Math.PI * 2 });
   }
 
   /** The surface under a point at foot level: 'metal', 'wood', 'concrete' or 'sand'. */
@@ -54,7 +140,7 @@ export class World {
       if (x < c.x0 || x > c.x1 || z < c.z0 || z > c.z1 || c.y1 > y + 0.08) continue;
       if (!best || c.y1 > best.y1) best = c;
     }
-    return (best && this.surfaces[best.mat]) || 'concrete';
+    return (best && (best.mat === 'barrel' ? 'metal' : this.surfaces[best.mat])) || 'concrete';
   }
 
   _addSolid(s) {

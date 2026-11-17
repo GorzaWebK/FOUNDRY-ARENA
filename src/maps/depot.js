@@ -141,6 +141,14 @@ export default {
   // menu background camera: circle inside, under the roof
   orbit: { r: 21, h: 11, lookY: 1 },
 
+  // set dressing (decor.js): warehouse safety yellow
+  decor: {
+    accent: '#f2b417', trim: '#1f2327', pipe: '#7d8a98', pipe2: '#c9742f', cable: '#141618', bracket: '#2c3238',
+    hazard: true, pipes: true, cables: true,
+    signs: [['BAY\n01', 'stencil'], ['FORKLIFT\nROUTE', 'hazard'], ['BAY\n02', 'stencil'], ['LOADING', 'plate'], ['BAY\n03', 'stencil'], ['HARD HATS', 'hazard'], ['DISPATCH', 'plate']],
+    barrels: 10, barrelColors: ['#2f5e8f', '#8c3a2b', '#c9742f'],
+  },
+
   solids,
 
   spawns: [

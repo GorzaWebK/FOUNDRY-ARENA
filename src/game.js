@@ -5,6 +5,7 @@ import { CFG, DIFFICULTY, BOT_ROSTER } from './config.js';
 import { World } from './world.js';
 import { NavGrid } from './navgrid.js';
 import { buildWorldMeshes, buildSky, buildLights } from './worldMesh.js';
+import { buildDecor } from './decor.js';
 import { Effects } from './effects.js';
 import { Pickup } from './pickups.js';
 import { ViewModel } from './viewmodel.js';
@@ -181,7 +182,7 @@ export class Game {
     this.nav = new NavGrid(this.world);
     const s0 = map.spawns[0];
     this.nav.markReachable(s0[0], s0[1], s0[2]);
-    const meshes = buildWorldMeshes(this.world, this.scene);
+    const meshes = [...buildWorldMeshes(this.world, this.scene), ...buildDecor(this.world, this.scene)];
     const sky = buildSky(this.scene, map.sky);
     this.lights = buildLights(this.scene, map, true);
     this.worldObjs = [...meshes, sky, ...this.lights.all];

@@ -304,6 +304,19 @@ a map, copy one of the files, edit it and register it in `src/maps/index.js`.
 Then run `npm run check:map` — it confirms that every spawn, pickup and patrol
 point is reachable by the bots.
 
+**Set dressing.** Each map has its own palette and a `decor` theme that
+`src/decor.js` turns into detail on top of the block-out: dark baseboards and
+caps on walls, a band of the map's accent colour, runs of pipe with brackets and
+the odd valve wheel, sagging cable runs, signs (stencilled bay numbers, warning
+signs, street plates, neon on Skyline) and hazard stripes along raised walkway
+edges. It's placed automatically wherever there's room (never where someone
+could stand inside it) and seeded by the map, so everyone sees the same thing.
+The themes: Foundry is warm and molten orange, Span cold steel and teal,
+Cloister old sandstone with verdigris trim, Depot safety yellow, Skyline red neon
+over brick, Dockyard rust and crane yellow. Oil drums sit in open corners (solid
+cover, placed by `src/world.js` so collision, bullets and the bot nav grid all
+know about them); `npm run check:map` validates maps with them in.
+
 ## Multiplayer
 
 No server to set up — one player hosts the match in their browser and the others
@@ -438,6 +451,7 @@ src/worldMesh.js      merged world meshes, sky shader, lights
 src/effects.js        particles, decals, tracers, explosions
 src/pickups.js        pickups
 src/audio.js          synthesised sound
+src/decor.js          set dressing: trims, pipes, cables, signs, hazard edges, drums
 src/hud.js            HUD, chat log
 src/settings.js       saved settings
 tools/check-map.mjs   offline map validator

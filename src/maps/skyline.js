@@ -109,6 +109,14 @@ export default {
     { pos: [20, 3, 0], color: '#ffd9a0', intensity: 18, distance: 14 },
   ],
 
+  // set dressing (decor.js): rooftops at dusk, red neon, ducting
+  decor: {
+    accent: '#ff3d5a', trim: '#2a2220', pipe: '#8f959b', pipe2: '#6a6f74', cable: '#121212', bracket: '#333',
+    hazard: false, pipes: true, cables: true,
+    signs: [['HOTEL', 'neon'], ['24 HR', 'neon'], ['ROOF\nACCESS', 'plate'], ['NO\nJUMPING', 'hazard'], ['BAR', 'neon'], ['FLOOR 31', 'stencil']],
+    barrels: 5, barrelColors: ['#3d4a57', '#7a2f2a'],
+  },
+
   solids,
 
   spawns: [

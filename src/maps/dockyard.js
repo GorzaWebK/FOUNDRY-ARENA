@@ -107,6 +107,14 @@ export default {
     { pos: [39, 3, 0], color: '#ffc890', intensity: 24, distance: 14 },
   ],
 
+  // set dressing (decor.js): salt-rusted docks, crane yellow
+  decor: {
+    accent: '#e0b030', trim: '#1f2226', pipe: '#7a6a5a', pipe2: '#b8504a', cable: '#121416', bracket: '#2f2a25',
+    hazard: true, pipes: true, cables: true,
+    signs: [['DOCK 3', 'stencil'], ['MIND\nTHE GAP', 'hazard'], ['CUSTOMS', 'plate'], ['BERTH 7', 'stencil'], ['NO\nSMOKING', 'hazard'], ['YARD B', 'stencil']],
+    barrels: 10, barrelColors: ['#8c3a2b', '#2f5e8f', '#4f7f4f', '#c46a2b'],
+  },
+
   solids,
 
   spawns: [

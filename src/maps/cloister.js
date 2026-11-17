@@ -82,14 +82,14 @@ export default {
   bounds: { minX: -26, maxX: 26, minZ: -26, maxZ: 26 },
 
   materials: {
-    floor: { color: '#8f8a80', tex: 'tiles', scale: 4 },
-    wall: { color: '#6d6a72', tex: 'concrete', scale: 5 },
-    concrete: { color: '#aaa69c', tex: 'concrete', scale: 4 },
-    plaza: { color: '#b3a48a', tex: 'tiles', scale: 2 },
-    pillar: { color: '#9a958b', tex: 'concrete', scale: 3 },
-    ramp: { color: '#807a73', tex: 'plates', scale: 2 },
-    metal: { color: '#8d99a6', tex: 'plates', scale: 2 },
-    metalDark: { color: '#5b5f6b', tex: 'plates', scale: 2 },
+    floor: { color: '#9a8d78', tex: 'tiles', scale: 4 },
+    wall: { color: '#8a7b68', tex: 'brick', scale: 4 },
+    concrete: { color: '#b0a390', tex: 'concrete', scale: 4 },
+    plaza: { color: '#b9a585', tex: 'tiles', scale: 2 },
+    pillar: { color: '#a59882', tex: 'concrete', scale: 3 },
+    ramp: { color: '#85796b', tex: 'plates', scale: 2 },
+    metal: { color: '#7f8c86', tex: 'plates', scale: 2 },
+    metalDark: { color: '#4f5652', tex: 'plates', scale: 2 },
     crate: { color: '#b98a4e', tex: 'crate' },
     sand: { color: '#c7b184', tex: 'concrete', scale: 4 },
   },
@@ -109,6 +109,14 @@ export default {
     { pos: [-24, 2, 0], color: '#ffd9a0', intensity: 20, distance: 18 },
     { pos: [24, 2, 0], color: '#ffd9a0', intensity: 20, distance: 18 },
   ],
+
+  // set dressing (decor.js): old sandstone, verdigris trim, painted wayfinding
+  decor: {
+    accent: '#4f9a86', trim: '#4a4036', bracket: '#3b342c',
+    hazard: false, pipes: false, cables: false,
+    signs: [['NORTH\nWALK', 'plate'], ['CHAPEL', 'plate'], ['SOUTH\nWALK', 'plate'], ['WELL', 'plate'], ['EAST GATE', 'plate'], ['WEST GATE', 'plate']],
+    barrels: 4, barrelColors: ['#6b4a2e', '#55493b'],
+  },
 
   solids,
 

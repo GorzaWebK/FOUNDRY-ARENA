@@ -93,13 +93,13 @@ export default {
   bounds: { minX: -50, maxX: 50, minZ: -24, maxZ: 24 },
 
   materials: {
-    floor: { color: '#7d8791', tex: 'tiles', scale: 4 },
-    wall: { color: '#5e6b7a', tex: 'concrete', scale: 5 },
-    concrete: { color: '#a3aab2', tex: 'concrete', scale: 4 },
-    pillar: { color: '#8a939e', tex: 'concrete', scale: 3 },
-    ramp: { color: '#7b8490', tex: 'plates', scale: 2 },
-    metal: { color: '#9aa7b5', tex: 'plates', scale: 2 },
-    metalDark: { color: '#566170', tex: 'plates', scale: 2 },
+    floor: { color: '#74808b', tex: 'tiles', scale: 4 },
+    wall: { color: '#4d5c6d', tex: 'concrete', scale: 5 },
+    concrete: { color: '#98a3ad', tex: 'concrete', scale: 4 },
+    pillar: { color: '#7c8995', tex: 'concrete', scale: 3 },
+    ramp: { color: '#6f7c89', tex: 'plates', scale: 2 },
+    metal: { color: '#90a2b3', tex: 'plates', scale: 2 },
+    metalDark: { color: '#43505e', tex: 'plates', scale: 2 },
     crate: { color: '#b98a4e', tex: 'crate' },
     blue: { color: '#4572ad', tex: 'plates', scale: 3 },
     orange: { color: '#c46a2b', tex: 'plates', scale: 3 },
@@ -118,6 +118,14 @@ export default {
     { pos: [-18, 1.8, 0], color: '#a0c8ff', intensity: 22, distance: 16 },
     { pos: [18, 1.8, 0], color: '#ffc890', intensity: 22, distance: 16 },
   ],
+
+  // set dressing (decor.js): cold steel and teal
+  decor: {
+    accent: '#3fc1c9', trim: '#1e252c', pipe: '#8a97a3', pipe2: '#2f7f86', cable: '#15191d', bracket: '#2e363e',
+    hazard: true, pipes: true, cables: true,
+    signs: [['WEST BAY', 'stencil'], ['BRIDGE\nDECK', 'plate'], ['EAST BAY', 'stencil'], ['MIND\nTHE DROP', 'hazard'], ['GANTRY 3', 'stencil'], ['NO ENTRY', 'hazard']],
+    barrels: 6, barrelColors: ['#2f5e8f', '#7a2f2a', '#3a3f45'],
+  },
 
   solids,
 
