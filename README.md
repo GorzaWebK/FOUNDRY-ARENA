@@ -291,6 +291,9 @@ connect to them directly.
    code and **Copy invite link**.
 2. **Friends:** open the invite link (or type the code) and press **Join**. Joining
    mid-match is fine. Up to 8 humans, plus the host's bots.
+3. **Private rooms:** fill in **Password** before hosting and only players who
+   type the same password can join (it's never put in the invite link, so send it
+   separately).
 3. Press `Enter` to chat.
 4. The host can switch bots on or off mid-match from the pause menu, pick the
    next match's mode and map there, and restart or start the next match from the

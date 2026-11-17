@@ -86,7 +86,9 @@ export class Net {
   // session
   // ======================================================================
 
-  async host(name) {
+  /** Open a room. `password`: optional; joiners must give the same one. */
+  async host(name, password = '') {
+    this.password = String(password || '').slice(0, 32);
     const room = await getTransport().host(makeRoomCode());
     const g = this.game;
     this.role = 'host';
@@ -100,7 +102,8 @@ export class Net {
     return room.code;
   }
 
-  async join(code, name) {
+  async join(code, name, password = this.lastPw || '') {
+    this.lastPw = String(password || '').slice(0, 32);
     code = cleanRoomCode(code);
     if (!code) throw new Error('Enter a room code.');
     const conn = await getTransport().join(code);
@@ -109,6 +112,13 @@ export class Net {
       conn.onClose = () => { clearTimeout(timer); reject(new Error('The connection was closed.')); };
       conn.onMessage = (m) => {
         if (!m) return;
+        if (m.t === 'denied') {
+          clearTimeout(timer);
+          conn.onClose = null;
+          conn.close();
+          reject(new Error(this.lastPw ? 'Wrong password for that room.' : 'That room is private. Enter its password and join again.'));
+          return;
+        }
         if (m.t === 'full') {
           clearTimeout(timer);
           conn.onClose = null;
@@ -145,7 +155,7 @@ export class Net {
         this._begin(m);
         resolve();
       };
-      conn.send({ t: 'hello', name: cleanName(name), v: this.version, vt: this.versionTime, pid: this.pid, cos: this._myCos(), tp: this.game.player.teamPref });
+      conn.send({ t: 'hello', name: cleanName(name), v: this.version, vt: this.versionTime, pid: this.pid, cos: this._myCos(), tp: this.game.player.teamPref, pw: this.lastPw || undefined });
     });
   }
 
@@ -257,6 +267,12 @@ export class Net {
         this.hooks.onChat('', 0, theyOlder
           ? 'Someone tried to join on an older version of the game. They need to refresh their page.'
           : 'Someone tried to join on a newer version of the game. Refresh your page and host a new room.');
+        return;
+      }
+      // private room: the password has to match
+      if (this.password && m.pw !== this.password) {
+        conn.send({ t: 'denied', why: 'password' });
+        setTimeout(() => conn.close(), 400);
         return;
       }
       char = this._admit(conn, m);

@@ -265,7 +265,7 @@ function updateRoomUi() {
   $('room').classList.toggle('hidden', !on);
   $('room-box').classList.toggle('hidden', !on);
   $('room-code').textContent = net.code;
-  $('room-count').textContent = on ? `${n} player${n === 1 ? '' : 's'} connected` : '';
+  $('room-count').textContent = on ? `${n} player${n === 1 ? '' : 's'} connected${net.role === 'host' && net.password ? '. Password protected.' : ''}` : '';
   $('pause-title').textContent = on ? 'MENU' : 'PAUSED';
   $('btn-restart').classList.toggle('hidden', net.role === 'client');
   const training = !!game.rules.training && !game.attract;
@@ -366,7 +366,7 @@ async function hostGame() {
   setMpBusy(true);
   setMpStatus('Creating a room…');
   try {
-    await net.host(settings.name);
+    await net.host(settings.name, $('mp-pass').value.trim());
   } catch (e) {
     setMpStatus(e.message, true);
     return;
@@ -388,7 +388,7 @@ async function joinGame() {
   setMpStatus(`Connecting to room ${code}…`);
   hud.chatClear();
   try {
-    await net.join(code, settings.name);
+    await net.join(code, settings.name, $('mp-pass').value.trim());
   } catch (e) {
     setMpStatus(e.message, true);
     return;
