@@ -16,6 +16,7 @@ import { CFG } from './config.js';
 import { moveBody } from './physics.js';
 import { BotModel } from './botModel.js';
 import { GRENADE, FLASH, SMOKE, TACTICALS } from './weapons.js';
+import { FLAG_STATE } from './ctf.js';
 
 export const STATE = {
   PATROL: 'patrol',
@@ -24,6 +25,7 @@ export const STATE = {
   RETREAT: 'retreat',
   SEARCH: 'search',
   COLLECT: 'collect',
+  OBJECTIVE: 'objective', // Capture the Flag: on the way to a flag job, shooting back as it goes
 };
 
 const _eye = new THREE.Vector3();
@@ -67,6 +69,8 @@ export class Bot extends Character {
     this.lookPos = new THREE.Vector3();
     this.lastStuckPos = new THREE.Vector3();
     this.thinkT = Math.random() * 0.12;
+    this.ctfRole = id % 3 === 0 ? 'defend' : 'attack'; // Capture the Flag job
+    this.nextObjT = 0;
     this.resetAI();
   }
 
@@ -228,8 +232,8 @@ export class Bot extends Character {
   hear(x, y, z, src, kind, frac) {
     if (!this.alive || this.target) return;
     if (src && this.game.sameTeam(src, this)) return; // a teammate's noise is nothing to investigate
-    // King of the Hill: look toward noises, but the hill is the job
-    if (this.game.rules.hill && kind === 'shot') {
+    // King of the Hill / Capture the Flag: look toward noises, but the objective is the job
+    if ((this.game.rules.hill || this.game.ctf) && kind === 'shot') {
       if (this.game.time > this.lookUntil) { this.lookPos.set(x, y + 1.4, z); this.lookUntil = this.game.time + 1.2; }
       return;
     }
@@ -286,6 +290,18 @@ export class Bot extends Character {
   decide() {
     const now = this.game.time;
     const t = this.target;
+    // Capture the Flag: carriers keep running for home, and anyone on a flag job keeps
+    // going (shooting on the move) unless the enemy is right on top of them
+    if (t && this.game.ctf) {
+      const carrying = this.game.ctf.carrying(this);
+      const onJob = this.state === STATE.OBJECTIVE && !this.done;
+      if (carrying || (onJob && this.pos.distanceTo(t.pos) > 9)) {
+        this.enemy = t;
+        this.lastCombatT = now;
+        if (!onJob) this.enterFlag();
+        return;
+      }
+    }
     if (t) {
       this.enemy = t;
       this.lastCombatT = now;
@@ -317,6 +333,11 @@ export class Bot extends Character {
         }
         const hz = this.game.hillZone();
         if (hz && Math.hypot(m.lastPos.x - hz[0], m.lastPos.z - hz[2]) > hz[3] + 6) { this.enterHill(); return; }
+        // Capture the Flag: don't wander off after them, unless they have our flag
+        if (this.game.ctf) {
+          const own = this.game.ctf.flags[this.team];
+          if (!own || own.carrier !== e) { this.enterFlag(); return; }
+        }
         this.enterChase(_t, e, 'enemy');
       } else {
         this.pickNext();
@@ -352,7 +373,9 @@ export class Bot extends Character {
     // the hill moved while we were heading for (or sitting on) the old one
     const g = this.game;
     if (g.rules.hill && this.state === STATE.PATROL && this.hillIdx !== g.hill.idx) { this.enterHill(); return; }
-    if (!g.rules.hill && (this.state === STATE.PATROL || this.state === STATE.SEARCH) && now > this.nextNeedCheck) {
+    // Capture the Flag: flags move, so look again at what the job is every so often
+    if (g.ctf && (this.state === STATE.PATROL || this.state === STATE.SEARCH) && now > this.nextObjT) { this.enterFlag(); return; }
+    if (!g.rules.hill && !g.ctf && (this.state === STATE.PATROL || this.state === STATE.SEARCH) && now > this.nextNeedCheck) {
       this.nextNeedCheck = now + 1;
       const p = this.choosePickup(this.state === STATE.SEARCH ? 10 : Infinity);
       if (p) this.enterCollect(p);
@@ -360,6 +383,12 @@ export class Bot extends Character {
   }
 
   pickNext() {
+    if (this.game.ctf) {
+      const p = this.health < 40 && !this.game.ctf.carrying(this) ? this.choosePickup(20) : null;
+      if (p && p.type === 'health') this.enterCollect(p);
+      else this.enterFlag();
+      return;
+    }
     if (this.game.rules.hill) {
       // the hill is the job; only detour for health when badly hurt
       const p = this.health < 45 ? this.choosePickup(25) : null;
@@ -370,6 +399,50 @@ export class Bot extends Character {
     const p = this.choosePickup(Infinity);
     if (p) this.enterCollect(p);
     else this.enterPatrol();
+  }
+
+  /**
+   * Capture the Flag: pick the most useful flag job right now and head for it.
+   * Carriers run home; everyone hunts a carrier who has our flag; dropped flags
+   * get returned or grabbed; otherwise attackers go for the enemy flag and
+   * defenders hang around our base.
+   */
+  enterFlag() {
+    const g = this.game, ctf = g.ctf, now = g.time;
+    this.nextObjT = now + 1.5;
+    if (!ctf || this.team < 0) { this.enterPatrol(); return; }
+    const own = ctf.flags[this.team], foe = ctf.flags[1 - this.team];
+    const dist = (f) => Math.hypot(f.x - this.pos.x, f.z - this.pos.z);
+    const go = (x, y, z) => {
+      this.setState(STATE.OBJECTIVE);
+      this.stateUntil = now + 3;
+      if (!this.setGoal(x, y, z)) this.done = true;
+    };
+    if (foe.carrier === this) { go(own.home[0], own.home[1], own.home[2]); return; }
+    if (own.state === FLAG_STATE.CARRIED && own.carrier && (this.ctfRole === 'defend' || dist(own) < 35 || Math.random() < 0.7)) {
+      const c = own.carrier;
+      go(c.pos.x, c.pos.y, c.pos.z);
+      return;
+    }
+    if (own.state === FLAG_STATE.DROPPED && (this.ctfRole === 'defend' || dist(own) < 30)) { go(own.x, own.y, own.z); return; }
+    if (foe.state === FLAG_STATE.DROPPED) { go(foe.x, foe.y, foe.z); return; }
+    if (this.ctfRole === 'attack') {
+      if (foe.state === FLAG_STATE.CARRIED && foe.carrier) {
+        // a teammate has it: stick close and cover them
+        const c = foe.carrier;
+        go(c.pos.x + rand(-3, 3), c.pos.y, c.pos.z + rand(-3, 3));
+      } else {
+        go(foe.x, foe.y, foe.z);
+      }
+      return;
+    }
+    // defend: wander between spots around our base, watching the approaches
+    const h = own.home;
+    const a = Math.random() * Math.PI * 2, r = rand(3, 9);
+    const n = g.nav.nearest(h[0] + Math.cos(a) * r, h[1], h[2] + Math.sin(a) * r);
+    this.setState(STATE.PATROL);
+    if (n < 0 || !this.setGoal(g.nav.px[n], g.nav.py[n], g.nav.pz[n])) this.setGoal(h[0], h[1], h[2]);
+    this.waitT = rand(1.5, 3.5);
   }
 
   /** King of the Hill: walk to a spot inside the zone and hold it for a bit. */
@@ -598,6 +671,12 @@ export class Bot extends Character {
         break;
       }
       case STATE.RETREAT: this.updateRetreat(dt); break;
+      case STATE.OBJECTIVE: {
+        const t = this.target;
+        this.lookMode = t && this.pos.distanceTo(t.pos) < 22 ? 'target' : 'move';
+        if (this.followPath(CFG.botSprint) || now > this.stateUntil) this.done = true;
+        break;
+      }
       case STATE.ATTACK: this.updateAttack(dt); break;
       default: break;
     }

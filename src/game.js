@@ -14,6 +14,7 @@ import { damageAtDistance, GRENADE, FLASH, KNIFE, makeLoadout, makeSingle } from
 import { SmokeClouds } from './smoke.js';
 import { applyCrosshair } from './settings.js';
 import { Career } from './career.js';
+import { Ctf } from './ctf.js';
 import { getMode, makeRules, MODES, TEAM_COLORS, TEAM_NAMES, GUN_LADDER, gunLevel } from './modes.js';
 import { MAPS, getMap } from './maps/index.js';
 import { Announcer } from './announcer.js';
@@ -123,6 +124,7 @@ export class Game {
     this.grenadePool = { frag: [], flash: [], smoke: [] };
     this.nextGrenadeId = 1;
     this.botsOn = true;
+    this.ctf = null; // Capture the Flag state, when that's the mode
     this.loadMap(map);
 
     this.player = new Player(this);
@@ -204,6 +206,7 @@ export class Game {
   // ======================================================================
 
   newMatch({ botCount, bots = true, difficulty, attract = false, map = null, rules = null }) {
+    this.clearCtf();
     for (const b of this.bots) b.dispose();
     this.bots = [];
     if (map) this.loadMap(map);
@@ -240,6 +243,7 @@ export class Game {
     for (const c of this.chars) this.resetScore(c);
     this.assignTeams();
     if (this.rules.hill) this.resetHill();
+    if (this.rules.ctf && this.map.flags) this.ctf = new Ctf(this);
     this.killcam.reset();
     if (this.mode === 'host') this.net.onStart(); // tell clients before anyone spawns
     for (const c of this.chars) this.respawn(c, true);
@@ -269,6 +273,7 @@ export class Game {
 
   /** Multiplayer client: reset to a clean slate; the host drives everything else. */
   startClient(matchTime, rules) {
+    this.clearCtf();
     for (const b of this.bots) b.dispose();
     this.bots = [];
     this.mode = 'client';
@@ -293,6 +298,11 @@ export class Game {
     p.respawnAt = Infinity; // wait for the host to place us
     this.chars = [p, ...this.remotes];
     for (const c of this.chars) this.resetScore(c);
+    if (this.rules.ctf && this.map.flags) this.ctf = new Ctf(this);
+  }
+
+  clearCtf() {
+    if (this.ctf) { this.ctf.dispose(); this.ctf = null; }
   }
 
   /** Fresh scores, streaks and lives for a new match. */
@@ -302,8 +312,9 @@ export class Game {
     c.gunLevel = 0;
     c.lives = this.rules.lives || 0;
     c.hillTime = 0;
+    c.caps = 0;
     // for the end-of-match awards (kept by whoever runs the match)
-    c.st = { shots: 0, hits: 0, heads: 0, knives: 0, nades: 0, bestStreak: 0, longest: 0 };
+    c.st = { shots: 0, hits: 0, heads: 0, knives: 0, nades: 0, bestStreak: 0, longest: 0, returns: 0 };
   }
 
   /** A shot left `c`'s gun; `hit` = it hurt an enemy. Called by the match authority. */
@@ -333,6 +344,10 @@ export class Game {
     add('Demolitions', best((c) => c.st.nades, 1), (v) => `${v} grenade kill${v === 1 ? '' : 's'}`);
     add('Butcher', best((c) => c.st.knives, 1), (v) => `${v} knife kill${v === 1 ? '' : 's'}`);
     if (this.rules.hill) add('Hill Keeper', best((c) => c.hillTime || 0, 10), (v) => `${Math.round(v)} s on the hill`);
+    if (this.rules.ctf) {
+      add('Flag Runner', best((c) => c.caps || 0, 1), (v) => `${v} capture${v === 1 ? '' : 's'}`);
+      add('Defender', best((c) => c.st.returns || 0, 1), (v) => `${v} flag return${v === 1 ? '' : 's'}`);
+    }
     add('Punching Bag', best((c) => c.deaths, 6), (v) => `${v} deaths`);
     return out.slice(0, 6);
   }
@@ -467,6 +482,8 @@ export class Game {
       }
       let score = Math.min(minD, 32) + Math.random() * 7;
       if (seen) score -= 9;
+      // Capture the Flag: spawn on your own side of the map
+      if (this.ctf && who.team >= 0) { const h = this.map.flags[who.team]; score -= Math.hypot(s.x - h[0], s.z - h[2]) * 0.45; }
       if (minD < 9) score -= 30;
       if (this.time - s.lastUsed < 4) score -= 40;
       if (score > bestScore) { bestScore = score; best = s; }
@@ -607,7 +624,7 @@ export class Game {
     const teamKill = this.sameTeam(victim, attacker);
     if (attacker !== victim && !teamKill) { // a team kill earns nothing
       attacker.kills++;
-      if (this.rules.teams && !this.rules.hill && attacker.team >= 0) this.teamScore[attacker.team]++;
+      if (this.rules.teams && !this.rules.hill && !this.rules.ctf && attacker.team >= 0) this.teamScore[attacker.team]++; // objective modes score otherwise
       const st = attacker.st;
       if (st) {
         if (def === KNIFE) st.knives++;
@@ -1151,6 +1168,8 @@ export class Game {
     this.updateGrenades(dt);
     this.updatePickups(dt);
     if (this.rules.hill && !this.attract) this.updateHill(dt);
+    if (this.ctf && !this.attract) this.ctf.update(dt);
+    if (this.ctf) this.ctf.updateVisuals(dt, this.time);
     this.updateHillFx(this.time);
     this.effects.update(dt);
     this.smokes.update(dt);
@@ -1172,6 +1191,7 @@ export class Game {
     for (const p of this.pickups) p.update(dt, this.time, false);
     this.updateGrenades(dt);
     if (this.rules.hill) this.hill.t = Math.max(0, this.hill.t - dt); // re-synced by snapshots
+    if (this.ctf) this.ctf.updateVisuals(dt, this.time);
     this.updateHillFx(this.time);
     this.effects.update(dt);
     this.smokes.update(dt);

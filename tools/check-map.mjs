@@ -65,6 +65,16 @@ for (const h of map.hills || []) {
   if (!ok) { console.log(`ERROR hill at ${h.slice(0, 3)} has no reachable ground`); bad++; }
 }
 if (!map.hills || map.hills.length < 3) { console.log('ERROR map needs at least 3 King of the Hill zones'); bad++; }
+// Capture the Flag: two reachable bases, far apart, with a path between them
+if (!Array.isArray(map.flags) || map.flags.length !== 2) { console.log('ERROR map needs flags: [blue, red]'); bad++; }
+else {
+  map.flags.forEach((f, i) => check(`flag ${i}`, f));
+  const [a, b] = map.flags;
+  const d = Math.hypot(a[0] - b[0], a[2] - b[2]);
+  if (d < 40) { console.log(`ERROR flags only ${d.toFixed(0)} m apart`); bad++; }
+  const p = nav.findPath(a[0], a[1], a[2], b[0], b[1], b[2]);
+  if (!p || !p.complete) { console.log('ERROR no path between the two flags'); bad++; }
+}
 
 // every spawn must be able to path to every pickup, and back
 for (const s of map.spawns) {

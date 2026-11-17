@@ -621,7 +621,7 @@ function renderCareer() {
     ['Best streak', c.bestStreak, ''],
     ['Longest kill', c.longest ? c.longest + ' m' : '—', ''],
     ['Knife kills', c.knives, ''], ['Grenade kills', c.nades, ''],
-    ['Time played', fmtTime(c.time), ''],
+    ['Flag captures', c.caps, ''], ['Time played', fmtTime(c.time), ''],
   ];
   const grid = $('career-grid');
   grid.textContent = '';

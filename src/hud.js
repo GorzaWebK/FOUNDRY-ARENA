@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import { TEAM_COLORS, TEAM_NAMES } from './modes.js';
+import { FLAG_STATE } from './ctf.js';
 
 const _hv = new THREE.Vector3();
 const HILL_TEXT_COL = { [-1]: '#e8e8e8', 0: '#' + TEAM_COLORS[0].toString(16).padStart(6, '0'), 1: '#' + TEAM_COLORS[1].toString(16).padStart(6, '0'), 2: '#ffd24d' };
@@ -219,9 +220,40 @@ export class Hud {
 
     if (this.anT > 0) { this.anT -= dt; if (this.anT <= 0) e.announce.style.opacity = 0; }
 
-    // King of the Hill: status line + a marker pointing at the zone
+    // Capture the Flag: status line + a marker on each flag
+    const ctf = game.ctf;
+    for (let i = 0; i < 2; i++) {
+      const el = $('flag-marker-' + i);
+      const f = ctf && ctf.flags[i];
+      const show = !!f && p.alive && f.carrier !== p;
+      el.classList.toggle('hidden', !show);
+      if (!show) continue;
+      this._set('fmC' + i, f.team, (v) => { el.style.color = hex(TEAM_COLORS[v]); });
+      const d = Math.round(Math.hypot(p.pos.x - f.x, p.pos.z - f.z));
+      const what = f.team === p.team
+        ? (f.state === FLAG_STATE.HOME ? 'BASE' : f.state === FLAG_STATE.CARRIED ? 'STOLEN' : 'RETURN')
+        : (f.state === FLAG_STATE.HOME ? 'TAKE' : f.state === FLAG_STATE.CARRIED ? 'ESCORT' : 'TAKE');
+      this._set('fmT' + i, `${what} ${d}m`, (v) => { el.lastChild.textContent = v; });
+      this.placeMarker(el, f.x, f.y + 2.6, f.z, game.camera);
+    }
     const h = game.hillZone();
-    this._set('hillOn', !!h, (v) => { e.hillStatus.classList.toggle('hidden', !v); });
+    if (ctf) {
+      const st = (f) => (f.state === FLAG_STATE.HOME ? 'HOME'
+        : f.state === FLAG_STATE.CARRIED ? `TAKEN BY ${(f.carrier ? f.carrier.name : '?').toUpperCase()}`
+          : `DROPPED · BACK IN ${Math.max(0, Math.ceil(f.returnT))}s`);
+      const mine = ctf.flags[Math.max(0, p.team)], theirs = ctf.flags[1 - Math.max(0, p.team)];
+      const carrying = theirs.carrier === p;
+      const text = carrying
+        ? (mine.state === FLAG_STATE.HOME ? 'YOU HAVE THE FLAG · TAKE IT TO YOUR BASE' : 'YOU HAVE THE FLAG · YOUR FLAG MUST BE HOME TO SCORE')
+        : `YOUR FLAG: ${st(mine)} · ENEMY FLAG: ${st(theirs)}`;
+      e.hillStatus.classList.remove('hidden');
+      this._set('hillText', text, (v) => { e.hillStatus.textContent = v; });
+      this._set('hillCol', carrying ? 'c' : mine.state === FLAG_STATE.HOME ? 'h' : 'x', (v) => { e.hillStatus.style.color = v === 'c' ? '#ffd24d' : v === 'h' ? '#e8e8e8' : '#ff6b6b'; });
+      this._set('hillIn', carrying, (v) => e.hillStatus.classList.toggle('on', v));
+      this._set('hillOn', 'ctf', () => {});
+    }
+    // King of the Hill: status line + a marker pointing at the zone
+    if (!ctf) this._set('hillOn', !!h, (v) => { e.hillStatus.classList.toggle('hidden', !v); });
     if (h) {
       const holder = game.hill.holder;
       const left = Math.max(0, Math.ceil(game.hill.t));
@@ -235,13 +267,7 @@ export class Hud {
       const showMarker = p.alive && !inside;
       e.hillMarker.classList.toggle('hidden', !showMarker);
       if (showMarker) {
-        _hv.set(h[0], h[1] + 1.2, h[2]).project(game.camera);
-        let x = _hv.x, y = _hv.y;
-        if (_hv.z > 1) { x = -x; y = -y; } // behind us: flip, then push to the edge
-        const m = Math.max(Math.abs(x), Math.abs(y));
-        if (_hv.z > 1 || m > 0.92) { x = (x / (m || 1)) * 0.92; y = (y / (m || 1)) * 0.92; }
-        const W = window.innerWidth, H = window.innerHeight;
-        e.hillMarker.style.transform = `translate(${((x + 1) / 2) * W}px, ${((1 - y) / 2) * H}px) translate(-50%, -50%)`;
+        this.placeMarker(e.hillMarker, h[0], h[1] + 1.2, h[2], game.camera);
         const d = Math.round(Math.hypot(p.pos.x - h[0], p.pos.z - h[2]));
         this._set('hillD', d, (v) => { e.hillMarker.lastChild.textContent = `${v}m`; });
       }
@@ -267,6 +293,17 @@ export class Hud {
       }
     }
     this._set('fpsOn', game.settings.showFps, (v) => e.fps.classList.toggle('hidden', !v));
+  }
+
+  /** Put a HUD marker over a world point, or pinned to the screen edge pointing at it. */
+  placeMarker(el, wx, wy, wz, camera) {
+    _hv.set(wx, wy, wz).project(camera);
+    let x = _hv.x, y = _hv.y;
+    if (_hv.z > 1) { x = -x; y = -y; } // behind us: flip, then push to the edge
+    const m = Math.max(Math.abs(x), Math.abs(y));
+    if (_hv.z > 1 || m > 0.92) { x = (x / (m || 1)) * 0.92; y = (y / (m || 1)) * 0.92; }
+    const W = window.innerWidth, H = window.innerHeight;
+    el.style.transform = `translate(${((x + 1) / 2) * W}px, ${((1 - y) / 2) * H}px) translate(-50%, -50%)`;
   }
 
   hitmarker(head, kill) {

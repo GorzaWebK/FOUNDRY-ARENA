@@ -149,6 +149,9 @@ export default {
   ],
 
   // King of the Hill zones: [x, floorY, z, radius]
+  // Capture the Flag bases: [blue, red], each [x, floorY, z]
+  flags: [[-44.5, 3, 0.5], [44.5, 3, 0.5]],
+
   hills: [
     [0.5, 3, 0.5, 3.5], [0.5, 0, -18, 5], [0.5, 0, 18, 5],
     [-18, 0, 0.5, 4], [18, 0, 0.5, 4], [-42, 3, 0.5, 4], [42, 3, 0.5, 4],

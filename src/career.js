@@ -8,7 +8,7 @@ export const CAREER_KEY = 'foundry-arena-career';
 
 const blank = () => ({
   v: 1, matches: 0, wins: 0, kills: 0, deaths: 0, shots: 0, hits: 0, heads: 0,
-  bestStreak: 0, longest: 0, knives: 0, nades: 0, time: 0,
+  bestStreak: 0, longest: 0, knives: 0, nades: 0, caps: 0, time: 0,
   weapons: {}, // weapon id -> kills with it
   modes: {}, // mode id -> matches played
 });
@@ -60,6 +60,8 @@ export class Career {
   }
 
   death() { this.c.deaths++; this.save(); }
+
+  cap() { this.c.caps++; this.save(); }
 
   shot(hit) {
     this.c.shots++;

@@ -12,6 +12,7 @@
 //   gunGame        weapons are handed out by kill count (see GUN_LADDER)
 //   lives          limited lives; nobody respawns after their last
 //   hill           King of the Hill: a scoring zone that moves (see map.hills)
+//   ctf            Capture the Flag: a flag at each team's base (see map.flags, ctf.js)
 //   forcePrimary   everyone gets this primary regardless of their loadout
 //
 // A match plays with makeRules(id, custom): the mode plus the host's custom rules
@@ -119,6 +120,30 @@ export const MODES = [
       const w = b > r ? 0 : 1;
       const won = game.player.team === w;
       return { won, sub: `${TEAM_NAMES[w]} team held the hill, ${Math.max(b, r)}–${Math.min(b, r)}.` };
+    },
+  },
+
+  {
+    id: 'ctf', name: 'Capture the Flag', teams: true, ctf: true, scoreLimit: 3,
+    desc: (r) => `Blue vs Red. Grab the enemy flag and carry it home while yours is safe at your base. First to ${r.scoreLimit} captures.`,
+    limit: { key: 'scoreLimit', label: 'Captures to win', unit: 'captures', options: [1, 2, 3, 5, 7, 10] },
+    rank: (chars) => [...chars].sort((a, b) => a.team - b.team || (b.caps || 0) - (a.caps || 0) || byKills(a, b)),
+    won: (game) => game.teamScore[0] >= game.rules.scoreLimit || game.teamScore[1] >= game.rules.scoreLimit,
+    hud(game) {
+      const mine = Math.max(0, game.player.team), other = 1 - mine;
+      return {
+        left: [TEAM_NAMES[mine].toUpperCase(), game.teamScore[mine], hex(TEAM_COLORS[mine])],
+        right: [TEAM_NAMES[other].toUpperCase(), game.teamScore[other], hex(TEAM_COLORS[other])],
+        sub: `capture the flag · ${game.rules.scoreLimit}`,
+      };
+    },
+    column: { title: 'Caps', value: (c) => c.caps || 0 },
+    result(game) {
+      const [b, r] = game.teamScore;
+      if (b === r) return { won: false, draw: true, sub: `Both teams finished on ${plural(b, 'capture')}.` };
+      const w = b > r ? 0 : 1;
+      const won = game.player.team === w;
+      return { won, sub: `${TEAM_NAMES[w]} team won ${Math.max(b, r)}–${Math.min(b, r)} on captures.` };
     },
   },
 

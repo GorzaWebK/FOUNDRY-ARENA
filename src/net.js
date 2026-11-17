@@ -298,7 +298,7 @@ export class Net {
     g.resetScore(c);
     if (saved) {
       c.kills = saved.kills; c.deaths = saved.deaths; c.lives = saved.lives;
-      c.hillTime = saved.hillTime; c.st = saved.st;
+      c.hillTime = saved.hillTime; c.st = saved.st; c.caps = saved.caps || 0;
       c.gunLevel = saved.gunLevel;
       if (g.rules.teams && (saved.team === 0 || saved.team === 1)) { c.team = saved.team; g.paint(c); } else g.joinTeam(c);
     } else {
@@ -329,7 +329,7 @@ export class Net {
     const kept = keep && c.pid && !g.over;
     if (kept) {
       this.parked.set(c.pid, {
-        name: c.name, color: c.baseColor, team: c.team, kills: c.kills, deaths: c.deaths, lives: c.lives,
+        name: c.name, color: c.baseColor, team: c.team, kills: c.kills, deaths: c.deaths, lives: c.lives, caps: c.caps || 0,
         hillTime: c.hillTime || 0, gunLevel: c.gunLevel, st: c.st, until: performance.now() + REJOIN_MS,
       });
     }
@@ -509,12 +509,13 @@ export class Net {
       (ch.alive ? 1 : 0) | (ch.crouching ? 2 : 0) | (ch.isProtected() ? 4 : 0) | (ch.onGround ? 8 : 0),
       Math.max(0, Math.round(ch.health * 10) / 10), Math.round(ch.armor * 10) / 10,
       ch.kills, ch.deaths, ch.weapon.def.index, r2(ch.lean), ch.lives,
-      ch.weapons[0].def.index, ch.weapons.length > 1 ? 1 : 0, Math.round(ch.hillTime || 0),
+      ch.weapons[0].def.index, ch.weapons.length > 1 ? 1 : 0, Math.round(ch.hillTime || 0), ch.caps || 0,
     ]);
     let p = '';
     for (const pk of g.pickups) p += pk.active ? '1' : '0';
     const snap = { t: 's', mt: r2(g.matchTime), c, p, ts: g.teamScore };
     if (g.rules.hill) snap.hl = [g.hill.idx, r2(g.hill.t), g.hill.holder];
+    if (g.ctf) snap.fl = g.ctf.snapshot();
     this.broadcast(snap);
   }
 
@@ -537,6 +538,11 @@ export class Net {
 
   onKill(victim, attacker, head, weapon) {
     this.broadcast({ t: 'kill', v: victim.id, k: attacker.id, h: head ? 1 : 0, w: weapon });
+  }
+
+  /** A flag event (take / drop / return / home / cap) for team `team`'s flag. */
+  onFlag(kind, team, who) {
+    this.broadcast({ t: 'fl', k: kind, tm: team, id: who ? who.id : -1 });
   }
 
   onPickup(i, c) {
@@ -719,6 +725,11 @@ export class Net {
       case 'c':
         this.hooks.onChat(cleanName(m.n), num(m.col) ? m.col : 0, cleanChat(m.m));
         break;
+      case 'fl':
+        if (g.ctf && ['take', 'drop', 'return', 'home', 'cap'].includes(m.k) && (m.tm === 0 || m.tm === 1)) {
+          g.ctf.present(m.k, m.tm, num(m.id) ? g.charById(m.id) : null);
+        }
+        break;
       case 'bye':
         this._lost('The host closed the room.', false);
         break;
@@ -755,12 +766,14 @@ export class Net {
       if (holder !== g.hill.holder && (holder === 0 || holder === 1)) g.hillTaken(holder);
       g.hill.idx = idx; g.hill.t = t; g.hill.holder = holder;
     }
+    if (g.ctf && Array.isArray(m.fl)) g.ctf.applySnapshot(m.fl);
     if (Array.isArray(m.c)) {
       for (const e of m.c) {
         if (!Array.isArray(e) || e.length < 12) continue;
-        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, held, lean, lives, prim, side, hillT] = e;
+        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, held, lean, lives, prim, side, hillT, caps] = e;
         if (id === p.id) {
           p.kills = k; p.deaths = d;
+          if (num(caps)) p.caps = caps;
           if (num(lives)) p.lives = lives;
           if (num(hillT)) p.hillTime = hillT;
           p.applyGunLevel(); // gun game: a kill may have earned the next gun
@@ -781,6 +794,7 @@ export class Net {
         c.health = hp; c.armor = ar; c.kills = k; c.deaths = d;
         if (num(lives)) c.lives = lives;
         if (num(hillT)) c.hillTime = hillT;
+        if (num(caps)) c.caps = caps;
         if (num(held)) c.netHeld = held | 0;
         if (num(prim)) c.netPrim = prim | 0;
         if (num(side)) c.netSide = !!side;

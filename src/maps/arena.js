@@ -237,6 +237,9 @@ export default {
     { type: 'ammo', pos: [-36.5, 0, 28.5] },
   ],
 
+  // Capture the Flag bases: [blue, red], each [x, floorY, z]
+  flags: [[-30.5, 0, -32.5], [30.5, 0, 34.5]],
+
   // King of the Hill zones: [x, floorY, z, radius]
   hills: [
     [0.5, 1, 0.5, 4.5], [0.5, 0, 31, 4], [-35.5, 3, 0.5, 3.5],
