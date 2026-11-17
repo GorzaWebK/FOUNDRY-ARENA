@@ -65,8 +65,20 @@ const solids = [
   box([-24, 8, 1.3], [-4, 8.9, 1.5], 'metalDark'), box([4, 8, 1.3], [24, 8.9, 1.5], 'metalDark'),
   // tower cover
   box([-29, 8, 2.2], [-27, 9.2, 3], 'crate'), box([27, 8, -3], [29, 9.2, -2.2], 'crate'),
-  // hangers holding the catwalk up
-  ...[-16, -8, 8, 16].flatMap((x) => [box([x - 0.1, 8.9, -1.5], [x + 0.1, 13, -1.3], 'metalDark'), box([x - 0.1, 8.9, 1.3], [x + 0.1, 13, 1.5], 'metalDark')]),
+  // the catwalk hangs from the roof: a beam along each edge of the middle skylight,
+  // bolted under the roof panels and into both end walls, with hangers dropping
+  // from them to the catwalk rails
+  box([-36, 13.3, -2.3], [36, 14, -1.2], 'metalDark'),
+  box([-36, 13.3, 1.2], [36, 14, 2.3], 'metalDark'),
+  ...[-22, -16, -10, -6, 6, 10, 16, 22].flatMap((x) => [
+    box([x - 0.1, 8.9, -1.5], [x + 0.1, 13.3, -1.3], 'metalDark'),
+    box([x - 0.1, 8.9, 1.3], [x + 0.1, 13.3, 1.5], 'metalDark'),
+  ]),
+  // hanger plates where the rods meet the beams
+  ...[-22, -16, -10, -6, 6, 10, 16, 22].flatMap((x) => [
+    box([x - 0.25, 13.1, -1.6], [x + 0.25, 13.3, -1.2], 'metal'),
+    box([x - 0.25, 13.1, 1.2], [x + 0.25, 13.3, 1.6], 'metal'),
+  ]),
 
   // ---------------------------------------------------------------- ground floor
   // shelving racks
