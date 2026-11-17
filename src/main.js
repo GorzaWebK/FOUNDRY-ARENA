@@ -46,10 +46,11 @@ const ui = { menu: $('menu'), pause: $('pause'), end: $('end') };
 
 const net = new Net(game, {
   onRoster: () => updateRoomUi(),
-  onLeft: (reason) => {
+  onLeft: (reason, retryCode) => {
     input.exitLock();
     startAttract();
-    setMpStatus(reason, true);
+    if (retryCode) rejoin(retryCode, reason);
+    else setMpStatus(reason, true);
   },
   onVotes: () => renderVote(),
   onMatchStart: () => {
@@ -296,6 +297,7 @@ async function lock() {
 /** Solo practice on the training range. */
 async function startTraining() {
   if (net.active) return;
+  cancelRejoin();
   audio.resume();
   audio.setVolume(settings.volume);
   game.newMatch({ botCount: 1, bots: false, difficulty: settings.difficulty, map: RANGE_MAP, rules: TRAINING });
@@ -313,6 +315,7 @@ function restart() {
 
 async function startMatch() {
   if (net.role === 'client') return; // only the host starts matches
+  if (!net.active) cancelRejoin();
   audio.resume();
   audio.setVolume(settings.volume);
   game.newMatch({
@@ -325,6 +328,7 @@ async function startMatch() {
 }
 
 async function hostGame() {
+  cancelRejoin();
   audio.resume();
   setMpBusy(true);
   setMpStatus('Creating a room…');
@@ -343,6 +347,7 @@ async function hostGame() {
 }
 
 async function joinGame() {
+  cancelRejoin();
   const code = cleanRoomCode(codeInput.value);
   if (!code) { setMpStatus('Enter the room code from your host.', true); return; }
   audio.resume();
@@ -357,12 +362,46 @@ async function joinGame() {
   } finally {
     setMpBusy(false);
   }
+  await enterRoom();
+}
+
+/** Joined (or rejoined) a room: into the match, or its end screen. */
+async function enterRoom() {
   setMpStatus('');
   audio.setVolume(settings.volume);
   if (game.over) { game.onMatchEnd(game.ranking()[0], game.ranking()); return; }
   setState('playing');
   const ok = await lock();
   if (!ok && state === 'playing') hud.setLockHint(true);
+}
+
+// ---------------------------------------------------------------- rejoining after a drop
+// The host keeps a dropped player's score for a few minutes (keyed by player ID),
+// so try to get straight back in.
+const REJOIN_TRIES = 5;
+let rejoinToken = 0;
+function cancelRejoin() { rejoinToken++; }
+
+async function rejoin(code, reason) {
+  const token = ++rejoinToken;
+  codeInput.value = code;
+  for (let i = 1; i <= REJOIN_TRIES; i++) {
+    if (token !== rejoinToken || net.active) return;
+    setMpStatus(`${reason} Rejoining room ${code}… (try ${i} of ${REJOIN_TRIES})`, true);
+    try {
+      await net.join(code, settings.name);
+      if (token !== rejoinToken) { net.leave(); return; } // they went and did something else
+      hud.chatAdd('', 0, 'Reconnected.');
+      await enterRoom();
+      return;
+    } catch (e) {
+      if (/newer version|older version|full/i.test(e.message)) { setMpStatus(e.message, true); return; }
+    }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  if (token === rejoinToken && !net.active) {
+    setMpStatus(`Couldn't get back into room ${code}. The host may have left. Press Join to try again — your score is kept for 3 minutes.`, true);
+  }
 }
 
 function startAttract() {
@@ -616,7 +655,7 @@ window.addEventListener('resize', () => game.resize());
 window.addEventListener('beforeunload', (e) => {
   if (state === 'playing' || state === 'paused') { e.preventDefault(); e.returnValue = ''; }
 });
-window.addEventListener('pagehide', () => net.leave());
+window.addEventListener('pagehide', () => net.leave(false));
 
 game.onMatchEnd = () => {
   const res = game.rules.result(game);

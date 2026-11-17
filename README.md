@@ -216,7 +216,13 @@ connect to them directly.
    next match's mode and map there, and restart or start the next match from the
    end screen. Closing the room (or the
    host's tab) ends the session for everyone.
-5. Everyone has to be on the same version of the game. It's shown under the play
+5. **Dropped?** If your connection drops (or you reload the tab by accident), the
+   game tries to get you back into the room by itself. The host keeps your kills,
+   deaths, team, lives and award stats for 3 minutes, matched by your player ID,
+   and gives them back when you rejoin. Leaving with **Leave game** gives your
+   place up, and when the host closes the room everyone is told rather than
+   left retrying.
+6. Everyone has to be on the same version of the game. It's shown under the play
    buttons on the main menu. If someone has an old tab open, joining tells them who
    needs to refresh (`Ctrl+Shift+R`) instead of letting them in.
 
@@ -235,7 +241,7 @@ How it works:
   set in `vite.config.js`). Host and joiner swap stamps on connect and refuse to
   play together if they differ, since the message format can change between versions.
 - If a connection goes quiet for 10 seconds the player is dropped (or, for a
-  client, returned to the menu).
+  client, returned to the menu, where it retries the room up to 5 times).
 
 Limits worth knowing: very strict corporate / school networks can block
 peer-to-peer connections, and the experience is only as good as the host's

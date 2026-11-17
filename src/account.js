@@ -15,6 +15,7 @@ const DATA_KEYS = [SETTINGS_KEY, RANGE_BEST_KEY];
 
 const ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // no 0/O/1/I to misread
 const ID_RE = /^FA-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/;
+export const isPlayerId = (s) => typeof s === 'string' && ID_RE.test(s);
 
 function randomId() {
   const b = new Uint8Array(8);

@@ -27,10 +27,12 @@ import { getMode } from './modes.js';
 import { NetChar } from './netChar.js';
 import { getTransport, makeRoomCode, cleanRoomCode } from './transport.js';
 import { BUILD, BUILD_TIME, OLD_CLIENT_MSG, OLD_HOST_MSG } from './version.js';
+import { getAccount, isPlayerId } from './account.js';
 
 const SNAP_INTERVAL = 1 / 20;
 const SEND_INTERVAL = 1 / 30;
 const TIMEOUT_MS = 10000; // silence for this long means the other side is gone
+const REJOIN_MS = 3 * 60 * 1000; // a dropped player's score is kept this long for them to come back to
 
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
@@ -66,6 +68,9 @@ export class Net {
     this.pingT = 0;
     this.version = BUILD; // must match exactly to share a room
     this.versionTime = BUILD_TIME;
+    this.pid = getAccount().id; // who we are, so a host can give us our place back after a drop
+    this.parked = new Map(); // host: player id -> what a dropped player had (see _drop)
+    this.lastCode = ''; // client: the room we were last in (for rejoining)
   }
 
   get active() { return this.role !== null; }
@@ -137,18 +142,31 @@ export class Net {
         this._begin(m);
         resolve();
       };
-      conn.send({ t: 'hello', name: cleanName(name), v: this.version, vt: this.versionTime });
+      conn.send({ t: 'hello', name: cleanName(name), v: this.version, vt: this.versionTime, pid: this.pid });
     });
   }
 
-  leave() {
+  /**
+   * Leave the session. `onPurpose` = false for a tab closing / reloading: a client
+   * then doesn't say goodbye, so the host keeps their place in case they come back.
+   */
+  leave(onPurpose = true) {
     if (!this.role) return;
     if (this.role === 'host') {
-      for (const r of this.game.remotes) if (r.conn) { r.conn.onClose = null; r.conn.close(); }
-      this.room.close();
+      // tell everyone the room is closing on purpose, so they don't try to rejoin
+      for (const r of this.game.remotes) if (r.conn) { r.conn.send({ t: 'bye' }); }
+      const conns = this.game.remotes.filter((r) => r.conn).map((r) => r.conn);
+      for (const c of conns) c.onClose = null;
+      setTimeout(() => conns.forEach((c) => c.close()), 150);
+      const room = this.room;
+      this.room = null;
+      setTimeout(() => room.close(), 200);
+      this.parked.clear();
     } else if (this.conn) {
-      this.conn.onClose = null;
-      this.conn.close();
+      if (onPurpose) this.conn.send({ t: 'bye' }); // leaving on purpose: no need to keep our place
+      const c = this.conn;
+      c.onClose = null;
+      setTimeout(() => c.close(), 150);
     }
     this._reset();
   }
@@ -165,11 +183,14 @@ export class Net {
     g.player.color = g.player.baseColor = HUMAN_COLORS[0];
   }
 
-  _lost(reason = 'The host left the game.') {
+  /** Client: the connection to the host is gone. `retry` = worth trying to rejoin. */
+  _lost(reason = 'Lost connection to the host.', retry = true) {
     if (!this.role) return;
+    const code = this.code;
     if (this.conn) { this.conn.onClose = null; this.conn.close(); }
     this._reset();
-    this.hooks.onLeft(reason);
+    this.lastCode = code;
+    this.hooks.onLeft(reason, retry ? code : '');
   }
 
   /** Call once per frame after game.update(). */
@@ -192,7 +213,7 @@ export class Net {
         if (r.conn && now - r.lastSeen > TIMEOUT_MS) {
           r.conn.onClose = null;
           r.conn.close();
-          this._drop(r);
+          this._drop(r, true);
         }
       }
     } else if (now - this.lastHeard > TIMEOUT_MS) {
@@ -230,14 +251,21 @@ export class Net {
     };
     conn.onClose = () => {
       clearTimeout(timer);
-      if (char && this.role === 'host') this._drop(char);
+      if (char && this.role === 'host') this._drop(char, !char.leftOnPurpose);
     };
   }
 
   _admit(conn, m) {
     const g = this.game;
-    // the same browser connecting again replaces its old self
-    for (const r of [...g.remotes]) if (r.conn && r.conn.id === conn.id) { r.conn.onClose = null; this._drop(r); }
+    const now = performance.now();
+    // the same player connecting again replaces their old self: same connection, or the
+    // same player ID on a connection that has gone quiet (a dropped player coming back)
+    const pid = isPlayerId(m.pid) && m.pid !== this.pid ? m.pid : null;
+    for (const r of [...g.remotes]) {
+      if (!r.conn) continue;
+      const stale = pid && r.pid === pid && now - r.lastSeen > 1500;
+      if (r.conn.id === conn.id || stale) { r.conn.onClose = null; r.conn.close(); this._drop(r, true, true); }
+    }
     const humans = g.remotes.filter((r) => r.isHuman);
     if (humans.length + 1 >= MAX_HUMANS) {
       conn.send({ t: 'full' });
@@ -251,33 +279,63 @@ export class Net {
     const names = new Set(g.chars.map((c) => c.name.toLowerCase()));
     for (let i = 2; names.has(name.toLowerCase()); i++) name = `${cleanName(m.name) || 'Player'} ${i}`.slice(0, 18);
 
-    const c = new NetChar(g, this.nextId++, name, color, false);
+    // back after a drop? pick up where they left off
+    let saved = null;
+    for (const [k, p] of this.parked) if (now > p.until) this.parked.delete(k);
+    if (pid && this.parked.has(pid) && !g.over) {
+      saved = this.parked.get(pid);
+      this.parked.delete(pid);
+      if (!names.has(saved.name.toLowerCase())) name = saved.name;
+    }
+
+    const c = new NetChar(g, this.nextId++, name, saved && !used.has(saved.color) ? saved.color : color, false);
     c.conn = conn;
-    c.lastSeen = performance.now();
+    c.pid = pid;
+    c.lastSeen = now;
     c.alive = false;
     c.respawnAt = Infinity;
     g.addRemote(c);
     g.resetScore(c);
-    g.joinTeam(c);
+    if (saved) {
+      c.kills = saved.kills; c.deaths = saved.deaths; c.lives = saved.lives;
+      c.hillTime = saved.hillTime; c.st = saved.st;
+      c.gunLevel = saved.gunLevel;
+      if (g.rules.teams && (saved.team === 0 || saved.team === 1)) { c.team = saved.team; g.paint(c); } else g.joinTeam(c);
+    } else {
+      g.joinTeam(c);
+    }
     // Last One Standing: a round in progress can't be joined, so watch until the next one
-    const spectate = !!g.rules.lives;
+    // (someone coming back keeps whatever lives they had left)
+    const spectate = !!g.rules.lives && (!saved || c.lives <= 0);
     if (spectate) c.lives = 0;
     const welcome = { t: 'welcome', v: this.version, vt: this.versionTime, you: c.id, map: g.map.id, mode: g.rules.id, mt: r2(g.matchTime), over: g.over, r: this._roster(), ts: g.teamScore };
     if (g.over) Object.assign(welcome, { aw: g.awards, vo: g.voteOptions, vn: g.voteTally(), vl: Math.round((g.voteDeadline - performance.now()) / 1000) });
     conn.send(welcome);
     if (!g.over && !spectate) g.respawn(c, true);
     this.broadcast({ t: 'roster', r: this._roster() }, conn);
-    this.system(spectate ? `${name} joined — they'll play from the next round` : `${name} joined`);
+    if (saved) this.system(`${name} rejoined with their score`);
+    else this.system(spectate ? `${name} joined — they'll play from the next round` : `${name} joined`);
     this.hooks.onRoster();
     return c;
   }
 
-  _drop(c) {
+  /**
+   * A player is gone. `keep`: they didn't leave on purpose (dropped / timed out),
+   * so hold on to their score in case they come back. `quiet`: no chat line.
+   */
+  _drop(c, keep = false, quiet = false) {
     const g = this.game;
     if (!g.remotes.includes(c)) return;
+    const kept = keep && c.pid && !g.over;
+    if (kept) {
+      this.parked.set(c.pid, {
+        name: c.name, color: c.baseColor, team: c.team, kills: c.kills, deaths: c.deaths, lives: c.lives,
+        hillTime: c.hillTime || 0, gunLevel: c.gunLevel, st: c.st, until: performance.now() + REJOIN_MS,
+      });
+    }
     g.removeRemote(c);
     this.broadcast({ t: 'roster', r: this._roster() });
-    this.system(`${c.name} left`);
+    if (!quiet) this.system(kept ? `${c.name} lost connection — they keep their score if they rejoin within 3 minutes` : `${c.name} left`);
     this.hooks.onRoster();
   }
 
@@ -292,6 +350,7 @@ export class Net {
     else if (m.t === 'g') this._hostGrenade(c, m);
     else if (m.t === 'k') this._hostKnife(c, m);
     else if (m.t === 'vote') this._vote(c.id, m.i);
+    else if (m.t === 'bye') c.leftOnPurpose = true;
     else if (m.t === 'c') {
       const now = performance.now();
       const text = cleanChat(m.m);
@@ -463,6 +522,7 @@ export class Net {
 
   onStart() {
     const g = this.game;
+    this.parked.clear(); // scores belong to the match that just ended
     this.broadcast({ t: 'start', map: g.map.id, mode: g.rules.id, mt: r2(g.matchTime), r: this._roster() });
   }
 
@@ -658,6 +718,9 @@ export class Net {
       }
       case 'c':
         this.hooks.onChat(cleanName(m.n), num(m.col) ? m.col : 0, cleanChat(m.m));
+        break;
+      case 'bye':
+        this._lost('The host closed the room.', false);
         break;
       case 'votes':
         if (Array.isArray(m.n) && m.n.every(num)) {
