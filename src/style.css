@@ -304,6 +304,7 @@ h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .play-row { display: flex; gap: 10px; }
 .play-row .primary { flex: 3; }
 .play-row #btn-train { flex: 1; font-size: 14px; }
+.version-note { margin: 6px 0 0; text-align: right; font-size: 11px; opacity: 0.45; letter-spacing: 0.04em; }
 #range-panel {
   position: absolute; left: 16px; top: 72px; font-size: 13px; line-height: 1.55; background: rgba(12, 16, 22, 0.62);
   padding: 8px 12px; border-radius: 8px; max-width: 340px;

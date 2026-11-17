@@ -14,6 +14,14 @@ import { Game } from './game.js';
 import { Net, cleanName } from './net.js';
 import { cleanRoomCode } from './transport.js';
 import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
+import { BUILD, BUILD_TIME } from './version.js';
+
+{
+  // version stamp on the main menu, so players can compare before joining
+  const el = document.getElementById('version-note');
+  const day = BUILD_TIME ? BUILD_TIME.slice(0, 10) : '';
+  if (el) el.textContent = 'Version ' + BUILD + (day ? ' · ' + day : '');
+}
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);

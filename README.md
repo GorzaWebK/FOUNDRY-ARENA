@@ -177,6 +177,9 @@ connect to them directly.
    next match's mode and map there, and restart or start the next match from the
    end screen. Closing the room (or the
    host's tab) ends the session for everyone.
+5. Everyone has to be on the same version of the game. It's shown under the play
+   buttons on the main menu. If someone has an old tab open, joining tells them who
+   needs to refresh (`Ctrl+Shift+R`) instead of letting them in.
 
 How it works:
 
@@ -189,6 +192,9 @@ How it works:
   That keeps shooting responsive at any ping, and is the right trade-off for
   playing with friends; it is not hardened against a determined cheater.
 - A hosted match keeps running while the host's tab is in the background.
+- Each build is stamped with the git commit it was built from (`src/version.js`,
+  set in `vite.config.js`). Host and joiner swap stamps on connect and refuse to
+  play together if they differ, since the message format can change between versions.
 - If a connection goes quiet for 10 seconds the player is dropped (or, for a
   client, returned to the menu).
 

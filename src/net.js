@@ -26,6 +26,7 @@ import { getMap } from './maps/index.js';
 import { getMode } from './modes.js';
 import { NetChar } from './netChar.js';
 import { getTransport, makeRoomCode, cleanRoomCode } from './transport.js';
+import { BUILD, BUILD_TIME, OLD_CLIENT_MSG, OLD_HOST_MSG } from './version.js';
 
 const SNAP_INTERVAL = 1 / 20;
 const SEND_INTERVAL = 1 / 30;
@@ -63,6 +64,8 @@ export class Net {
     this.lastHeard = 0; // client: when the host last spoke
     this.checkT = 0;
     this.pingT = 0;
+    this.version = BUILD; // must match exactly to share a room
+    this.versionTime = BUILD_TIME;
   }
 
   get active() { return this.role !== null; }
@@ -105,8 +108,25 @@ export class Net {
           reject(new Error('That room is full.'));
           return;
         }
+        if (m.t === 'version') {
+          // the host turned us away: we're on different builds
+          clearTimeout(timer);
+          conn.onClose = null;
+          conn.close();
+          const hostNewer = typeof m.vt === 'string' && m.vt > this.versionTime;
+          reject(new Error(hostNewer ? OLD_CLIENT_MSG : OLD_HOST_MSG));
+          return;
+        }
         if (m.t !== 'welcome') return;
         clearTimeout(timer);
+        if (m.v !== this.version) {
+          // a host from before version checks existed, or a mismatched one
+          conn.onClose = null;
+          conn.close();
+          const hostNewer = typeof m.vt === 'string' && m.vt > this.versionTime;
+          reject(new Error(hostNewer ? OLD_CLIENT_MSG : OLD_HOST_MSG));
+          return;
+        }
         this.role = 'client';
         this.conn = conn;
         this.code = code;
@@ -117,7 +137,7 @@ export class Net {
         this._begin(m);
         resolve();
       };
-      conn.send({ t: 'hello', name: cleanName(name) });
+      conn.send({ t: 'hello', name: cleanName(name), v: this.version, vt: this.versionTime });
     });
   }
 
@@ -196,6 +216,16 @@ export class Net {
       if (char) { this._hostMsg(char, m); return; }
       if (m.t !== 'hello') return;
       clearTimeout(timer);
+      if (m.v !== this.version) {
+        // different build: tell them which side needs to refresh, then hang up
+        conn.send({ t: 'version', v: this.version, vt: this.versionTime });
+        setTimeout(() => conn.close(), 600);
+        const theyOlder = !(typeof m.vt === 'string' && m.vt > this.versionTime);
+        this.hooks.onChat('', 0, theyOlder
+          ? 'Someone tried to join on an older version of the game. They need to refresh their page.'
+          : 'Someone tried to join on a newer version of the game. Refresh your page and host a new room.');
+        return;
+      }
       char = this._admit(conn, m);
     };
     conn.onClose = () => {
@@ -232,7 +262,7 @@ export class Net {
     // Last One Standing: a round in progress can't be joined, so watch until the next one
     const spectate = !!g.rules.lives;
     if (spectate) c.lives = 0;
-    conn.send({ t: 'welcome', you: c.id, map: g.map.id, mode: g.rules.id, mt: r2(g.matchTime), over: g.over, r: this._roster(), ts: g.teamScore });
+    conn.send({ t: 'welcome', v: this.version, vt: this.versionTime, you: c.id, map: g.map.id, mode: g.rules.id, mt: r2(g.matchTime), over: g.over, r: this._roster(), ts: g.teamScore });
     if (!g.over && !spectate) g.respawn(c, true);
     this.broadcast({ t: 'roster', r: this._roster() }, conn);
     this.system(spectate ? `${name} joined — they'll play from the next round` : `${name} joined`);
