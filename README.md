@@ -96,7 +96,7 @@ sounds depends on the voices your browser and OS provide.
 | Right click           | aim down sights / scope                       |
 | `Space`               | jump                                          |
 | `Shift`               | sprint (firing or aiming pauses it)           |
-| `C` or `Ctrl`         | crouch — press it **while sprinting to slide** |
+| `C` or `Ctrl`         | crouch — press it **while sprinting to slide**, again to cancel the slide |
 | `Q` / `E`             | lean left / right (tap to toggle; hold if **Toggle lean** is off) |
 | `F`                   | throw a grenade                               |
 | `V`                   | knife                                         |
@@ -117,7 +117,8 @@ before the tab closes mid-match).
 Leaning moves your head (and your shots) out sideways, so you can peek and shoot
 around a corner while most of your body stays behind it. It won't push you into
 a wall, and you can't lean while sprinting or sliding. A slide keeps your sprint
-momentum for about a second with a low profile; jumping cancels it.
+momentum for about a second with a low profile; jumping or pressing crouch
+again cancels it.
 
 Sensitivity, field of view, volume, graphics quality, announcer voice, kill cam,
 invert-Y, key bindings, mode, map, bots, difficulty, loadout, your multiplayer

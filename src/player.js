@@ -105,7 +105,9 @@ export class Player extends Character {
 
     // ---- slide: crouch while sprinting
     this.slideCd -= dt;
+    let slideStarted = false;
     if (!this.sliding && crouchHit && this.onGround && this.slideCd <= 0 && speedNow > CFG.walkSpeed + 0.8) {
+      slideStarted = true;
       this.sliding = true;
       this.slideT = SLIDE_TIME;
       this.slideSpeed = Math.max(speedNow, CFG.sprintSpeed) * 1.22;
@@ -123,8 +125,9 @@ export class Player extends Character {
         this.vel.x = this.slideX * this.slideSpeed;
         this.vel.z = this.slideZ * this.slideSpeed;
       }
-      // ends when it runs out of time or speed, hits something, or you jump out of it
-      if (this.slideT <= 0 || this.slideSpeed < CFG.crouchSpeed + 0.4 || this.hitWall || input.actHit('jump')) {
+      // ends when it runs out, hits something, or you jump or press crouch again
+      const cancel = (crouchHit && !slideStarted) || input.actHit('jump');
+      if (this.slideT <= 0 || this.slideSpeed < CFG.crouchSpeed + 0.4 || this.hitWall || cancel) {
         this.sliding = false;
         this.slideCd = 0.45;
       }
