@@ -351,6 +351,19 @@ h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .play-row #btn-train { flex: 1; font-size: 14px; }
 .acct-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 .acct-row .small-btn { margin: 0; }
+.acct-btns { display: flex; gap: 6px; }
+.acct-row .acct-line { white-space: nowrap; }
+#career .panel { width: min(620px, 100%); }
+.career-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; }
+@media (max-width: 560px) { .career-grid { grid-template-columns: repeat(2, 1fr); } }
+.cstat { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+.cstat b { display: block; font: 700 20px var(--mono); color: var(--ink); }
+.cstat span { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.cstat small { display: block; font-size: 11px; color: var(--dim); }
+.career-weapons td, .career-weapons th { padding: 4px 8px; font-size: 13px; }
+.career-weapons .bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); overflow: hidden; min-width: 120px; }
+.career-weapons .bar i { display: block; height: 100%; background: var(--accent); }
+.career-weapons .done { color: #5dff9a; font-size: 11px; }
 .acct-line { margin: 0; font-size: 13px; color: var(--dim); }
 .acct-id { font-family: var(--mono); color: var(--ink); letter-spacing: 0.06em; margin-left: 4px; user-select: all; }
 #account .panel { width: min(560px, 100%); }

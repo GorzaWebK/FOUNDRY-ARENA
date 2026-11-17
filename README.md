@@ -134,6 +134,15 @@ again cancels it.
 Sensitivity, field of view, volume, graphics quality, announcer voice, kill cam,
 invert-Y, crosshair, key bindings, mode, map, bots, difficulty, loadout, your
 multiplayer name and your training-range best are saved to `localStorage`.
+### Career stats
+
+**Career** (next to your player ID on the main menu) shows your totals across
+every match you play, solo or multiplayer: matches, wins and win rate, kills,
+deaths, K/D, accuracy, headshots, best streak, longest kill, knife and grenade
+kills, time played, and kills with each weapon. The training range and the menu
+background don't count, and a match only counts once you've played 20 seconds
+of it. Career stats are part of your account, so they move with your account code.
+
 ### Your account
 
 Every player gets a random, unique **player ID** (like `FA-7K3M-Q9XD`), shown at

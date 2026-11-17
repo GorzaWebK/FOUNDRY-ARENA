@@ -5,7 +5,7 @@ import { MAPS, getMap } from './maps/index.js';
 import { MODES, getMode } from './modes.js';
 import RANGE_MAP from './maps/range.js';
 import { TRAINING } from './training.js';
-import { WEAPON_BY_ID, PRIMARIES, TACTICALS, TACTICAL_BY_ID } from './weapons.js';
+import { WEAPON_BY_ID, PRIMARIES, TACTICALS, TACTICAL_BY_ID, WEAPONS as WEAPON_LIST } from './weapons.js';
 import { loadSettings, saveSettings, buildSettingsUI } from './settings.js';
 import { AudioSys } from './audio.js';
 import { Hud } from './hud.js';
@@ -544,6 +544,64 @@ function openAccount() {
 }
 function closeAccount() { $('account').classList.add('hidden'); }
 
+// ---------------------------------------------------------------- career
+const SKIN_KILLS = 50; // kills with a gun to unlock its skins
+const fmtTime = (s) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m`; };
+function renderCareer() {
+  const c = game.career.stats;
+  const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) + '%' : '—');
+  const gunKills = c.kills - c.knives - c.nades;
+  const cells = [
+    ['Matches', c.matches, ''], ['Wins', c.wins, pct(c.wins, c.matches) + ' win rate'],
+    ['Kills', c.kills, ''], ['Deaths', c.deaths, ''],
+    ['K/D', c.deaths ? (c.kills / c.deaths).toFixed(2) : c.kills ? c.kills.toFixed(2) : '—', ''],
+    ['Accuracy', pct(c.hits, c.shots), `${c.hits} / ${c.shots} shots`],
+    ['Headshots', c.heads, pct(c.heads, gunKills) + ' of gun kills'],
+    ['Best streak', c.bestStreak, ''],
+    ['Longest kill', c.longest ? c.longest + ' m' : '—', ''],
+    ['Knife kills', c.knives, ''], ['Grenade kills', c.nades, ''],
+    ['Time played', fmtTime(c.time), ''],
+  ];
+  const grid = $('career-grid');
+  grid.textContent = '';
+  for (const [label, value, sub] of cells) {
+    const d = document.createElement('div');
+    d.className = 'cstat';
+    const b = document.createElement('b'); b.textContent = value;
+    const s = document.createElement('span'); s.textContent = label;
+    d.append(b, s);
+    if (sub) { const sm = document.createElement('small'); sm.textContent = sub; d.append(sm); }
+    grid.append(d);
+  }
+  const body = $('career-weapons');
+  body.textContent = '';
+  const rows = [...WEAPON_LIST.map((w) => [w.id, w.name, true]), ['knife', 'Knife', false], ['grenade', 'Grenade', false]];
+  for (const [id, name, gun] of rows) {
+    const n = c.weapons[id] || 0;
+    const tr = document.createElement('tr');
+    const a = document.createElement('td'); a.className = 'l'; a.textContent = name;
+    const b = document.createElement('td'); b.textContent = n;
+    const p = document.createElement('td'); p.className = 'l';
+    if (gun) {
+      if (n >= SKIN_KILLS) { p.innerHTML = '<span class="done">Skins unlocked</span>'; }
+      else {
+        p.title = `${SKIN_KILLS - n} more kills to unlock its skins`;
+        p.innerHTML = `<div class="bar"><i style="width:${Math.round((n / SKIN_KILLS) * 100)}%"></i></div>`;
+      }
+    }
+    tr.append(a, b, p);
+    body.append(tr);
+  }
+  $('career-id').textContent = account.id;
+}
+$('btn-career').addEventListener('click', () => { renderCareer(); $('career').classList.remove('hidden'); });
+$('btn-career-done').addEventListener('click', () => $('career').classList.add('hidden'));
+$('btn-career-reset').addEventListener('click', () => {
+  if (!window.confirm('Reset all your career stats to zero? This also re-locks weapon skins. It can\'t be undone (unless you have an account code from before).')) return;
+  game.career.reset();
+  renderCareer();
+});
+
 $('btn-account').addEventListener('click', openAccount);
 $('btn-acct-done').addEventListener('click', closeAccount);
 $('btn-acct-copy').addEventListener('click', async () => {
@@ -576,6 +634,7 @@ async function doImport(text) {
     ? `Restore account ${obj.id} from this code (saved ${String(obj.saved || '').slice(0, 10)})? What's saved here now will be replaced.`
     : `Switch this browser to account ${obj.id}? Account ${account.id} here will be replaced. Back it up first if you want to keep it.`;
   if (!window.confirm(msg)) return;
+  game.career.frozen = true; // don't let this page save over the imported stats
   importAccount(obj);
   acctStatus(`Imported ${obj.id}. Reloading…`, 'ok');
   setTimeout(() => location.reload(), 400);
@@ -632,6 +691,10 @@ window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') closeAccount();
     return;
   }
+  if (!$('career').classList.contains('hidden')) {
+    if (e.code === 'Escape') $('career').classList.add('hidden');
+    return;
+  }
   const binds = settings.binds;
   if (binds.chat.includes(e.code) && state === 'playing' && net.active) {
     e.preventDefault();
@@ -655,11 +718,16 @@ window.addEventListener('resize', () => game.resize());
 window.addEventListener('beforeunload', (e) => {
   if (state === 'playing' || state === 'paused') { e.preventDefault(); e.returnValue = ''; }
 });
-window.addEventListener('pagehide', () => net.leave(false));
+window.addEventListener('pagehide', () => { net.leave(false); game.career.flush(); });
 
 game.onMatchEnd = () => {
   const res = game.rules.result(game);
   const won = res.won;
+  // career: count the match if you actually played some of it
+  if (game.forCareer && game.matchPlayT >= 20 && !game.careerCounted) {
+    game.careerCounted = true;
+    game.career.match(game.rules.id, won);
+  }
   $('end-title').textContent = res.draw ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT';
   $('end-title').style.color = res.draw ? '#ffd24d' : won ? '#5dff9a' : '#ff6b6b';
   $('end-sub').textContent = `${game.rules.name}: ${res.sub}`;
@@ -766,6 +834,7 @@ function tick(dt, render) {
   if (state === 'playing') {
     hud.setScoreboard(input.act('scoreboard'), game);
     game.update(dt);
+    if (game.forCareer && !game.over) { game.matchPlayT += dt; game.career.tick(dt); }
   } else if (state === 'menu' || state === 'ended' || (state === 'paused' && net.active)) {
     game.update(dt);
   }

@@ -125,7 +125,7 @@
             <ul class="keys" id="keys-list"></ul>
             <button id="btn-controls" class="small-btn">Change controls…</button>
             <p class="note">Tip: avoid <kbd>Ctrl</kbd> combos — browsers reserve <kbd>Ctrl</kbd>+<kbd>W</kbd> for closing the tab.</p>
-            <div class="acct-row"><span class="acct-line">Player ID <b id="acct-id-menu" class="acct-id">—</b></span><button id="btn-account" class="small-btn">Account…</button></div>
+            <div class="acct-row"><span class="acct-line" title="Your player ID">ID <b id="acct-id-menu" class="acct-id">—</b></span><span class="acct-btns"><button id="btn-career" class="small-btn">Career</button><button id="btn-account" class="small-btn">Account…</button></span></div>
           </div>
         </div>
         <div class="play-row">
@@ -195,13 +195,30 @@
       </div>
     </div>
 
+    <!-- ============================== CAREER ============================== -->
+    <div id="career" class="overlay hidden">
+      <div class="panel">
+        <h2>CAREER</h2>
+        <p class="acct-line">Player ID <b id="career-id" class="acct-id">—</b></p>
+        <div id="career-grid" class="career-grid"></div>
+        <h4>Kills by weapon</h4>
+        <table class="career-weapons"><thead><tr><th class="l">Weapon</th><th>Kills</th><th class="l prog-h">Skins (at 50 kills)</th></tr></thead><tbody id="career-weapons"></tbody></table>
+        <p class="note">Counts every match you play, solo or multiplayer (not the training range). It's part of your account, so
+          it comes with you when you import your account code.</p>
+        <div class="btn-row">
+          <button id="btn-career-reset">Reset career…</button>
+          <button id="btn-career-done" class="primary">DONE</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ============================== ACCOUNT ============================== -->
     <div id="account" class="overlay hidden">
       <div class="panel">
         <h2>ACCOUNT</h2>
         <p class="acct-line">Your player ID <b id="acct-id" class="acct-id">—</b> <small id="acct-since"></small></p>
         <p class="note">Your account is everything this browser has saved: your name, settings, crosshair, loadout,
-          key bindings and training-range best. There's no sign-up. Back it up as an account code and paste it into
+          key bindings, career stats and training-range best. There's no sign-up. Back it up as an account code and paste it into
           any browser to carry on there.</p>
         <h4>Back up</h4>
         <div class="btn-row">
