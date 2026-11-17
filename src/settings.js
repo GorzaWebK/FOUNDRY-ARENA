@@ -23,6 +23,7 @@ export const DEFAULTS = {
   mode: DEFAULT_MODE,
   announcer: true, // spoken killstreak call-outs
   killcam: true,
+  leanToggle: true, // tap Q / E to lean instead of holding
   binds: defaultBinds(), // action -> [key, key]
 };
 
@@ -68,6 +69,7 @@ export function buildSettingsUI(container, settings, onChange) {
     { key: 'quality', label: 'Graphics', options: [['high', 'High'], ['low', 'Low (faster)']] },
     { key: 'announcer', label: 'Announcer voice', check: true },
     { key: 'killcam', label: 'Kill cam', check: true },
+    { key: 'leanToggle', label: 'Toggle lean', check: true },
     { key: 'invertY', label: 'Invert Y', check: true },
     { key: 'showFps', label: 'Show FPS', check: true },
   ];

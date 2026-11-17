@@ -97,7 +97,7 @@ sounds depends on the voices your browser and OS provide.
 | `Space`               | jump                                          |
 | `Shift`               | sprint (firing or aiming pauses it)           |
 | `C` or `Ctrl`         | crouch — press it **while sprinting to slide** |
-| `Q` / `E`             | lean left / right                             |
+| `Q` / `E`             | lean left / right (tap to toggle; hold if **Toggle lean** is off) |
 | `F`                   | throw a grenade                               |
 | `V`                   | knife                                         |
 | `T`                   | inspect your weapon                           |

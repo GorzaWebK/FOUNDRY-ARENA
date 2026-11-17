@@ -31,6 +31,7 @@ export class Player extends Character {
     this.deathT = 0;
     this.killer = null;
     this.roll = 0;
+    this.leanLatch = 0; // toggle-lean state: -1 left, 0 none, 1 right
   }
 
   spawnAt(x, y, z, yaw) {
@@ -49,6 +50,7 @@ export class Player extends Character {
     this.shake = 0;
     this.sliding = false;
     this.slideT = 0; this.slideCd = 0;
+    this.leanLatch = 0;
   }
 
   aimDir(out) {
@@ -150,7 +152,16 @@ export class Player extends Character {
     this.eyeH += (eyeTarget - this.eyeH) * Math.min(1, dt * 12);
 
     // ---- lean (Q / E): shifts the head sideways, not through walls
-    const leanIn = (input.act('leanRight') ? 1 : 0) - (input.act('leanLeft') ? 1 : 0);
+    let leanIn;
+    if (g.settings.leanToggle) {
+      // tap to lean, tap the same key again to stand straight, tap the other key to switch sides
+      if (input.actHit('leanLeft')) this.leanLatch = this.leanLatch === -1 ? 0 : -1;
+      if (input.actHit('leanRight')) this.leanLatch = this.leanLatch === 1 ? 0 : 1;
+      if (this.sprinting || this.sliding) this.leanLatch = 0;
+      leanIn = this.leanLatch;
+    } else {
+      leanIn = (input.act('leanRight') ? 1 : 0) - (input.act('leanLeft') ? 1 : 0);
+    }
     const wantLean = this.sprinting || this.sliding ? 0 : leanIn;
     this.lean += (wantLean - this.lean) * Math.min(1, dt * 11);
     if (Math.abs(this.lean) < 0.002) this.lean = 0;
