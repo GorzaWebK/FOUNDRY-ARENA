@@ -150,7 +150,7 @@ export const MODES = [
 
   {
     id: 'gungame', name: 'Gun Game', gunGame: true,
-    desc: () => `A new gun every ${KILLS_PER_GUN} kills, all the way down to the Hammer. One pistol kill wins.`,
+    desc: () => `A new gun every ${KILLS_PER_GUN} kills, all the way down to the pistol. One pistol kill wins.`,
     rank: (chars) => [...chars].sort(byKills),
     won: (game) => game.chars.some((c) => c.kills >= GUN_WIN),
     hud(game) {
@@ -194,7 +194,7 @@ export const MODES = [
 
   killLimitMode({
     id: 'snipers', name: 'Snipers Only', scoreLimit: 15, forcePrimary: 'sniper',
-    desc: (r) => `Spires and Hammers only. First to ${r.scoreLimit} kills.`,
+    desc: (r) => `Sniper rifles and pistols only. First to ${r.scoreLimit} kills.`,
   }),
 ];
 

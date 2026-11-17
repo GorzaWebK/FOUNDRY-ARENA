@@ -4,9 +4,7 @@
 
 An arena shooter with its own look: tempered steel and safety orange, stencil
 type, a crew of bots named for the shop floor (Slag, Rivet, Cinder, Anvil, Flux…)
-and two teams, **Cobalt** and **Furnace**. Every gun has a name: the **Kestrel**
-rifle, **Wasp** SMG, **Breaker** shotgun, **Spire** sniper, **Ironside** LMG and
-the **Hammer** pistol everyone carries.
+and two teams, **Cobalt** and **Furnace**.
 
 A complete browser first-person shooter: you, your friends and AI bots in a
 free-for-all deathmatch. Play solo, or host a room and share the code.
@@ -225,12 +223,12 @@ still spread apart to show your current accuracy.
 
 | Weapon        | Mag / reserve | Damage  | Notes                                               |
 | ------------- | ------------- | ------- | --------------------------------------------------- |
-| Kestrel (assault rifle) | 30 / 90 | 15      | full auto all-rounder; spread blooms as you hold fire |
-| Wasp (SMG)    | 32 / 128      | 12      | fastest fire rate, accurate on the move, weak at range |
-| Breaker (shotgun) | 6 / 24    | 8 × 10  | wide spread, falls off quickly with distance         |
-| Spire (sniper rifle) | 3 / 21 | 80      | bolt action; scoped shots are pinpoint, hip fire is not |
-| Ironside (LMG) | 60 / 120     | 17      | huge belt, heavy: slower movement, long reload       |
-| Hammer (pistol) | 12 / ∞      | 25      | everyone's sidearm                                   |
+| Assault rifle | 30 / 90       | 15      | full auto all-rounder; spread blooms as you hold fire |
+| SMG           | 32 / 128      | 12      | fastest fire rate, accurate on the move, weak at range |
+| Shotgun       | 6 / 24        | 8 × 10  | wide spread, falls off quickly with distance         |
+| Sniper rifle  | 3 / 21        | 80      | bolt action; scoped shots are pinpoint, hip fire is not |
+| LMG           | 60 / 120      | 17      | huge belt, heavy: slower movement, long reload       |
+| Pistol        | 12 / ∞        | 25      | everyone's sidearm                                   |
 | Grenade       | 2 (max 3)     | up to 130 | 2.3 s fuse, bounces, 7.5 m blast; walls block it; hurts you too |
 | Flashbang     | 2             | —       | 1.6 s fuse; whites out the game view (your HUD stays visible on top) and muffles sound for up to 3.6 s for anyone who can see it (much less if they're facing away). Bots lose track of you while blinded |
 | Smoke         | 2             | —       | 1.2 s fuse; a 4.6 m cloud for 15 s that nobody (bots included) can see through. Bullets still go through it |

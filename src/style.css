@@ -620,7 +620,6 @@ kbd { font-family: var(--cond); font-size: 14px; font-weight: 600; background: v
 
 #ammo { right: 26px; bottom: 22px; }
 #ammo-name { font-family: var(--cond); font-size: 22px; font-weight: 800; letter-spacing: 0.12em; color: var(--ink); text-transform: uppercase; }
-#ammo-cls { font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); margin-top: -2px; }
 #ammo-count { font-family: var(--cond); }
 #ammo-mag { font-size: 64px; font-weight: 700; }
 #ammo-mag.low { color: var(--accent); }

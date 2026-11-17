@@ -4,7 +4,7 @@
 
 const DEFS = [
   {
-    id: 'pistol', name: 'Hammer', cls: 'Pistol', blurb: 'Twelve in the mag. Never runs dry.',
+    id: 'pistol', name: 'Pistol', blurb: 'Twelve in the mag. Never runs dry.',
     damage: 25, pellets: 1,
     magSize: 12, reserveStart: Infinity, reserveMax: Infinity, ammoBox: 0,
     auto: false, interval: 0.15, reload: 1.3,
@@ -15,7 +15,7 @@ const DEFS = [
     noise: 38, botRange: 12, botMaxRange: 45,
   },
   {
-    id: 'rifle', name: 'Kestrel', cls: 'Assault rifle', blurb: 'Full auto. Holds steady at range.',
+    id: 'rifle', name: 'Assault Rifle', blurb: 'Full auto. Holds steady at range.',
     damage: 15, pellets: 1,
     magSize: 30, reserveStart: 90, reserveMax: 180, ammoBox: 30,
     auto: true, interval: 0.095, reload: 2.0,
@@ -26,7 +26,7 @@ const DEFS = [
     noise: 45, botRange: 16, botMaxRange: 60,
   },
   {
-    id: 'smg', name: 'Wasp', cls: 'SMG', blurb: 'Fastest trigger here. Quits past twenty metres.',
+    id: 'smg', name: 'SMG', blurb: 'Fastest trigger here. Quits past twenty metres.',
     damage: 12, pellets: 1,
     magSize: 32, reserveStart: 128, reserveMax: 224, ammoBox: 32,
     auto: true, interval: 0.066, reload: 1.6,
@@ -37,7 +37,7 @@ const DEFS = [
     noise: 40, botRange: 9, botMaxRange: 30,
   },
   {
-    id: 'shotgun', name: 'Breaker', cls: 'Shotgun', blurb: 'Eight pellets. Built for doorways.',
+    id: 'shotgun', name: 'Shotgun', blurb: 'Eight pellets. Built for doorways.',
     damage: 10, pellets: 8,
     magSize: 6, reserveStart: 24, reserveMax: 42, ammoBox: 6,
     auto: false, interval: 0.8, reload: 2.3,
@@ -48,7 +48,7 @@ const DEFS = [
     noise: 50, botRange: 5, botMaxRange: 18,
   },
   {
-    id: 'sniper', name: 'Spire', cls: 'Sniper rifle', blurb: 'Bolt action. One clean headshot.',
+    id: 'sniper', name: 'Sniper Rifle', blurb: 'Bolt action. One clean headshot.',
     damage: 80, pellets: 1,
     magSize: 3, reserveStart: 21, reserveMax: 36, ammoBox: 6,
     auto: false, interval: 1.15, reload: 2.4,
@@ -59,7 +59,7 @@ const DEFS = [
     noise: 60, botRange: 34, botMaxRange: 90,
   },
   {
-    id: 'lmg', name: 'Ironside', cls: 'LMG', blurb: 'Sixty-round belt. Slow to move, slow to stop.',
+    id: 'lmg', name: 'LMG', blurb: 'Sixty-round belt. Slow to move, slow to stop.',
     damage: 17, pellets: 1,
     magSize: 60, reserveStart: 120, reserveMax: 180, ammoBox: 30,
     auto: true, interval: 0.105, reload: 3.6,

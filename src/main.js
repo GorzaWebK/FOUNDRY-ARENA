@@ -448,7 +448,7 @@ function pause() {
   $('copy-note').textContent = '';
   const r = game.rules;
   $('loadout-note').textContent = r.gunGame ? 'Gun Game hands out the guns. Your pick waits for the next mode.'
-    : r.forcePrimary ? 'Snipers Only: everyone carries a Spire.' : '';
+    : r.forcePrimary ? 'Snipers Only: everyone carries a sniper rifle.' : '';
   syncMatchPickers();
   setState('paused');
 }

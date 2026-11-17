@@ -94,7 +94,7 @@ export class Hud {
     this._set('mag', w.mag, (v) => { e.mag.textContent = v; });
     this._set('magLow', w.mag <= w.def.magSize * 0.25, (v) => e.mag.classList.toggle('low', v));
     this._set('res', w.reserve, (v) => { e.res.textContent = v === Infinity ? '∞' : v; });
-    this._set('wname', w.def.name, (v) => { e.wname.textContent = v; $('ammo-cls').textContent = w.def.cls || ''; });
+    this._set('wname', w.def.name, (v) => { e.wname.textContent = v; });
     const rl = w.reloadT > 0 ? 'RELOADING' : w.mag === 0 ? (w.reserve > 0 ? `PRESS ${this.reloadKey} TO RELOAD` : 'NO AMMO') : '';
     this._set('rl', rl, (v) => { e.reload.textContent = v; });
     this._set('slot', p.weaponIdx, (v) => this.slots.forEach((s, i) => s.classList.toggle('on', i === v)));
