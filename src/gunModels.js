@@ -96,6 +96,12 @@ function kit(mats) {
     cone: (p, r0, r1, len, mat, x, y, z) => add(p, cylGeo(r0, r1, len), mat, x, y, z),
     ball: (p, r, mat, x, y, z) => add(p, sphereGeo(r), mat, x, y, z),
     group: (p, x = 0, y = 0, z = 0) => { const g = new THREE.Group(); g.position.set(x, y, z); p.add(g); return g; },
+    /** trigger guard: a loop from the frame (yTop) down and back to the grip */
+    guard(p, zFront, zBack, yTop, yBottom, w = 0.008) {
+      const len = zBack - zFront, h = yTop - yBottom;
+      this.box(p, w, 0.008, len, 'metal', 0, yBottom + 0.004, (zFront + zBack) / 2); // bottom bar
+      this.box(p, w, h, 0.008, 'metal', 0, yBottom + h / 2, zFront + 0.004); // front, up into the frame
+    },
     /** picatinny rail: a strip with teeth */
     rail(p, len, x, y, z, w = 0.022) {
       this.box(p, w, 0.008, len, 'metal', x, y, z);
@@ -122,7 +128,7 @@ function pistol(mats) {
   k.cyl(g, 0.007, 0.02, 'metal', 0, 0.022, -0.125);
   k.box(g, 0.032, 0.11, 0.05, 'polymer', 0, -0.075, 0.055, 0.2); // grip
   k.box(g, 0.034, 0.07, 0.035, 'polymerLight', 0, -0.07, 0.057, 0.2); // grip panels
-  k.box(g, 0.008, 0.035, 0.05, 'polymer', 0, -0.042, -0.002); // trigger guard
+  k.guard(g, -0.03, 0.04, -0.02, -0.05); // trigger guard
   k.box(g, 0.006, 0.02, 0.006, 'metal', 0, -0.03, 0.006, 0.3); // trigger
   const mag = k.group(g, 0, -0.08, 0.058);
   mag.rotation.x = 0.2;
@@ -158,14 +164,14 @@ function rifle(mats) {
   const charge = k.box(g, 0.03, 0.012, 0.02, 'metal', 0, 0.045, 0.14); // charging handle
   k.box(g, 0.014, 0.022, 0.03, 'metal', 0.03, 0.02, -0.02); // ejection port cover
   k.box(g, 0.03, 0.09, 0.045, 'polymer', 0, -0.085, 0.1, -0.3); // grip
-  k.box(g, 0.008, 0.012, 0.075, 'metal', 0, -0.06, 0.035); // trigger guard
-  k.cyl(g, 0.015, 0.12, 'metal', 0, -0.002, 0.18); // buffer tube
-  k.box(g, 0.042, 0.075, 0.16, 'polymer', 0, -0.012, 0.31);
+  k.guard(g, 0.0, 0.085, -0.05, -0.078); // trigger guard
+  k.cyl(g, 0.019, 0.14, 'metal', 0, -0.002, 0.17); // buffer tube
+  k.box(g, 0.026, 0.03, 0.08, 'polymer', 0, -0.03, 0.2, -0.25); // stock web, tube to butt
+  k.box(g, 0.042, 0.075, 0.18, 'polymer', 0, -0.012, 0.3);
   k.box(g, 0.044, 0.085, 0.02, 'polymerLight', 0, -0.014, 0.395);
   const mag = k.group(g, 0, -0.05, -0.06);
-  k.box(mag, 0.03, 0.08, 0.06, 'metal', 0, -0.035, 0, 0.1);
-  k.box(mag, 0.03, 0.07, 0.058, 'metal', 0, -0.1, 0.012, 0.28);
-  k.box(mag, 0.034, 0.012, 0.062, 'polymer', 0, -0.14, 0.024, 0.28);
+  k.box(mag, 0.03, 0.14, 0.06, 'metal', 0, -0.06, 0.008, 0.16); // one straight, slightly raked mag
+  k.box(mag, 0.034, 0.012, 0.064, 'polymer', 0, -0.13, 0.019, 0.16); // floor plate
   return {
     group: g, parts: { mag, charge }, casing: 'brass',
     points: {
@@ -187,11 +193,13 @@ function smg(mats) {
   k.box(g, 0.005, 0.024, 0.008, 'metal', 0, 0.062, -0.14); // front post
   k.box(g, 0.022, 0.018, 0.02, 'metal', 0, 0.058, 0.06); // rear sight
   k.box(g, 0.03, 0.085, 0.04, 'polymer', 0, -0.075, 0.07, -0.25); // grip
-  k.box(g, 0.026, 0.05, 0.03, 'polymer', 0, -0.055, -0.19, 0.1); // fore grip
-  k.box(g, 0.008, 0.012, 0.06, 'metal', 0, -0.05, 0.02); // trigger guard
-  k.box(g, 0.012, 0.012, 0.16, 'metal', -0.016, 0.0, 0.19); // folding stock rods
-  k.box(g, 0.012, 0.012, 0.16, 'metal', 0.016, 0.0, 0.19);
-  k.box(g, 0.044, 0.07, 0.02, 'polymer', 0, -0.01, 0.275);
+  k.box(g, 0.026, 0.055, 0.032, 'polymer', 0, -0.04, -0.19, 0.1); // fore grip, straight off the shroud
+  k.guard(g, -0.01, 0.06, -0.037, -0.062); // trigger guard
+  // folding stock: hinge block, a solid strut and a cheek bar, butt plate
+  k.box(g, 0.04, 0.05, 0.03, 'metal', 0, -0.005, 0.12);
+  k.box(g, 0.034, 0.018, 0.16, 'metal', 0, 0.012, 0.19); // top bar
+  k.box(g, 0.03, 0.016, 0.17, 'metal', 0, -0.03, 0.19, 0.12); // lower strut
+  k.box(g, 0.044, 0.075, 0.022, 'polymer', 0, -0.012, 0.275);
   k.box(g, 0.012, 0.02, 0.028, 'metal', 0.028, 0.02, -0.03); // ejection port
   const mag = k.group(g, 0, -0.05, -0.07);
   k.box(mag, 0.026, 0.16, 0.04, 'metal', 0, -0.06, 0, 0.06);
@@ -217,10 +225,11 @@ function shotgun(mats) {
   const pump = k.group(g, 0, -0.018, -0.3);
   k.box(pump, 0.058, 0.05, 0.16, 'wood', 0, 0, 0);
   for (let i = 0; i < 5; i++) k.box(pump, 0.06, 0.006, 0.012, 'woodDark', 0, -0.004, -0.06 + i * 0.03); // grooves
-  k.box(g, 0.034, 0.07, 0.05, 'wood', 0, -0.06, 0.15, -0.35); // grip
-  k.box(g, 0.042, 0.07, 0.26, 'wood', 0, -0.04, 0.3, -0.12); // stock
-  k.box(g, 0.044, 0.08, 0.02, 'polymer', 0, -0.058, 0.43, -0.12); // butt pad
-  k.box(g, 0.008, 0.012, 0.07, 'metal', 0, -0.05, 0.07); // trigger guard
+  k.box(g, 0.044, 0.07, 0.07, 'wood', 0, -0.02, 0.14); // stock wrist, butted against the receiver
+  k.box(g, 0.036, 0.07, 0.05, 'wood', 0, -0.06, 0.16, -0.35); // grip
+  k.box(g, 0.042, 0.07, 0.28, 'wood', 0, -0.04, 0.29, -0.12); // stock
+  k.box(g, 0.044, 0.08, 0.02, 'polymer', 0, -0.06, 0.43, -0.12); // butt pad
+  k.guard(g, 0.03, 0.12, -0.035, -0.062); // trigger guard
   return {
     group: g, parts: { pump }, casing: 'shell',
     points: {
@@ -232,15 +241,17 @@ function shotgun(mats) {
 
 function sniper(mats) {
   const k = kit(mats), g = new THREE.Group();
-  k.cyl(g, 0.022, 0.24, 'metal', 0, 0.012, 0.0, 12); // action
-  k.box(g, 0.048, 0.05, 0.34, 'olive', 0, -0.016, -0.32); // forend
-  k.box(g, 0.05, 0.08, 0.18, 'olive', 0, -0.022, 0.05);
-  k.box(g, 0.044, 0.085, 0.24, 'olive', 0, -0.04, 0.3); // stock
-  k.box(g, 0.04, 0.03, 0.12, 'tan', 0, 0.025, 0.28); // cheek rest
-  k.box(g, 0.046, 0.09, 0.02, 'polymer', 0, -0.04, 0.43);
-  k.cyl(g, 0.012, 0.56, 'metal', 0, 0.012, -0.56);
-  k.box(g, 0.036, 0.036, 0.07, 'metal', 0, 0.012, -0.86); // muzzle brake
-  for (let i = 0; i < 2; i++) k.box(g, 0.04, 0.03, 0.006, 'polymer', 0, 0.012, -0.87 + i * 0.022);
+  k.cyl(g, 0.022, 0.26, 'metal', 0, 0.012, 0.0, 12); // action
+  // the stock is one piece: forend, body, wrist and butt all overlap
+  k.box(g, 0.048, 0.05, 0.42, 'olive', 0, -0.014, -0.3); // forend
+  k.box(g, 0.05, 0.08, 0.3, 'olive', 0, -0.026, 0.02); // body under the action
+  k.box(g, 0.044, 0.062, 0.12, 'olive', 0, -0.038, 0.2); // wrist
+  k.box(g, 0.044, 0.095, 0.2, 'olive', 0, -0.044, 0.33); // butt
+  k.box(g, 0.04, 0.026, 0.13, 'tan', 0, 0.012, 0.31); // cheek rest, sitting on the butt
+  k.box(g, 0.046, 0.1, 0.02, 'polymer', 0, -0.044, 0.44); // recoil pad
+  k.cone(g, 0.015, 0.011, 0.74, 'metal', 0, 0.012, -0.49); // barrel, from the action to the brake
+  k.box(g, 0.036, 0.036, 0.07, 'metal', 0, 0.012, -0.87); // muzzle brake
+  for (let i = 0; i < 2; i++) k.box(g, 0.04, 0.03, 0.006, 'polymer', 0, 0.012, -0.88 + i * 0.022);
   // scope
   k.cyl(g, 0.018, 0.28, 'polymer', 0, 0.075, -0.02, 14);
   k.cone(g, 0.028, 0.018, 0.08, 'polymer', 0, 0.075, -0.2);
@@ -250,10 +261,12 @@ function sniper(mats) {
   k.box(g, 0.02, 0.016, 0.016, 'metal', 0.024, 0.075, -0.02); // windage turret
   k.box(g, 0.022, 0.034, 0.02, 'metal', 0, 0.048, -0.09); // rings
   k.box(g, 0.022, 0.034, 0.02, 'metal', 0, 0.048, 0.07);
-  k.box(g, 0.008, 0.01, 0.2, 'metal', -0.018, -0.045, -0.45); // folded bipod
-  k.box(g, 0.008, 0.01, 0.2, 'metal', 0.018, -0.045, -0.45);
-  k.box(g, 0.03, 0.08, 0.04, 'polymer', 0, -0.08, 0.13, -0.3); // grip
-  k.box(g, 0.008, 0.012, 0.07, 'metal', 0, -0.065, 0.06);
+  // folded bipod, tucked flat against the underside of the forend
+  k.box(g, 0.03, 0.02, 0.03, 'metal', 0, -0.044, -0.48); // mount
+  k.box(g, 0.008, 0.01, 0.2, 'metal', -0.012, -0.044, -0.37);
+  k.box(g, 0.008, 0.01, 0.2, 'metal', 0.012, -0.044, -0.37);
+  k.box(g, 0.032, 0.085, 0.045, 'olive', 0, -0.085, 0.15, -0.3); // grip, part of the stock
+  k.guard(g, 0.04, 0.13, -0.066, -0.094);
   const bolt = k.group(g, 0.024, 0.012, 0.08);
   k.box(bolt, 0.04, 0.01, 0.01, 'metalLight', 0.02, 0, 0);
   k.ball(bolt, 0.012, 'metalLight', 0.042, 0, 0);
@@ -283,10 +296,12 @@ function lmg(mats) {
   k.box(g, 0.012, 0.035, 0.012, 'metal', 0, 0.075, -0.24); // carry handle legs
   k.box(g, 0.012, 0.035, 0.012, 'metal', 0, 0.075, -0.12);
   k.box(g, 0.012, 0.012, 0.13, 'polymer', 0, 0.096, -0.18);
-  k.box(g, 0.01, 0.01, 0.22, 'metal', -0.02, -0.03, -0.4); // folded bipod
-  k.box(g, 0.01, 0.01, 0.22, 'metal', 0.02, -0.03, -0.4);
+  // folded bipod, clamped to the shroud
+  k.box(g, 0.05, 0.02, 0.03, 'metal', 0, -0.016, -0.47); // clamp
+  k.box(g, 0.01, 0.012, 0.22, 'metal', -0.016, -0.018, -0.35);
+  k.box(g, 0.01, 0.012, 0.22, 'metal', 0.016, -0.018, -0.35);
   k.box(g, 0.03, 0.09, 0.045, 'polymer', 0, -0.085, 0.12, -0.25); // grip
-  k.box(g, 0.008, 0.012, 0.07, 'metal', 0, -0.06, 0.06);
+  k.guard(g, 0.02, 0.105, -0.045, -0.075);
   k.box(g, 0.046, 0.07, 0.24, 'polymer', 0, -0.012, 0.3);
   k.box(g, 0.048, 0.085, 0.02, 'polymerLight', 0, -0.014, 0.425);
   const mag = k.group(g, -0.015, -0.1, -0.05);

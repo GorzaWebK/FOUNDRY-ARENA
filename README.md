@@ -163,7 +163,7 @@ still spread apart to show your current accuracy.
 | Assault rifle | 30 / 90       | 15      | full auto all-rounder; spread blooms as you hold fire |
 | SMG           | 32 / 128      | 12      | fastest fire rate, accurate on the move, weak at range |
 | Shotgun       | 6 / 24        | 8 × 10  | wide spread, falls off quickly with distance         |
-| Sniper rifle  | 2 / 20        | 80      | bolt action; scoped shots are pinpoint, hip fire is not |
+| Sniper rifle  | 3 / 21        | 80      | bolt action; scoped shots are pinpoint, hip fire is not |
 | LMG           | 60 / 120      | 17      | huge belt, heavy: slower movement, long reload       |
 | Pistol        | 12 / ∞        | 25      | everyone's sidearm                                   |
 | Grenade       | 2 (max 3)     | up to 130 | 2.3 s fuse, bounces, 7.5 m blast; walls block it; hurts you too |

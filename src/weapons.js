@@ -50,7 +50,7 @@ const DEFS = [
   {
     id: 'sniper', name: 'Sniper Rifle', blurb: 'Bolt action with a scope. One headshot is enough.',
     damage: 80, pellets: 1,
-    magSize: 2, reserveStart: 20, reserveMax: 36, ammoBox: 6,
+    magSize: 3, reserveStart: 21, reserveMax: 36, ammoBox: 6,
     auto: false, interval: 1.15, reload: 2.4,
     spreadMin: 0.05, spreadMax: 0.06, heatPerShot: 0.5, heatDecay: 1.5,
     adsSpread: 0.012, adsFov: 0.24, moveSpread: 1.6, scope: true,
