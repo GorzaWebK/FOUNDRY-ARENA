@@ -258,7 +258,7 @@ connect to them directly.
    and gives them back when you rejoin. Leaving with **Leave game** gives your
    place up, and when the host closes the room everyone is told rather than
    left retrying.
-6. Everyone has to be on the same version of the game. It's shown under the play
+6. Everyone has to be on the same version of the game. It's shown in the
    main menu's bottom right corner. If someone has an old tab open, joining tells them who
    needs to refresh (`Ctrl+Shift+R`) instead of letting them in.
 
