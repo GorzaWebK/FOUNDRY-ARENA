@@ -4,7 +4,7 @@
 
 An arena shooter with its own look: tempered steel and safety orange, stencil
 type, a crew of bots named for the shop floor (Slag, Rivet, Cinder, Anvil, Flux…)
-and two teams, **Cobalt** and **Furnace**.
+and two teams, **Cobalt** (blue) and **Crimson** (red).
 
 A complete browser first-person shooter: you, your friends and AI bots in a
 free-for-all deathmatch. Play solo, or host a room and share the code.
@@ -50,9 +50,9 @@ The pause menu's **Next match** section changes mode and map between matches.
 | Mode                  | How it works                                                                  |
 | --------------------- | ----------------------------------------------------------------------------- |
 | **Deathmatch**        | free-for-all; first to 20 kills, or most kills after 10 minutes               |
-| **King of the Hill**  | Cobalt vs Furnace over a zone that moves every minute; a team scores a point a second while it holds the zone with no enemies inside. First to 100. A light pillar marks the zone and a HUD marker points to it |
-| **Team Deathmatch**   | Cobalt vs Furnace, no friendly fire; first team to 40 kills. Humans are spread across both teams and bots fill the rest |
-| **Capture the Flag**  | Cobalt vs Furnace, a flag at each base. Touch the enemy flag to take it and carry it to your own base while your flag is at home to score; first to 3 captures. A carrier who dies drops the flag: their team can pick it back up, and yours sends it home with a touch (or it goes home by itself after 20 s). Markers show where both flags are; you spawn on your own side. Bots attack, defend, escort carriers and hunt anyone who has their flag |
+| **King of the Hill**  | Cobalt vs Crimson over a zone that moves every minute; a team scores a point a second while it holds the zone with no enemies inside. First to 100. A light pillar marks the zone and a HUD marker points to it |
+| **Team Deathmatch**   | Cobalt vs Crimson, no friendly fire; first team to 40 kills. Humans are spread across both teams and bots fill the rest |
+| **Capture the Flag**  | Cobalt vs Crimson, a flag at each base. Touch the enemy flag to take it and carry it to your own base while your flag is at home to score; first to 3 captures. A carrier who dies drops the flag: their team can pick it back up, and yours sends it home with a touch (or it goes home by itself after 20 s). Markers show where both flags are; you spawn on your own side. Bots attack, defend, escort carriers and hunt anyone who has their flag |
 | **Gun Game**          | every 2 kills hand you the next gun: LMG → rifle → SMG → shotgun → sniper → pistol. One pistol kill wins. Unlimited reserve ammo |
 | **Last One Standing** | 5 lives each, no respawns after that; the last player alive wins. Once you're out you spectate the survivors over their shoulder (fire / aim to cycle, jump for the overhead view); players joining mid-round watch until the next one |
 | **Snipers Only**      | free-for-all with sniper rifles and pistols; first to 15 kills                |

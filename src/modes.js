@@ -22,9 +22,9 @@
 import { WEAPON_BY_ID } from './weapons.js';
 import { CFG } from './config.js';
 
-// the two crews: cobalt blue and furnace orange-red
-export const TEAM_COLORS = [0x3f7fd0, 0xe2552a];
-export const TEAM_NAMES = ['Cobalt', 'Furnace'];
+// the two crews: Cobalt (blue) and Crimson (red)
+export const TEAM_COLORS = [0x3f7fd0, 0xc9343c];
+export const TEAM_NAMES = ['Cobalt', 'Crimson'];
 export const GUN_LADDER = ['lmg', 'rifle', 'smg', 'shotgun', 'sniper', 'pistol'];
 export const KILLS_PER_GUN = 2;
 const GUN_WIN = (GUN_LADDER.length - 1) * KILLS_PER_GUN + 1; // one kill with the last gun wins
@@ -77,7 +77,7 @@ export const MODES = [
 
   {
     id: 'tdm', name: 'Team Deathmatch', scoreLimit: 40, teams: true,
-    desc: (r) => `Cobalt against Furnace. First crew to ${r.scoreLimit} kills.${r.friendlyFire ? ' Friendly fire is on.' : ''}`,
+    desc: (r) => `Cobalt against Crimson. First crew to ${r.scoreLimit} kills.${r.friendlyFire ? ' Friendly fire is on.' : ''}`,
     limit: { key: 'scoreLimit', label: 'Team kill limit', unit: 'kills', options: [10, 20, 30, 40, 50, 75, 100] },
     rank: (chars) => [...chars].sort((a, b) => a.team - b.team || byKills(a, b)),
     won: (game) => game.teamScore[0] >= game.rules.scoreLimit || game.teamScore[1] >= game.rules.scoreLimit,
