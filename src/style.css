@@ -126,7 +126,7 @@ table.final { margin-top: 14px; }
   position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); font-size: 16px; font-weight: 700;
   letter-spacing: 0.06em; opacity: 0; transition: opacity 0.25s;
 }
-#center-msg { position: absolute; left: 50%; top: 27%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity 0.25s; }
+#center-msg { position: absolute; left: 50%; top: 31%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity 0.25s; }
 #cm-main { font-size: 26px; font-weight: 800; letter-spacing: 0.08em; }
 #cm-sub { font-size: 14px; color: var(--dim); margin-top: 2px; }
 #protect-label {
@@ -233,3 +233,29 @@ h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 #chat.open .chat-line.old { opacity: 0.85; }
 #chat-input { width: 100%; pointer-events: auto; background: rgba(12, 16, 22, 0.85); }
 #chat-hint { font-size: 11px; letter-spacing: 0.1em; color: var(--dim); text-transform: uppercase; }
+
+/* ------------------------------------------------------------------ announcer + modes */
+#announce {
+  position: absolute; left: 50%; top: 15%; transform: translateX(-50%); text-align: center; opacity: 0;
+  transition: opacity 0.35s; white-space: nowrap;
+}
+#an-main {
+  font-size: clamp(30px, 5vw, 54px); font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; font-style: italic;
+  color: #ffd24d; text-shadow: 0 2px 0 #7a4a00, 0 0 24px rgba(255, 170, 40, 0.65), 0 3px 10px rgba(0, 0, 0, 0.8);
+}
+#an-sub { font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase; color: #ffe9b0; margin-top: 2px; }
+#announce.pop #an-main { animation: an-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes an-pop { 0% { transform: scale(2.2); opacity: 0; } 60% { opacity: 1; } 100% { transform: scale(1); } }
+.kf.note { font-style: italic; color: #d8dee6; background: rgba(40, 30, 8, 0.6); }
+#mode-blurb, #pause-mode-blurb { margin: 2px 0 6px; }
+#next-match .row { grid-template-columns: 90px 1fr 0; }
+
+/* compact main menu so everything fits on a 720p screen */
+#menu .panel { padding: 20px 26px; }
+#menu h1 { font-size: clamp(30px, 5vw, 46px); }
+#menu h4 { margin: 12px 0 6px; }
+#menu .row { padding: 3px 0; }
+#menu .cols { margin: 2px 0 12px; }
+#menu .loadout button { padding: 6px 9px; }
+#menu .note { margin-top: 6px; }
+#mode-blurb { min-height: 2.6em; }

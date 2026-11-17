@@ -186,7 +186,7 @@ export class Bot extends Character {
     this.getEye(_eye);
     let best = null, bestScore = Infinity;
     for (const c of g.chars) {
-      if (c === this) continue;
+      if (c === this || g.sameTeam(c, this)) continue;
       const m = this.memOf(c);
       if (!c.alive) { m.visible = false; m.lastSeenT = -99; continue; }
       if (this.canSee(c, m)) {
@@ -223,6 +223,7 @@ export class Bot extends Character {
   /** Something made a noise nearby. kind = 'shot' | 'step'. */
   hear(x, y, z, src, kind, frac) {
     if (!this.alive || this.target) return;
+    if (src && this.game.sameTeam(src, this)) return; // a teammate's noise is nothing to investigate
     const now = this.game.time;
     if (kind === 'shot') {
       // busy saving my skin, or already hunting a specific enemy: ignore
@@ -908,7 +909,7 @@ export class Bot extends Character {
   /** Primary or pistol? (slot 0 / slot 1) */
   chooseWeapon(d) {
     const now = this.game.time;
-    if (this.switchT > 0 || now < this.nextSwitchOk) return;
+    if (this.switchT > 0 || now < this.nextSwitchOk || this.weapons.length < 2) return;
     const prim = this.weapons[0], side = this.weapons[1];
     const cur = this.weaponIdx;
     let want = 0;

@@ -10,7 +10,13 @@ import { Pickup } from './pickups.js';
 import { ViewModel } from './viewmodel.js';
 import { Player } from './player.js';
 import { Bot } from './bot.js';
-import { damageAtDistance, GRENADE } from './weapons.js';
+import { damageAtDistance, GRENADE, makeLoadout, makeSingle } from './weapons.js';
+import { getMode, TEAM_COLORS, GUN_LADDER, gunLevel } from './modes.js';
+import { Announcer } from './announcer.js';
+
+const MULTI_WINDOW = 4; // seconds between kills that still count as a multi-kill
+const MULTI_NAMES = { 2: 'Double Kill', 3: 'Triple Kill', 4: 'Quad Kill' }; // 5+: Mega Kill
+const STREAK_NAMES = { 3: 'Killing Spree', 5: 'Rampage', 7: 'Dominating', 10: 'Unstoppable', 15: 'Godlike', 20: 'Legendary' };
 
 const r2 = (v) => Math.round(v * 100) / 100;
 
@@ -89,6 +95,10 @@ export class Game {
 
     this.effects = new Effects(this.scene);
     this.viewmodel = new ViewModel();
+    this.announcer = new Announcer(settings, audio, hud);
+    this.rules = getMode('ffa');
+    this.teamScore = [0, 0];
+    this.firstBlood = false;
     this.pickups = [];
     this.worldObjs = [];
     this.grenades = [];
@@ -169,7 +179,7 @@ export class Game {
   // match flow
   // ======================================================================
 
-  newMatch({ botCount, bots = true, difficulty, attract = false, map = null }) {
+  newMatch({ botCount, bots = true, difficulty, attract = false, map = null, rules = null }) {
     for (const b of this.bots) b.dispose();
     this.bots = [];
     if (map) this.loadMap(map);
@@ -181,6 +191,9 @@ export class Game {
     this.skill = DIFFICULTY[difficulty] || DIFFICULTY.normal;
     this.difficulty = difficulty;
     this.attract = attract;
+    this.rules = attract ? getMode('ffa') : rules || getMode('ffa');
+    this.teamScore = [0, 0];
+    this.firstBlood = false;
     this.time = 0;
     this.matchTime = CFG.timeLimit;
     this.over = false;
@@ -196,10 +209,11 @@ export class Game {
     const p = this.player;
     p.kills = 0; p.deaths = 0; p.alive = false;
     this.chars = attract ? [...this.bots] : [p, ...this.remotes, ...this.bots];
-    for (const c of this.chars) { c.kills = 0; c.deaths = 0; c.alive = false; }
+    for (const c of this.chars) this.resetScore(c);
+    this.assignTeams();
     if (this.mode === 'host') this.net.onStart(); // tell clients before anyone spawns
     for (const c of this.chars) this.respawn(c, true);
-    if (!attract) this.hud.centerMessage('FIGHT', `First to ${CFG.killLimit} kills`, 2.2, '#ff8a2a');
+    if (!attract) this.hud.centerMessage(this.rules.name.toUpperCase(), this.rules.blurb, 3.2, '#ff8a2a');
   }
 
   /** Add or remove the bots mid-match (host / solo only). */
@@ -215,6 +229,8 @@ export class Game {
         const b = new Bot(this, i + 1, BOT_ROSTER[i % BOT_ROSTER.length]);
         this.bots.push(b);
         this.chars.push(b);
+        this.resetScore(b);
+        this.joinTeam(b);
         if (!this.over) this.respawn(b, true);
       }
     }
@@ -222,10 +238,13 @@ export class Game {
   }
 
   /** Multiplayer client: reset to a clean slate; the host drives everything else. */
-  startClient(matchTime) {
+  startClient(matchTime, rules) {
     for (const b of this.bots) b.dispose();
     this.bots = [];
     this.mode = 'client';
+    this.rules = rules;
+    this.teamScore = [0, 0];
+    this.firstBlood = false;
     this.attract = false;
     this.time = 0;
     this.matchTime = matchTime;
@@ -236,10 +255,60 @@ export class Game {
     this.hud.reset();
     for (const p of this.pickups) p.reset();
     const p = this.player;
-    p.kills = 0; p.deaths = 0; p.alive = false;
+    p.alive = false;
     p.respawnAt = Infinity; // wait for the host to place us
     this.chars = [p, ...this.remotes];
+    for (const c of this.chars) this.resetScore(c);
   }
+
+  /** Fresh scores, streaks and lives for a new match. */
+  resetScore(c) {
+    c.kills = 0; c.deaths = 0; c.alive = false;
+    c.streak = 0; c.multi = 0; c.lastKillT = -99;
+    c.gunLevel = 0;
+    c.lives = this.rules.lives || 0;
+  }
+
+  /** The weapons a character gets on spawning, under the current rules. */
+  loadoutFor(c) {
+    const r = this.rules;
+    if (r.gunGame) return makeSingle(GUN_LADDER[gunLevel(c.kills)]);
+    return makeLoadout(r.forcePrimary || c.primary);
+  }
+
+  /** Out of lives (Last One Standing)? */
+  isOut(c) { return !!this.rules.lives && c.lives <= 0; }
+
+  /** Team colours in team modes, everyone's own colour otherwise. */
+  paint(c) {
+    const color = this.rules.teams && c.team >= 0 ? TEAM_COLORS[c.team] : c.baseColor;
+    c.color = color;
+    if (c.model) c.model.setColor(color, c.name);
+  }
+
+  /** Split everyone into alternating teams (humans first, so they spread out too). */
+  assignTeams() {
+    let i = 0;
+    for (const c of this.chars) { c.team = this.rules.teams ? i++ % 2 : -1; this.paint(c); }
+  }
+
+  /** A late arrival joins the smaller team. */
+  joinTeam(c) {
+    if (!this.rules.teams) { c.team = -1; this.paint(c); return; }
+    const n = [0, 0], humans = [0, 0];
+    for (const o of this.chars) {
+      if (o === c || o.team < 0) continue;
+      n[o.team]++;
+      if (o.isHuman) humans[o.team]++;
+    }
+    // smaller team first; on a tie, spread the humans out
+    if (n[0] !== n[1]) c.team = n[0] < n[1] ? 0 : 1;
+    else if (c.isHuman && humans[0] !== humans[1]) c.team = humans[0] < humans[1] ? 0 : 1;
+    else c.team = 0;
+    this.paint(c);
+  }
+
+  sameTeam(a, b) { return this.rules.teams && a !== b && a.team >= 0 && a.team === b.team; }
 
   charById(id) {
     for (const c of this.chars) if (c.id === id) return c;
@@ -264,7 +333,7 @@ export class Game {
   }
 
   ranking() {
-    return [...this.chars].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths || a.id - b.id);
+    return this.rules.rank(this.chars);
   }
 
   endMatch() {
@@ -282,7 +351,7 @@ export class Game {
     for (const s of this.spawns) {
       let minD = 60, seen = false;
       for (const c of this.chars) {
-        if (c === who || !c.alive) continue;
+        if (c === who || !c.alive || this.sameTeam(c, who)) continue; // teammates are not a threat
         const d = Math.hypot(c.pos.x - s.x, c.pos.y - s.y, c.pos.z - s.z);
         if (d < minD) minD = d;
         if (!seen && d < 45 && !this.world.segmentBlocked(s.x, s.y + 1.6, s.z, c.pos.x, c.pos.y + c.eyeH, c.pos.z)) seen = true;
@@ -371,7 +440,7 @@ export class Game {
       // The host owns health. Report what we hit; show the hit marker right away.
       this.net.sendFire(def, _muz, ends, claims);
       for (const v of victims) {
-        if (v.c.isProtected()) continue;
+        if (v.c.isProtected() || this.sameTeam(v.c, shooter)) continue;
         this.hud.hitmarker(v.head, false);
         this.audio.play(v.head ? 'headshot' : 'hit');
       }
@@ -385,6 +454,7 @@ export class Game {
   damage(victim, amount, attacker, head, def) {
     if (!victim.alive || this.over) return;
     if (victim.isProtected()) return;
+    if (this.sameTeam(victim, attacker)) return; // no friendly fire
     if (!attacker.isHuman && victim.isHuman) amount *= this.skill.dmgVsPlayer;
     const absorbed = Math.min(victim.armor, amount * CFG.armorAbsorb);
     victim.armor -= absorbed;
@@ -405,13 +475,21 @@ export class Game {
     victim.alive = false;
     victim.deaths++;
     victim.respawnAt = this.time + CFG.respawnDelay;
-    if (attacker !== victim) attacker.kills++;
+    if (this.rules.lives) {
+      victim.lives = Math.max(0, victim.lives - 1);
+      if (victim.lives === 0) victim.respawnAt = Infinity; // out for the rest of the match
+    }
+    if (attacker !== victim) {
+      attacker.kills++;
+      if (this.rules.teams && attacker.team >= 0) this.teamScore[attacker.team]++;
+    }
     this.stats.kills++;
     const weapon = def ? def.name : '?';
     this.presentKill(victim, attacker, head, weapon);
     if (this.mode === 'host') this.net.onKill(victim, attacker, head, weapon);
-    if (attacker.kills >= CFG.killLimit) {
-      if (this.attract) { for (const c of this.chars) { c.kills = 0; c.deaths = 0; } }
+    if (attacker !== victim) attacker.applyGunLevel();
+    if (!this.over && this.rules.won(this)) {
+      if (this.attract) { for (const c of this.chars) { c.kills = 0; c.deaths = 0; } } // menu background loops forever
       else this.endMatch();
     }
   }
@@ -421,13 +499,47 @@ export class Game {
     victim.onDeath(attacker);
     this.effects.deathBurst(victim.pos.x, victim.pos.y, victim.pos.z, victim.color);
     this.audio.play('death', victim.isPlayer ? null : victim.pos);
+
+    // Streaks and multi-kills, tracked on every machine from the kills it sees.
+    const ended = victim.streak;
+    victim.streak = 0;
+    victim.multi = 0;
+    let first = false;
+    if (attacker !== victim) {
+      attacker.multi = this.time - attacker.lastKillT <= MULTI_WINDOW ? attacker.multi + 1 : 1;
+      attacker.lastKillT = this.time;
+      attacker.streak++;
+      if (!this.firstBlood) { this.firstBlood = true; first = true; }
+    }
     if (this.attract) return;
+
     this.hud.addKill(attacker, victim, weapon, head);
-    if (attacker.isPlayer) {
+    if (attacker.isPlayer && attacker !== victim) {
       this.audio.play('kill');
-      const sub = head ? 'Headshot' : this.mode === 'client' ? '' : `${attacker.kills} / ${CFG.killLimit}`;
+      const limit = this.rules.scoreLimit && !this.rules.teams && this.mode !== 'client';
+      const sub = head ? 'Headshot' : limit ? `${attacker.kills} / ${this.rules.scoreLimit}` : '';
       this.hud.centerMessage(`ELIMINATED ${victim.name.toUpperCase()}`, sub, 1.6, '#' + victim.color.toString(16).padStart(6, '0'));
     }
+    this.announceKill(victim, attacker, first, ended);
+  }
+
+  /** Killstreak announcer: big call-outs for you, kill-feed notes for everyone else. */
+  announceKill(victim, attacker, first, ended) {
+    const me = this.player;
+    const streakName = STREAK_NAMES[attacker.streak];
+    if (attacker === me && victim !== me) {
+      let text = null, sub = '';
+      if (me.multi >= 2) text = me.multi >= 5 ? 'Mega Kill' : MULTI_NAMES[me.multi];
+      if (streakName) { if (text) sub = streakName; else text = streakName; }
+      if (!text && first) text = 'First Blood';
+      if (!text && ended >= 3) { text = 'Shutdown'; sub = `Ended ${victim.name}'s ${ended}-kill streak`; }
+      if (text) this.announcer.announce(text, sub);
+    } else if (attacker !== victim) {
+      if (first) this.hud.feedNote(`${attacker.name} drew first blood`, attacker.color);
+      else if (streakName && attacker.streak >= 5) this.hud.feedNote(`${attacker.name} is on a ${streakName.toLowerCase()}`, attacker.color);
+      if (ended >= 5 && victim !== me) this.hud.feedNote(`${attacker.name} ended ${victim.name}'s ${ended}-kill streak`, attacker.color);
+    }
+    if (victim === me && ended >= 3 && attacker !== me) this.hud.feedNote(`Your ${ended}-kill streak is over`, 0x9aa6b2);
   }
 
   // ======================================================================

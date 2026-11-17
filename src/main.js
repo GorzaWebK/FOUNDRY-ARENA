@@ -2,7 +2,7 @@
 
 import './style.css';
 import { MAPS, getMap } from './maps/index.js';
-import { CFG } from './config.js';
+import { MODES, getMode } from './modes.js';
 import { WEAPON_BY_ID, PRIMARIES } from './weapons.js';
 import { loadSettings, saveSettings, buildSettingsUI } from './settings.js';
 import { AudioSys } from './audio.js';
@@ -69,15 +69,39 @@ const syncPause = buildSettingsUI($('pause-settings'), settings, onSetting);
 function syncAll() { syncMenu(); syncPause(); }
 
 // match options
-const bots = $('set-bots'), botsOut = $('out-bots'), botsOn = $('set-bots-on'), diff = $('set-diff'), mapSel = $('set-map');
-for (const m of MAPS) {
-  const o = document.createElement('option');
-  o.value = m.id;
-  o.textContent = m.name;
-  o.title = m.blurb || '';
-  mapSel.append(o);
+const bots = $('set-bots'), botsOut = $('out-bots'), botsOn = $('set-bots-on'), diff = $('set-diff');
+// map + mode pickers exist twice: main menu, and "next match" in the pause menu
+const mapSels = [$('set-map'), $('pause-map')], modeSels = [$('set-mode'), $('pause-mode')];
+function fillSelect(sel, list) {
+  for (const m of list) {
+    const o = document.createElement('option');
+    o.value = m.id;
+    o.textContent = m.name;
+    o.title = m.blurb || '';
+    sel.append(o);
+  }
 }
-mapSel.value = settings.map;
+mapSels.forEach((s) => fillSelect(s, MAPS));
+modeSels.forEach((s) => fillSelect(s, MODES));
+function syncMatchPickers() {
+  for (const s of mapSels) s.value = settings.map;
+  for (const s of modeSels) s.value = settings.mode;
+  const blurb = getMode(settings.mode).blurb;
+  $('mode-blurb').textContent = blurb;
+  $('pause-mode-blurb').textContent = blurb;
+}
+syncMatchPickers();
+for (const s of mapSels) {
+  s.addEventListener('change', () => {
+    settings.map = s.value;
+    saveSettings(settings);
+    syncMatchPickers();
+    if (state === 'menu') startAttract(); // show the chosen map behind the menu
+  });
+}
+for (const s of modeSels) {
+  s.addEventListener('change', () => { settings.mode = s.value; saveSettings(settings); syncMatchPickers(); });
+}
 bots.value = settings.botCount;
 botsOut.textContent = settings.botCount;
 botsOn.checked = settings.bots;
@@ -95,11 +119,6 @@ bots.addEventListener('input', () => {
 });
 botsOn.addEventListener('change', () => { settings.bots = botsOn.checked; saveSettings(settings); syncBotsUi(); });
 diff.addEventListener('change', () => { settings.difficulty = diff.value; saveSettings(settings); });
-mapSel.addEventListener('change', () => {
-  settings.map = mapSel.value;
-  saveSettings(settings);
-  if (state === 'menu') startAttract(); // show the chosen map behind the menu
-});
 // host / solo: switch the bots on or off in the middle of a match
 $('btn-bots').addEventListener('click', () => {
   if (net.role === 'client') return;
@@ -174,6 +193,7 @@ function updateRoomUi() {
   $('room-count').textContent = on ? `${n} player${n === 1 ? '' : 's'} connected` : '';
   $('pause-title').textContent = on ? 'MENU' : 'PAUSED';
   $('btn-restart').classList.toggle('hidden', net.role === 'client');
+  $('next-match').classList.toggle('hidden', net.role === 'client');
   $('btn-bots').classList.toggle('hidden', net.role === 'client');
   $('btn-quit').textContent = on ? (net.role === 'host' ? 'Close room' : 'Leave game') : 'Main menu';
   $('btn-again').classList.toggle('hidden', net.role === 'client');
@@ -233,7 +253,8 @@ async function startMatch() {
   audio.resume();
   audio.setVolume(settings.volume);
   game.newMatch({
-    botCount: settings.botCount, bots: settings.bots, difficulty: settings.difficulty, map: getMap(settings.map),
+    botCount: settings.botCount, bots: settings.bots, difficulty: settings.difficulty,
+    map: getMap(settings.map), rules: getMode(settings.mode),
   });
   setState('playing');
   const ok = await lock();
@@ -297,6 +318,10 @@ function pause() {
   if (state !== 'playing') return;
   $('pause-hint').textContent = net.active ? 'The match keeps running while this menu is open.' : '';
   $('copy-note').textContent = '';
+  const r = game.rules;
+  $('loadout-note').textContent = r.gunGame ? 'Gun Game hands out the weapons — your pick applies in other modes.'
+    : r.forcePrimary ? 'Snipers Only: everyone has a sniper rifle — your pick applies in other modes.' : '';
+  syncMatchPickers();
   setState('paused');
 }
 
@@ -351,16 +376,12 @@ window.addEventListener('beforeunload', (e) => {
 });
 window.addEventListener('pagehide', () => net.leave());
 
-game.onMatchEnd = (winner, rank) => {
-  const me = game.player;
-  const won = winner === me;
-  const place = rank.indexOf(me) + 1;
-  $('end-title').textContent = won ? 'VICTORY' : 'DEFEAT';
-  $('end-title').style.color = won ? '#5dff9a' : '#ff6b6b';
-  const why = winner.kills >= CFG.killLimit ? `reached ${CFG.killLimit} kills` : `led with ${winner.kills} kills when time ran out`;
-  $('end-sub').textContent = won
-    ? `You ${why}.`
-    : `${winner.name} ${why}. You placed #${place} of ${rank.length}.`;
+game.onMatchEnd = () => {
+  const res = game.rules.result(game);
+  const won = res.won;
+  $('end-title').textContent = res.draw ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT';
+  $('end-title').style.color = res.draw ? '#ffd24d' : won ? '#5dff9a' : '#ff6b6b';
+  $('end-sub').textContent = `${game.rules.name}: ${res.sub}`;
   hud.renderScores(game, $('end-body'));
   setState('ended');
   audio.muted = false;

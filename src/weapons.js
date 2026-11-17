@@ -50,8 +50,8 @@ const DEFS = [
   {
     id: 'sniper', name: 'Sniper Rifle', blurb: 'Bolt action with a scope. One headshot is enough.',
     damage: 80, pellets: 1,
-    magSize: 5, reserveStart: 20, reserveMax: 35, ammoBox: 5,
-    auto: false, interval: 1.15, reload: 2.7,
+    magSize: 2, reserveStart: 20, reserveMax: 36, ammoBox: 6,
+    auto: false, interval: 1.15, reload: 2.4,
     spreadMin: 0.05, spreadMax: 0.06, heatPerShot: 0.5, heatDecay: 1.5,
     adsSpread: 0.012, adsFov: 0.24, moveSpread: 1.6, scope: true,
     falloffStart: 200, falloffEnd: 400, falloffMin: 1,
@@ -106,6 +106,13 @@ function makeState(def) {
 export function makeLoadout(primaryId) {
   const prim = WEAPON_BY_ID[isPrimary(primaryId) ? primaryId : DEFAULT_PRIMARY];
   return [makeState(prim), makeState(PISTOL)];
+}
+
+/** Gun game: just the one gun, with bottomless reserve ammo. */
+export function makeSingle(id) {
+  const s = makeState(WEAPON_BY_ID[id]);
+  s.reserve = Infinity;
+  return [s];
 }
 
 export function damageAtDistance(def, dist) {

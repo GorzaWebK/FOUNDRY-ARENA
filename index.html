@@ -22,7 +22,7 @@
       <div id="dmg"></div>
 
       <div id="topbar">
-        <div class="tb-side"><span class="tb-label">YOU</span><span id="tb-you">0</span></div>
+        <div class="tb-side"><span class="tb-label" id="tb-youlabel">YOU</span><span id="tb-you">0</span></div>
         <div class="tb-mid"><span id="tb-time">10:00</span><span id="tb-limit">first to 20</span></div>
         <div class="tb-side"><span id="tb-lead">0</span><span class="tb-label" id="tb-leadname">LEADER</span></div>
       </div>
@@ -30,6 +30,7 @@
       <div id="killfeed"></div>
       <div id="toast"></div>
       <div id="center-msg"><div id="cm-main"></div><div id="cm-sub"></div></div>
+      <div id="announce"><div id="an-main"></div><div id="an-sub"></div></div>
       <div id="protect-label">SPAWN PROTECTION</div>
       <div id="lock-hint" class="hidden">Click to capture the mouse</div>
 
@@ -82,6 +83,8 @@
         <div class="cols">
           <div class="col">
             <h4>Match</h4>
+            <label class="row"><span>Mode</span><select id="set-mode"></select><output></output></label>
+            <p id="mode-blurb" class="note"></p>
             <label class="row"><span>Map</span><select id="set-map"></select><output></output></label>
             <label class="row"><span>Bots</span><input type="checkbox" id="set-bots-on" /><output></output></label>
             <label class="row" id="row-botcount"><span>Bot count</span><input type="range" id="set-bots" min="1" max="10" step="1" /><output id="out-bots"></output></label>
@@ -136,8 +139,16 @@
           <button id="btn-copy">Copy invite link</button>
           <p id="copy-note" class="note"></p>
         </div>
+        <div id="next-match">
+          <h4>Next match</h4>
+          <label class="row"><span>Mode</span><select id="pause-mode"></select><output></output></label>
+          <p id="pause-mode-blurb" class="note"></p>
+          <label class="row"><span>Map</span><select id="pause-map"></select><output></output></label>
+          <p class="note">Press <b>Restart match</b> to play it.</p>
+        </div>
         <h4>Loadout <small>— applies on your next respawn</small></h4>
         <div id="pause-loadout" class="loadout compact"></div>
+        <p id="loadout-note" class="note"></p>
         <h4>Settings</h4>
         <div id="pause-settings"></div>
         <div class="btn-row">

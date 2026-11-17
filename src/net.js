@@ -20,8 +20,9 @@
 
 import { CFG, HUMAN_COLORS, MAX_HUMANS } from './config.js';
 import * as THREE from 'three';
-import { WEAPONS, WEAPON_BY_ID, isPrimary, makeLoadout, damageAtDistance } from './weapons.js';
+import { WEAPONS, WEAPON_BY_ID, isPrimary, damageAtDistance } from './weapons.js';
 import { getMap } from './maps/index.js';
+import { getMode } from './modes.js';
 import { NetChar } from './netChar.js';
 import { getTransport, makeRoomCode, cleanRoomCode } from './transport.js';
 
@@ -82,7 +83,7 @@ export class Net {
     g.net = this;
     g.player.id = 0;
     g.player.name = cleanName(name) || 'Host';
-    g.player.color = HUMAN_COLORS[0];
+    g.player.color = g.player.baseColor = HUMAN_COLORS[0];
     room.onConnection = (conn) => this._accept(conn);
     return room.code;
   }
@@ -140,7 +141,7 @@ export class Net {
     g.net = null;
     g.player.id = 0;
     g.player.name = 'You';
-    g.player.color = HUMAN_COLORS[0];
+    g.player.color = g.player.baseColor = HUMAN_COLORS[0];
   }
 
   _lost(reason = 'The host left the game.') {
@@ -212,7 +213,8 @@ export class Net {
       setTimeout(() => conn.close(), 300);
       return null;
     }
-    const used = new Set([g.player.color, ...humans.map((h) => h.color)]);
+    // personal colours (not the team colours they may be wearing right now)
+    const used = new Set([g.player.baseColor, ...humans.map((h) => h.baseColor)]);
     const color = HUMAN_COLORS.find((c) => !used.has(c)) || HUMAN_COLORS[humans.length % HUMAN_COLORS.length];
     let name = cleanName(m.name) || 'Player';
     const names = new Set(g.chars.map((c) => c.name.toLowerCase()));
@@ -224,10 +226,15 @@ export class Net {
     c.alive = false;
     c.respawnAt = Infinity;
     g.addRemote(c);
-    conn.send({ t: 'welcome', you: c.id, map: g.map.id, mt: r2(g.matchTime), over: g.over, r: this._roster() });
-    if (!g.over) g.respawn(c, true);
+    g.resetScore(c);
+    g.joinTeam(c);
+    // Last One Standing: a round in progress can't be joined, so watch until the next one
+    const spectate = !!g.rules.lives;
+    if (spectate) c.lives = 0;
+    conn.send({ t: 'welcome', you: c.id, map: g.map.id, mode: g.rules.id, mt: r2(g.matchTime), over: g.over, r: this._roster(), ts: g.teamScore });
+    if (!g.over && !spectate) g.respawn(c, true);
     this.broadcast({ t: 'roster', r: this._roster() }, conn);
-    this.system(`${name} joined`);
+    this.system(spectate ? `${name} joined — they'll play from the next round` : `${name} joined`);
     this.hooks.onRoster();
     return c;
   }
@@ -242,7 +249,7 @@ export class Net {
   }
 
   _roster() {
-    return this.game.chars.map((c) => [c.id, c.name, c.color, c.isHuman ? 0 : 1]);
+    return this.game.chars.map((c) => [c.id, c.name, c.color, c.isHuman ? 0 : 1, c.team]);
   }
 
   _hostMsg(c, m) {
@@ -303,12 +310,13 @@ export class Net {
     c.netLean = clamp(d[9], -1, 1);
     // their loadout: mirrored so pickups know what this player could use
     const prim = WEAPONS[d[10] | 0];
+    const g = this.game;
     if (prim && isPrimary(prim.id) && prim.id !== c.primary) {
       c.primary = prim.id;
-      c.weapons = makeLoadout(prim.id);
+      if (!g.rules.gunGame) c.weapons = g.loadoutFor(c);
     }
-    c.weaponIdx = (d[6] | 0) === c.weapons[0].def.index ? 0 : 1;
-    c.weapons[0].reserve = clamp(d[7] | 0, 0, c.weapons[0].def.reserveMax);
+    c.weaponIdx = Math.min(c.weapons.length - 1, (d[6] | 0) === c.weapons[0].def.index ? 0 : 1);
+    if (!g.rules.gunGame) c.weapons[0].reserve = clamp(d[7] | 0, 0, c.weapons[0].def.reserveMax);
   }
 
   /** A remote player fired. Relay the visuals and check their hit claims. */
@@ -363,18 +371,18 @@ export class Net {
       ch.id, r2(ch.pos.x), r2(ch.pos.y), r2(ch.pos.z), r3(ch.yaw), r3(ch.pitch),
       (ch.alive ? 1 : 0) | (ch.crouching ? 2 : 0) | (ch.isProtected() ? 4 : 0) | (ch.onGround ? 8 : 0),
       Math.max(0, Math.round(ch.health * 10) / 10), Math.round(ch.armor * 10) / 10,
-      ch.kills, ch.deaths, ch.weapon.def.index, r2(ch.lean),
+      ch.kills, ch.deaths, ch.weapon.def.index, r2(ch.lean), ch.lives,
     ]);
     let p = '';
     for (const pk of g.pickups) p += pk.active ? '1' : '0';
-    this.broadcast({ t: 's', mt: r2(g.matchTime), c, p });
+    this.broadcast({ t: 's', mt: r2(g.matchTime), c, p, ts: g.teamScore });
   }
 
   // hooks called by Game on the host ---------------------------------------
 
   onStart() {
     const g = this.game;
-    this.broadcast({ t: 'start', map: g.map.id, mt: r2(g.matchTime), r: this._roster() });
+    this.broadcast({ t: 'start', map: g.map.id, mode: g.rules.id, mt: r2(g.matchTime), r: this._roster() });
   }
 
   onSpawn(c) {
@@ -422,8 +430,9 @@ export class Net {
     g.clearRemotes();
     if (num(m.you)) g.player.id = m.you;
     g.loadMap(getMap(m.map));
-    g.startClient(num(m.mt) ? m.mt : CFG.timeLimit);
+    g.startClient(num(m.mt) ? m.mt : CFG.timeLimit, getMode(m.mode));
     this._applyRoster(m.r);
+    if (Array.isArray(m.ts)) g.teamScore = [m.ts[0] | 0, m.ts[1] | 0];
     if (m.over) g.over = true;
   }
 
@@ -433,18 +442,24 @@ export class Net {
     const seen = new Set();
     for (const e of list) {
       if (!Array.isArray(e) || !num(e[0])) continue;
-      const [id, name, color, bot] = e;
+      const [id, name, color, bot, team] = e;
       seen.add(id);
+      const col = num(color) ? color : 0xffffff;
       if (id === g.player.id) {
         g.player.name = cleanName(name) || 'You';
-        if (num(color)) g.player.color = color;
+        g.player.color = col;
+        g.player.team = num(team) ? team : -1;
         continue;
       }
-      if (!g.remotes.some((r) => r.id === id)) {
-        const c = new NetChar(g, id, cleanName(name) || 'Player', num(color) ? color : 0xffffff, !!bot);
+      let c = g.remotes.find((r) => r.id === id);
+      if (!c) {
+        c = new NetChar(g, id, cleanName(name) || 'Player', col, !!bot);
         c.alive = false;
         g.addRemote(c);
       }
+      c.team = num(team) ? team : -1;
+      c.color = col;
+      c.model.setColor(col, c.name);
     }
     for (const r of [...g.remotes]) if (!seen.has(r.id)) g.removeRemote(r);
     this.hooks.onRoster();
@@ -472,6 +487,7 @@ export class Net {
         victim.alive = false;
         victim.health = 0;
         victim.respawnAt = g.time + CFG.respawnDelay;
+        if (g.rules.lives) victim.lives = Math.max(0, victim.lives - 1); // the next snapshot confirms
         g.presentKill(victim, killer, !!m.h, String(m.w || '?'));
         break;
       }
@@ -514,7 +530,7 @@ export class Net {
         break;
       case 'start':
         g.loadMap(getMap(m.map));
-        g.startClient(num(m.mt) ? m.mt : CFG.timeLimit);
+        g.startClient(num(m.mt) ? m.mt : CFG.timeLimit, getMode(m.mode));
         this._applyRoster(m.r);
         this.hooks.onMatchStart();
         break;
@@ -525,12 +541,15 @@ export class Net {
   _applySnapshot(m) {
     const g = this.game, p = g.player;
     if (num(m.mt)) g.matchTime = m.mt;
+    if (Array.isArray(m.ts)) g.teamScore = [m.ts[0] | 0, m.ts[1] | 0];
     if (Array.isArray(m.c)) {
       for (const e of m.c) {
         if (!Array.isArray(e) || e.length < 12) continue;
-        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, , lean] = e;
+        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, , lean, lives] = e;
         if (id === p.id) {
           p.kills = k; p.deaths = d;
+          if (num(lives)) p.lives = lives;
+          p.applyGunLevel(); // gun game: a kill may have earned the next gun
           if (p.alive) { p.health = hp; p.armor = ar; }
           if (!(fl & 4)) p.protectedUntil = 0;
           continue;
@@ -546,6 +565,7 @@ export class Net {
         c.netGround = !!(fl & 8);
         c.netLean = num(lean) ? clamp(lean, -1, 1) : 0;
         c.health = hp; c.armor = ar; c.kills = k; c.deaths = d;
+        if (num(lives)) c.lives = lives;
       }
     }
     if (typeof m.p === 'string') {

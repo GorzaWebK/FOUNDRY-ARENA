@@ -5,6 +5,7 @@ import { Character } from './character.js';
 import { CFG } from './config.js';
 import { moveBody } from './physics.js';
 import { verticalFov } from './settings.js';
+import { GUN_LADDER } from './modes.js';
 
 const _v = new THREE.Vector3();
 const _hit = { t: 0, nx: 0, ny: 0, nz: 0 };
@@ -35,6 +36,8 @@ export class Player extends Character {
   spawnAt(x, y, z, yaw) {
     this.primary = this.game.settings.primary; // loadout choices apply on (re)spawn
     super.spawnAt(x, y, z, yaw);
+    const g = this.game;
+    if (g.rules.lives && this.lives === 1 && this.deaths > 0) g.announcer.announce('Last Life');
     this.ads = 0;
     this.scoped = false;
     this.recoilP = this.recoilY = 0;
@@ -202,6 +205,8 @@ export class Player extends Character {
     if (input.hit('KeyR')) this.startReload();
     if (input.hit('KeyF')) this.throwGrenade();
     this.tryFire(input.left, input.leftPressed, this.ads);
+    const aw = this.weapon;
+    if (aw.mag === 0 && aw.cooldown <= 0 && this.canReload()) this.startReload(); // empty: reload by itself
     // primary completely dry: fall back to the pistol
     const cw = this.weapon;
     if (cw.mag === 0 && cw.reserve === 0 && cw.reloadT <= 0 && this.switchT <= 0 && this.weaponIdx === 0) this.switchWeapon(1);
@@ -261,6 +266,8 @@ export class Player extends Character {
   updateDeathCam(dt) {
     const g = this.game, cam = g.camera;
     this.deathT += dt;
+    // out of lives: watch the rest of the match from above
+    if (g.isOut(this) && this.deathT > 2.5) { g.orbitCamera(dt, 0.05); return; }
     this.scoped = false;
     this.leanOff = 0; this.lean = 0;
     const t = Math.min(1, this.deathT / 0.6);
@@ -298,6 +305,11 @@ export class Player extends Character {
   }
 
   onThrow() { this.game.viewmodel.throwAnim(); }
+
+  onGunLevel(lvl) {
+    const def = this.weapon.def;
+    this.game.announcer.announce(lvl === GUN_LADDER.length - 1 ? 'Final Weapon' : 'Level Up', def.name);
+  }
   onReload(w) { this.game.audio.play('reload', null, 1, w.def.reload); }
   onSwitch() { this.game.audio.play('switch'); }
   onDryFire() { this.game.audio.play('dry'); }

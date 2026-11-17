@@ -1,6 +1,5 @@
 // DOM heads-up display. Only touches the DOM when a value actually changes.
 
-import { CFG } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
@@ -20,7 +19,9 @@ export class Hud {
       sb: $('scoreboard'), sbBody: $('sb-body'), fps: $('fps'), lockHint: $('lock-hint'),
       slotPrim: $('slot-prim'), nade: $('slot-nade'), nadeCount: $('nade-count'), scope: $('scope'),
       chat: $('chat'), chatLog: $('chat-log'), chatHint: $('chat-hint'),
+      youLabel: $('tb-youlabel'), announce: $('announce'), anMain: $('an-main'), anSub: $('an-sub'),
     };
+    this.anT = 0;
     this.chatLines = [];
     this.slots = [...document.querySelectorAll('#slots .slot[data-i]')];
     this.cache = {};
@@ -33,12 +34,13 @@ export class Hud {
     this.sbVisible = false;
     this.sbTimer = 0;
     this.fpsAcc = 0; this.fpsN = 0;
-    this.el.limit.textContent = `first to ${CFG.killLimit}`;
   }
 
   show(v) { this.root.classList.toggle('hidden', !v); }
 
   reset() {
+    this.anT = 0;
+    this.el.announce.style.opacity = 0;
     this.el.feed.innerHTML = '';
     this.feedItems.length = 0;
     for (const a of this.arcs) a.el.remove();
@@ -91,13 +93,16 @@ export class Hud {
       e.time.textContent = `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
       e.time.classList.toggle('hurry', v <= 30);
     });
-    this._set('you', p.kills, (v) => { e.you.textContent = v; });
-    let lead = null;
-    for (const c of game.chars) if (c !== p && (!lead || c.kills > lead.kills)) lead = c;
-    if (lead) {
-      this._set('lead', lead.kills, (v) => { e.lead.textContent = v; });
-      this._set('leadName', lead.name, (v) => { e.leadName.textContent = v.toUpperCase(); });
-    }
+    // the top bar's two scores depend on the mode
+    const tb = game.rules.hud(game);
+    this._set('youL', tb.left[0], (v) => { e.youLabel.textContent = v; });
+    this._set('you', tb.left[1], (v) => { e.you.textContent = v; });
+    this._set('youC', tb.left[2] || '', (v) => { e.you.style.color = v; });
+    this._set('leadName', tb.right[0], (v) => { e.leadName.textContent = v; });
+    this._set('lead', tb.right[1], (v) => { e.lead.textContent = v; });
+    this._set('leadC', tb.right[2] || '', (v) => { e.lead.style.color = v; });
+    this._set('sub', tb.sub, (v) => { e.limit.textContent = v; });
+    this._set('slot2', !!p.weapons[1], (v) => { this.slots[1].style.display = v ? '' : 'none'; });
 
     // crosshair spread
     const spread = p.currentSpread(p.ads);
@@ -122,7 +127,11 @@ export class Hud {
     this._set('dead', !p.alive, (v) => e.death.classList.toggle('hidden', !v));
     if (!p.alive) {
       const left = Math.max(0, p.respawnAt - game.time);
-      this._set('dc', Math.ceil(left), (v) => { e.deathCount.textContent = Number.isFinite(v) ? `Respawning in ${v}` : 'Waiting for the host…'; });
+      const out = game.isOut(p);
+      this._set('dc', out ? 'out' : Math.ceil(left), (v) => {
+        e.deathCount.textContent = v === 'out' ? 'Out of lives — spectating until the next match'
+          : Number.isFinite(v) ? `Respawning in ${v}` : 'Waiting for the host…';
+      });
       this._set('dn', p.killer ? p.killer.name : '', (v) => { e.deathName.textContent = v; e.deathName.style.color = p.killer ? hex(p.killer.color) : ''; });
       this._set('dby', !!p.killer, (v) => { $('death-by').style.visibility = v ? 'visible' : 'hidden'; });
     }
@@ -148,6 +157,8 @@ export class Hud {
       if (f.life < 0.4) f.el.style.opacity = 0;
       if (f.life <= 0) { f.el.remove(); this.feedItems.splice(i, 1); }
     }
+
+    if (this.anT > 0) { this.anT -= dt; if (this.anT <= 0) e.announce.style.opacity = 0; }
 
     // chat lines fade out after a while (they come back while the chat box is open)
     for (const c of this.chatLines) {
@@ -202,6 +213,29 @@ export class Hud {
     while (this.feedItems.length > 6) this.feedItems.shift().el.remove();
   }
 
+  /** Killstreak call-out banner. */
+  announce(text, sub = '') {
+    const e = this.el;
+    e.anMain.textContent = text;
+    e.anSub.textContent = sub;
+    e.announce.classList.remove('pop');
+    void e.announce.offsetWidth; // restart the pop animation
+    e.announce.classList.add('pop');
+    e.announce.style.opacity = 1;
+    this.anT = 2.4;
+  }
+
+  /** A line of text in the kill feed (streaks, first blood…). */
+  feedNote(text, color) {
+    const el = document.createElement('div');
+    el.className = 'kf note';
+    el.style.borderLeft = `3px solid ${hex(color)}`;
+    el.textContent = text;
+    this.el.feed.append(el);
+    this.feedItems.push({ el, life: 5 });
+    while (this.feedItems.length > 6) this.feedItems.shift().el.remove();
+  }
+
   /** Add a chat line. An empty name means a system message. */
   chatAdd(name, color, text) {
     const el = document.createElement('div');
@@ -252,9 +286,14 @@ export class Hud {
 
   renderScores(game, tbody) {
     const rows = game.ranking();
+    const col = game.rules.column;
+    const head = tbody.parentElement.tHead;
+    const headHtml = `<tr><th>#</th><th class="l">Player</th>${col ? `<th>${col.title}</th>` : ''}<th>Kills</th><th>Deaths</th></tr>`;
+    if (head.innerHTML !== headHtml) head.innerHTML = headHtml;
     tbody.innerHTML = rows.map((c, i) => (
       `<tr class="${c.isPlayer ? 'me' : ''}${c.alive ? '' : ' dead'}"><td>${i + 1}</td>`
-      + `<td class="l"><i style="background:${hex(c.color)}"></i>${esc(c.name)}</td><td>${c.kills}</td><td>${c.deaths}</td></tr>`
+      + `<td class="l"><i style="background:${hex(c.color)}"></i>${esc(c.name)}</td>`
+      + `${col ? `<td>${esc(col.value(c))}</td>` : ''}<td>${c.kills}</td><td>${c.deaths}</td></tr>`
     )).join('');
   }
 }

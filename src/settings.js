@@ -2,6 +2,7 @@
 
 import { DEFAULT_PRIMARY, isPrimary } from './weapons.js';
 import { DEFAULT_MAP, MAPS } from './maps/index.js';
+import { DEFAULT_MODE, MODES } from './modes.js';
 
 const KEY = 'foundry-arena-settings-v3';
 
@@ -18,6 +19,8 @@ export const DEFAULTS = {
   name: '', // multiplayer display name
   primary: DEFAULT_PRIMARY, // loadout
   map: DEFAULT_MAP,
+  mode: DEFAULT_MODE,
+  announcer: true, // spoken killstreak call-outs
 };
 
 export function loadSettings() {
@@ -36,6 +39,7 @@ export function loadSettings() {
   if (!['high', 'low'].includes(s.quality)) s.quality = 'high';
   if (!isPrimary(s.primary)) s.primary = DEFAULT_PRIMARY;
   if (!MAPS.some((m) => m.id === s.map)) s.map = DEFAULT_MAP;
+  if (!MODES.some((m) => m.id === s.mode)) s.mode = DEFAULT_MODE;
   return s;
 }
 
@@ -58,6 +62,7 @@ export function buildSettingsUI(container, settings, onChange) {
     { key: 'fov', label: 'Field of view', min: 70, max: 120, step: 1, fmt: (v) => v + '°' },
     { key: 'volume', label: 'Volume', min: 0, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' },
     { key: 'quality', label: 'Graphics', options: [['high', 'High'], ['low', 'Low (faster)']] },
+    { key: 'announcer', label: 'Announcer voice', check: true },
     { key: 'invertY', label: 'Invert Y', check: true },
     { key: 'showFps', label: 'Show FPS', check: true },
   ];

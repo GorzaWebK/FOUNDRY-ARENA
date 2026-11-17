@@ -292,6 +292,13 @@ export class AudioSys {
         this._tone(o, t + 0.06, 0.09, 'sine', 1320, 1320, 0.5);
         break;
       }
+      case 'announce': {
+        const o = this._out(null, 0.32 * vol); if (!o) return;
+        this._noise(o, t, 0.5, 'lowpass', 900, 0.4, 0.6, 0.01);
+        [392, 587, 784].forEach((f, i) => this._tone(o, t + i * 0.05, 0.45, 'sawtooth', f, f * 1.01, 0.22, 0.01));
+        this._tone(o, t, 0.6, 'sine', 98, 70, 0.7);
+        break;
+      }
       case 'ui': {
         const o = this._out(null, 0.2 * vol); if (!o) return;
         this._tone(o, t, 0.05, 'square', 700, 700, 0.3);

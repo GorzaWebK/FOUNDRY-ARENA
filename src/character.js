@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { CFG } from './config.js';
 import { makeLoadout, SWITCH_TIME, GRENADE, DEFAULT_PRIMARY } from './weapons.js';
+import { gunLevel } from './modes.js';
 import { hasHeadroom } from './physics.js';
 
 export class Character {
@@ -11,6 +12,13 @@ export class Character {
     this.id = id;
     this.name = name;
     this.color = color;
+    this.baseColor = color; // own colour (team modes paint characters in team colours)
+    this.team = -1;
+    this.lives = 0;
+    this.streak = 0; // kills since last death
+    this.multi = 0; // kills in quick succession
+    this.lastKillT = -99;
+    this.gunLevel = 0;
     this.isPlayer = isPlayer; // the person at this keyboard
     this.isHuman = isPlayer; // any human (local or remote), as opposed to a bot
 
@@ -95,7 +103,8 @@ export class Character {
     this.armor = 0;
     this.alive = true;
     this.protectedUntil = this.game.time + CFG.spawnProtection;
-    this.weapons = makeLoadout(this.primary);
+    this.gunLevel = gunLevel(this.kills);
+    this.weapons = this.game.loadoutFor(this);
     this.weaponIdx = 0;
     this.switchT = 0;
     this.grenades = GRENADE.start;
@@ -175,7 +184,20 @@ export class Character {
 
   hasAmmo(idx) {
     const w = this.weapons[idx];
-    return w.mag > 0 || w.reserve > 0;
+    return !!w && (w.mag > 0 || w.reserve > 0);
+  }
+
+  /** Gun game: hand out the gun this kill count has earned. */
+  applyGunLevel() {
+    if (!this.game.rules.gunGame || !this.alive) return;
+    const lvl = gunLevel(this.kills);
+    if (lvl === this.gunLevel) return;
+    this.gunLevel = lvl;
+    this.weapons = this.game.loadoutFor(this);
+    this.weaponIdx = 0;
+    this.switchT = SWITCH_TIME;
+    this.onSwitch();
+    this.onGunLevel(lvl);
   }
 
   /**
@@ -210,6 +232,7 @@ export class Character {
   }
 
   // hooks
+  onGunLevel() {}
   onThrow() {}
   onReload() {}
   onSwitch() {}

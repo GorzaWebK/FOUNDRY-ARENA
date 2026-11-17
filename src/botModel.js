@@ -24,6 +24,8 @@ export class BotModel {
     const visor = new THREE.MeshLambertMaterial({ color: 0x101418, emissive: c, emissiveIntensity: 0.9 });
     const gun = new THREE.MeshLambertMaterial({ color: 0x23262b });
     this.mats = [body, dark, skin, visor, gun];
+    this.name = name;
+    this.color = color;
 
     this.group = new THREE.Group();
     this.tilt = new THREE.Group(); // falls over on death
@@ -80,6 +82,20 @@ export class BotModel {
     this.walk = 0;
     this.deadT = 0;
     this.crouchT = 0;
+  }
+
+  /** Repaint the body and name tag (team colours). */
+  setColor(color, name = this.name) {
+    if (color === this.color && name === this.name) return;
+    this.color = color;
+    this.name = name;
+    const c = new THREE.Color(color);
+    this.mats[0].color.copy(c);
+    this.mats[1].color.copy(c).multiplyScalar(0.45);
+    this.mats[3].emissive.copy(c);
+    this.tag.material.map.dispose();
+    this.tag.material.map = nameTexture(name, color);
+    this.tag.material.needsUpdate = true;
   }
 
   muzzleFlash() {

@@ -19,7 +19,7 @@ npm install
 npm run dev
 ```
 
-Open the printed URL (http://localhost:5173), pick a map and a loadout, press **PLAY SOLO**.
+Open the printed URL (http://localhost:5173), pick a mode, a map and a loadout, press **PLAY SOLO**.
 
 | Script              | What it does                                              |
 | ------------------- | --------------------------------------------------------- |
@@ -31,11 +31,35 @@ Open the printed URL (http://localhost:5173), pick a map and a loadout, press **
 Every push to `main` is built and published to GitHub Pages by
 `.github/workflows/deploy.yml`.
 
+## Game modes
+
+Pick one in the main menu for solo play, or as the host of a multiplayer room.
+The pause menu's **Next match** section changes mode and map between matches.
+
+| Mode                  | How it works                                                                  |
+| --------------------- | ----------------------------------------------------------------------------- |
+| **Deathmatch**        | free-for-all; first to 20 kills, or most kills after 10 minutes               |
+| **Team Deathmatch**   | Blue vs Red, no friendly fire; first team to 40 kills. Humans are spread across both teams and bots fill the rest |
+| **Gun Game**          | every 2 kills hand you the next gun: LMG → rifle → SMG → shotgun → sniper → pistol. One pistol kill wins. Unlimited reserve ammo |
+| **Last One Standing** | 5 lives each, no respawns after that; the last player alive wins. You spectate from above once you are out, and players joining mid-round watch until the next one |
+| **Snipers Only**      | free-for-all with sniper rifles and pistols; first to 15 kills                |
+
+Every mode has a 10 minute clock; when it runs out the mode's best score wins.
+
+## Killstreak announcer
+
+Your multi-kills (Double, Triple, Quad, Mega Kill within 4 seconds of each other)
+and streaks (Killing Spree at 3, Rampage 5, Dominating 7, Unstoppable 10, Godlike 15,
+Legendary 20), plus First Blood and Shutdown (ending someone's streak), get a big
+banner and a spoken call-out. Other players' big streaks show up in the kill feed.
+The voice uses the browser's built-in speech synthesis, so no audio files are
+needed; it can be switched off with **Announcer voice** in settings, and how it
+sounds depends on the voices your browser and OS provide.
+
 ## Rules
 
-- Free-for-all. Bots fill the match (1–10, or switch them off entirely) and fight
-  each other as well as you.
-- First to **20 kills** wins, or the highest score when the **10 minute** clock runs out.
+- Bots fill the match (1–10, or switch them off entirely) and fight each other as
+  well as you.
 - 100 HP, no regeneration. Respawn after 3 s at a spawn point away from enemies,
   with 2 s of spawn protection (attacking ends it early).
 - **Loadout:** you choose a primary weapon and always carry a pistol and 2 grenades
@@ -72,8 +96,9 @@ around a corner while most of your body stays behind it. It won't push you into
 a wall, and you can't lean while sprinting or sliding. A slide keeps your sprint
 momentum for about a second with a low profile; jumping cancels it.
 
-Sensitivity, field of view, volume, graphics quality, invert-Y, map, bots,
-difficulty, loadout and your multiplayer name are saved to `localStorage`.
+Sensitivity, field of view, volume, graphics quality, announcer voice, invert-Y,
+mode, map, bots, difficulty, loadout and your multiplayer name are saved to
+`localStorage`.
 **Graphics: Low** turns off shadows and fill lights and renders at 75% resolution.
 
 ## Weapons
@@ -83,12 +108,12 @@ difficulty, loadout and your multiplayer name are saved to `localStorage`.
 | Assault rifle | 30 / 90       | 15      | full auto all-rounder; spread blooms as you hold fire |
 | SMG           | 32 / 128      | 12      | fastest fire rate, accurate on the move, weak at range |
 | Shotgun       | 6 / 24        | 8 × 10  | wide spread, falls off quickly with distance         |
-| Sniper rifle  | 5 / 20        | 80      | bolt action; scoped shots are pinpoint, hip fire is not |
+| Sniper rifle  | 2 / 20        | 80      | bolt action; scoped shots are pinpoint, hip fire is not |
 | LMG           | 60 / 120      | 17      | huge belt, heavy: slower movement, long reload       |
 | Pistol        | 12 / ∞        | 25      | everyone's sidearm                                   |
 | Grenade       | 2 (max 3)     | up to 130 | 2.3 s fuse, bounces, 7.5 m blast; walls block it; hurts you too |
 
-All guns are hitscan. Headshots deal 2×. Damage falls off with distance. Moving,
+All guns are hitscan, and reload by themselves when the magazine runs dry. Headshots deal 2×. Damage falls off with distance. Moving,
 jumping and holding the trigger widen the cone; crouching and aiming tighten it.
 
 ## Maps
@@ -111,14 +136,15 @@ point is reachable by the bots.
 No server to set up — one player hosts the match in their browser and the others
 connect to them directly.
 
-1. **Host:** enter a name, choose the map and whether you want bots, press
+1. **Host:** enter a name, choose the mode, the map and whether you want bots, press
    **Host game**. You are in the match straight away. Press `Esc` to see the room
    code and **Copy invite link**.
 2. **Friends:** open the invite link (or type the code) and press **Join**. Joining
    mid-match is fine. Up to 8 humans, plus the host's bots.
 3. Press `Enter` to chat.
-4. The host can switch bots on or off mid-match from the pause menu, and starts
-   the next match (on any map) from the end screen. Closing the room (or the
+4. The host can switch bots on or off mid-match from the pause menu, pick the
+   next match's mode and map there, and restart or start the next match from the
+   end screen. Closing the room (or the
    host's tab) ends the session for everyone.
 
 How it works:
@@ -175,7 +201,9 @@ and how much damage bots deal to you. Tune it in `src/config.js`.
 ```
 index.html            HUD + menu markup
 src/main.js           app flow: menus, pointer lock, pause, lobby, chat, main loop
-src/game.js           match rules, hitscan, grenades, damage, spawning, pickups
+src/game.js           match flow, hitscan, grenades, damage, spawning, pickups, streaks
+src/modes.js          game modes: rules, scoring, ranking, HUD text, results
+src/announcer.js      killstreak call-outs (banner + speech synthesis)
 src/net.js            multiplayer session: host/client protocol
 src/netChar.js        characters driven over the network (interpolated)
 src/transport.js      PeerJS (WebRTC) and local-tab transports
