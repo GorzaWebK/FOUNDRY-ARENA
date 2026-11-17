@@ -29,7 +29,7 @@ import { getAccount, exportCode, parseCode, importAccount } from './account.js';
 import { SKINS, SKIN_KILLS, skinSwatchCss, skinUnlocked, skinLockText } from './skins.js';
 import { SLOTS, ITEMS, itemOf, itemUnlocked, unlocksAt } from './cosmetics.js';
 import { XP, levelFromXp, MAX_LEVEL } from './progress.js';
-import { msToReset } from './challenges.js';
+import { msToReset, msToWeekReset } from './challenges.js';
 
 {
   // version stamp on the main menu, so players can compare before joining
@@ -607,17 +607,25 @@ function closeAccount() { $('account').classList.add('hidden'); }
 // ---------------------------------------------------------------- XP, levels, customize
 const fmt = (n) => n.toLocaleString('en-GB');
 game.progress.onXp = (amount) => { if (state === 'playing') hud.xpPop(amount); };
-game.progress.onChallenge = (c) => {
-  if (state === 'playing') game.announcer.announce('Challenge complete', `${c.text}  +${fmt(c.xp)} XP`);
+game.progress.onChallenge = (c, weekly) => {
+  if (state === 'playing') game.announcer.announce(weekly ? 'Weekly complete' : 'Challenge complete', `${c.text}  +${fmt(c.xp)} XP`);
   renderDaily();
 };
+game.progress.onWeekDone = (n) => {
+  const card = n >= 5 ? 'Night Shift' : 'Overtime';
+  setTimeout(() => game.announcer.announce('Full week!', n === 1 || n === 5 ? `Unlocked the ${card} calling card` : `${n} full weeks`), 2600);
+};
+let dailyTab = 'day';
 
 /** The main menu's "Today" card. */
+for (const t of document.querySelectorAll('.d-tab')) t.addEventListener('click', () => { dailyTab = t.dataset.tab; renderDaily(); });
 function renderDaily() {
   const box = $('daily-list');
   if (!box) return;
   box.textContent = '';
-  for (const { c, n, done } of game.progress.dailies()) {
+  for (const t of document.querySelectorAll('.d-tab')) t.classList.toggle('on', t.dataset.tab === dailyTab);
+  const week = dailyTab === 'week';
+  for (const { c, n, done } of week ? game.progress.weeklies() : game.progress.dailies()) {
     const row = document.createElement('div');
     row.className = 'daily' + (done ? ' done' : '');
     const top = document.createElement('div'); top.className = 'd-top';
@@ -633,8 +641,16 @@ function renderDaily() {
     row.append(top, line);
     box.append(row);
   }
-  const ms = msToReset(), h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
-  $('daily-reset').textContent = `New set in ${h}h ${m}m`;
+  const ms = week ? msToWeekReset() : msToReset();
+  const dd = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000), m = Math.floor((ms % 3600000) / 60000);
+  $('daily-reset').textContent = week ? `Resets in ${dd ? `${dd}d ` : ''}${h}h` : `New set in ${h}h ${m}m`;
+  if (week) {
+    const full = game.progress.weeksDone;
+    const note = document.createElement('p');
+    note.className = 'note d-note';
+    note.textContent = full ? `Full weeks: ${full}. Next card at ${full < 5 ? 5 : '—'}.`.replace(' Next card at —.', '') : 'Finish all three for the Overtime calling card.';
+    box.append(note);
+  }
 }
 // your own-screen cosmetics: knife finish, weapon charm, crosshair shape
 game.onCosmetics = (eq) => {
@@ -713,7 +729,7 @@ function renderCustom() {
     b.type = 'button';
     b.className = s.id === customSlot ? 'on' : '';
     b.textContent = s.name;
-    const n = ITEMS[s.id].filter((i) => itemUnlocked(i, pr.level, pr.prestige)).length;
+    const n = ITEMS[s.id].filter((i) => itemUnlocked(i, pr.level, pr.prestige, pr.weeksDone)).length;
     const sm = document.createElement('small'); sm.textContent = `${n}/${ITEMS[s.id].length}`;
     b.append(sm);
     b.addEventListener('click', () => { customSlot = s.id; renderCustom(); });
@@ -722,7 +738,7 @@ function renderCustom() {
   const grid = $('custom-items');
   grid.textContent = '';
   for (const item of ITEMS[customSlot]) {
-    const open = itemUnlocked(item, pr.level, pr.prestige);
+    const open = itemUnlocked(item, pr.level, pr.prestige, pr.weeksDone);
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'citem' + (eq[customSlot] === item.id ? ' on' : '') + (open ? '' : ' locked');
@@ -730,7 +746,8 @@ function renderCustom() {
     const nm = document.createElement('div'); nm.className = 'nm';
     nm.textContent = customSlot === 'title' ? '' : item.name; // a title's swatch already says it
     const req = document.createElement('small');
-    req.textContent = open ? (eq[customSlot] === item.id ? 'equipped' : '') : item.prestige ? `Prestige ${item.prestige}` : `Level ${item.level}`;
+    req.textContent = open ? (eq[customSlot] === item.id ? 'equipped' : '')
+      : item.weekly ? (item.weekly === 1 ? 'Finish a week' : `${item.weekly} full weeks`) : item.prestige ? `Prestige ${item.prestige}` : `Level ${item.level}`;
     nm.append(req);
     b.append(nm);
     b.addEventListener('click', () => {

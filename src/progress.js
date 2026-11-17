@@ -3,7 +3,7 @@
 // event adds to a per-match tally that the end screen shows, and to the total.
 
 import { DEFAULT_EQUIPPED, ITEMS, SLOTS, itemOf, itemUnlocked } from './cosmetics.js';
-import { dailyFor, today } from './challenges.js';
+import { dailyFor, today, weeklyFor, weekKey } from './challenges.js';
 
 export const PROGRESS_KEY = 'foundry-arena-progress';
 export const MAX_LEVEL = 50;
@@ -23,7 +23,7 @@ export const XP = {
 };
 
 function blank() {
-  return { v: 1, xp: 0, prestige: 0, equipped: { ...DEFAULT_EQUIPPED }, daily: { day: '', prog: {}, done: {} } };
+  return { v: 1, xp: 0, prestige: 0, equipped: { ...DEFAULT_EQUIPPED }, daily: { day: '', prog: {}, done: {} }, weekly: { week: '', prog: {}, done: {}, full: false }, weeksDone: 0 };
 }
 
 /** Level (1..50) and progress into it, from total XP this prestige. */
@@ -44,6 +44,11 @@ export class Progress {
         const num = (o) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([, v]) => typeof v === 'number' || v === true));
         this.p.daily = { day: raw.daily.day, prog: num(raw.daily.prog), done: num(raw.daily.done) };
       }
+      if (raw.weekly && typeof raw.weekly === 'object' && typeof raw.weekly.week === 'string') {
+        const num = (o) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([, v]) => typeof v === 'number' || v === true));
+        this.p.weekly = { week: raw.weekly.week, prog: num(raw.weekly.prog), done: num(raw.weekly.done), full: !!raw.weekly.full };
+      }
+      if (typeof raw.weeksDone === 'number') this.p.weeksDone = Math.max(0, raw.weeksDone | 0);
       if (raw.equipped && typeof raw.equipped === 'object') {
         for (const s of SLOTS) if (ITEMS[s.id].some((i) => i.id === raw.equipped[s.id])) this.p.equipped[s.id] = raw.equipped[s.id];
       }
@@ -75,7 +80,7 @@ export class Progress {
   newMatch() { this.match = []; this.startXp = this.p.xp; }
 
   /** Is `slot`'s `item` usable now? */
-  has(slot, id) { return itemUnlocked(itemOf(slot, id), this.level, this.prestige); }
+  has(slot, id) { return itemUnlocked(itemOf(slot, id), this.level, this.prestige, this.p.weeksDone); }
 
   /** Equipped items, falling back to the default for anything not (or no longer) unlocked. */
   equipped() {
@@ -100,11 +105,24 @@ export class Progress {
     return dailyFor(day).map((c) => ({ c, n: Math.min(c.goal, d.prog[c.id] || 0), done: !!d.done[c.id] }));
   }
 
+  /** This week's challenges with progress. A new week starts a new set. */
+  weeklies() {
+    const w = this.p.weekly, week = weekKey();
+    if (w.week !== week) { w.week = week; w.prog = {}; w.done = {}; w.full = false; }
+    return weeklyFor(week).map((c) => ({ c, n: Math.min(c.goal, w.prog[c.id] || 0), done: !!w.done[c.id] }));
+  }
+
+  get weeksDone() { return this.p.weeksDone; }
+
   /** Something that might move a challenge happened. meta: { weapon, mode }. */
   challenge(ev, amount = 1, meta = {}) {
     if (this.frozen) return;
-    const d = this.p.daily;
-    for (const { c, done } of this.dailies()) {
+    this._advance(this.dailies(), this.p.daily, ev, amount, meta, false);
+    this._advance(this.weeklies(), this.p.weekly, ev, amount, meta, true);
+  }
+
+  _advance(list, d, ev, amount, meta, weekly) {
+    for (const { c, done } of list) {
       if (done || c.ev !== ev) continue;
       if (c.weapon && c.weapon !== meta.weapon) continue;
       if (c.mode && c.mode !== meta.mode) continue;
@@ -112,8 +130,14 @@ export class Progress {
       this.dirty = true;
       if (d.prog[c.id] >= c.goal) {
         d.done[c.id] = true;
-        this.add(c.xp, 'Challenges');
-        if (this.onChallenge) this.onChallenge(c);
+        this.add(c.xp, weekly ? 'Weekly' : 'Challenges');
+        if (this.onChallenge) this.onChallenge(c, weekly);
+        // all three weeklies: a full week, which counts towards exclusive cards
+        if (weekly && !d.full && list.every((x) => x.c === c || d.done[x.c.id])) {
+          d.full = true;
+          this.p.weeksDone++;
+          if (this.onWeekDone) this.onWeekDone(this.p.weeksDone);
+        }
         this.save();
       }
     }

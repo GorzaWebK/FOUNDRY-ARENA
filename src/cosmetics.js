@@ -61,6 +61,8 @@ export const ITEMS = {
     { id: 'lava', name: 'Slag', level: 34, css: 'radial-gradient(circle at 30% 70%,#ffd27a 0 6%,#ff6b1a 16%,transparent 34%),radial-gradient(circle at 75% 35%,#ff6b1a 0 8%,transparent 28%),#231612' },
     { id: 'royal', name: 'Brass', level: 42, css: 'linear-gradient(180deg,#e2c27a,#a8803a 50%,#6a4a1a)' },
     { id: 'void', name: 'Blackened', level: 48, css: 'linear-gradient(135deg,#050505,#1c1f22 45%,#3a3f44 50%,#1c1f22 55%,#050505)' },
+    { id: 'overtime', name: 'Overtime', weekly: 1, css: 'repeating-linear-gradient(90deg,transparent 0 22px,rgba(242,180,23,.22) 22px 24px),linear-gradient(180deg,#2a1a08,#0f0b07)' },
+    { id: 'nightshift', name: 'Night Shift', weekly: 5, css: 'radial-gradient(circle at 78% 28%,#e9e4da 0 7%,transparent 8%),radial-gradient(circle at 70% 24%,#0b1020 0 8%,transparent 9%),linear-gradient(180deg,#0b1020,#1a2440 60%,#ff6b1a 140%)' },
     { id: 'gilded', name: 'Gilded', prestige: 1, css: 'linear-gradient(135deg,#7a5a10,#ffe08a 45%,#b8860b 70%,#ffe08a)' },
   ],
   helmet: [
@@ -137,7 +139,8 @@ export function itemOf(slot, id) {
 }
 
 /** Can someone at `level` / `prestige` use this item? */
-export function itemUnlocked(item, level, prestige) {
+export function itemUnlocked(item, level, prestige, weeks = 0) {
+  if (item.weekly) return weeks >= item.weekly;
   if (item.prestige) return prestige >= item.prestige;
   return level >= (item.level || 1);
 }

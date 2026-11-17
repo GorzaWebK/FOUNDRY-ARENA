@@ -197,6 +197,14 @@ headshot kills, a 5-kill streak, capturing 2 flags or winning a Team Deathmatch
 match. Each is worth 500 to 900 XP, paid the moment you finish it (with a
 call-out if you're mid-match). They count in any match except the training range.
 
+### Weekly challenges
+
+Switch the card to **This week** for three bigger goals (150 kills, 40 headshot
+kills, 8 wins, 8 flag captures and so on), picked fresh every Monday. Each pays
+2,500 XP. Finish all three in one week and it counts as a **full week**: your
+first full week unlocks the **Overtime** calling card, and five full weeks
+unlock **Night Shift**. Neither can be earned any other way.
+
 ### Weapon skins
 
 Every gun has five camos: Woodland, Desert, Arctic, Crimson and Tiger. A gun's
@@ -379,7 +387,7 @@ src/career.js         career stats (local, part of the account)
 src/skins.js          weapon camos: patterns, unlocks, colours
 src/progress.js       XP, levels, prestige, equipped cosmetics
 src/cosmetics.js      the unlock catalogue (what each level gives) + network form
-src/challenges.js     daily challenge pool and the day's pick
+src/challenges.js     daily and weekly challenge pools and each day's / week's pick
 src/smoke.js          smoke grenade clouds (visuals + line-of-sight blocking)
 src/account.js        player ID + account code export / import
 src/training.js       training range: targets, stands, challenge, stats
