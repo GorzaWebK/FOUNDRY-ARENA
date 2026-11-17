@@ -978,6 +978,11 @@ export class Bot extends Character {
           }
         }
       }
+      // in your face: the knife is faster than any gun
+      if (this.reactT <= 0 && this.knifeT <= 0 && !t.isProtected() && this.aimOff < 0.6) {
+        const d = Math.hypot(t.pos.x - this.pos.x, t.pos.z - this.pos.z);
+        if (d < 2.6 && Math.abs(t.pos.y - this.pos.y) < 1.5 && Math.random() < dt * 6) this.knife();
+      }
       if (w.mag === 0) this.startReload();
     } else {
       this.trackTime = Math.max(0, this.trackTime - dt * 2);
@@ -997,6 +1002,7 @@ export class Bot extends Character {
   // ======================================================================
 
   onFired() { this.model.muzzleFlash(); }
+  onKnife() { this.model.melee(); }
 
   onReload(w) { this.game.audio.play('reload', this.pos, 0.6, w.def.reload); }
 

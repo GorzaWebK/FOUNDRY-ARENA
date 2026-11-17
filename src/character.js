@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { CFG } from './config.js';
-import { makeLoadout, SWITCH_TIME, GRENADE, DEFAULT_PRIMARY } from './weapons.js';
+import { makeLoadout, SWITCH_TIME, GRENADE, KNIFE, DEFAULT_PRIMARY } from './weapons.js';
 import { gunLevel } from './modes.js';
 import { hasHeadroom } from './physics.js';
 
@@ -54,6 +54,8 @@ export class Character {
     this.switchT = 0;
     this.grenades = GRENADE.start;
     this.grenadeT = 0; // throw cooldown
+    this.knifeT = 0; // knife cooldown
+    this.meleeT = 0; // swing in progress: can't shoot
     this.lean = 0; // -1 (left) .. 1 (right)
     this.leanOff = 0; // metres the head is actually shifted sideways
     this.stepDist = 0;
@@ -109,6 +111,8 @@ export class Character {
     this.switchT = 0;
     this.grenades = GRENADE.start;
     this.grenadeT = 0;
+    this.knifeT = 0;
+    this.meleeT = 0;
     this.lean = 0;
     this.leanOff = 0;
     this.lastHurtBy = null;
@@ -141,6 +145,8 @@ export class Character {
   updateWeapons(dt) {
     if (this.switchT > 0) this.switchT = Math.max(0, this.switchT - dt);
     if (this.grenadeT > 0) this.grenadeT -= dt;
+    if (this.knifeT > 0) this.knifeT -= dt;
+    if (this.meleeT > 0) this.meleeT -= dt;
     for (let i = 0; i < this.weapons.length; i++) {
       const w = this.weapons[i];
       if (w.cooldown > 0) w.cooldown -= dt;
@@ -206,7 +212,7 @@ export class Character {
    */
   tryFire(held, pressed, ads = 0) {
     const w = this.weapon;
-    if (!held || this.switchT > 0 || w.reloadT > 0 || w.cooldown > 0) return false;
+    if (!held || this.switchT > 0 || w.reloadT > 0 || w.cooldown > 0 || this.meleeT > 0) return false;
     if (!w.def.auto && !pressed) return false;
     if (w.mag <= 0) {
       if (pressed) this.onDryFire();
@@ -221,6 +227,18 @@ export class Character {
     return true;
   }
 
+  /** Quick knife attack. Cancels a reload; the gun is back in your hands right after. */
+  knife() {
+    if (!this.alive || this.knifeT > 0) return false;
+    this.knifeT = KNIFE.cooldown;
+    this.meleeT = KNIFE.busy;
+    this.weapon.reloadT = 0;
+    this.protectedUntil = 0; // attacking ends spawn protection
+    this.game.knifeAttack(this);
+    this.onKnife();
+    return true;
+  }
+
   /** Throw a grenade along the aim direction (or `dir`, if given). */
   throwGrenade(dir = null) {
     if (!this.alive || this.grenades <= 0 || this.grenadeT > 0) return false;
@@ -232,6 +250,7 @@ export class Character {
   }
 
   // hooks
+  onKnife() {}
   onGunLevel() {}
   onThrow() {}
   onReload() {}

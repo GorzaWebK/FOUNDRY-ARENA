@@ -132,6 +132,7 @@ export class NetChar extends Character {
   }
 
   onDeath() { this.model.deadT = 0; }
+  onKnife() { this.model.melee(); }
 
   dispose() {
     this.model.dispose(this.game.scene);

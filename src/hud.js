@@ -86,6 +86,7 @@ export class Hud {
     this._set('prim', p.weapons[0].def.name, (v) => { e.slotPrim.textContent = v; });
     this._set('nades', p.grenades, (v) => { e.nadeCount.textContent = v; e.nade.classList.toggle('empty', v === 0); });
     this._set('scope', p.alive && p.scoped, (v) => e.scope.classList.toggle('hidden', !v));
+    this._set('knife', p.knifeT > 0, (v) => { $('slot-knife').classList.toggle('empty', v); });
 
     // match info
     const t = Math.max(0, Math.ceil(game.matchTime));

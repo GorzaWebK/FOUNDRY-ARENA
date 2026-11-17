@@ -10,7 +10,7 @@ import { Pickup } from './pickups.js';
 import { ViewModel } from './viewmodel.js';
 import { Player } from './player.js';
 import { Bot } from './bot.js';
-import { damageAtDistance, GRENADE, makeLoadout, makeSingle } from './weapons.js';
+import { damageAtDistance, GRENADE, KNIFE, makeLoadout, makeSingle } from './weapons.js';
 import { getMode, TEAM_COLORS, GUN_LADDER, gunLevel } from './modes.js';
 import { Announcer } from './announcer.js';
 
@@ -517,7 +517,7 @@ export class Game {
     if (attacker.isPlayer && attacker !== victim) {
       this.audio.play('kill');
       const limit = this.rules.scoreLimit && !this.rules.teams && this.mode !== 'client';
-      const sub = head ? 'Headshot' : limit ? `${attacker.kills} / ${this.rules.scoreLimit}` : '';
+      const sub = head ? (weapon === 'Knife' ? 'Backstab' : 'Headshot') : limit ? `${attacker.kills} / ${this.rules.scoreLimit}` : '';
       this.hud.centerMessage(`ELIMINATED ${victim.name.toUpperCase()}`, sub, 1.6, '#' + victim.color.toString(16).padStart(6, '0'));
     }
     this.announceKill(victim, attacker, first, ended);
@@ -540,6 +540,67 @@ export class Game {
       if (ended >= 5 && victim !== me) this.hud.feedNote(`${attacker.name} ended ${victim.name}'s ${ended}-kill streak`, attacker.color);
     }
     if (victim === me && ended >= 3 && attacker !== me) this.hud.feedNote(`Your ${ended}-kill streak is over`, 0x9aa6b2);
+  }
+
+  // ======================================================================
+  // knife
+  // ======================================================================
+
+  /** Closest enemy in front of `a` within `range` that the knife can reach, or null. */
+  meleeTarget(a, range) {
+    a.getEye(_o);
+    const fx = -Math.sin(a.yaw), fz = -Math.cos(a.yaw);
+    let best = null, bd = Infinity;
+    for (const c of this.chars) {
+      if (c === a || !c.alive || this.sameTeam(c, a)) continue;
+      if (Math.abs(c.pos.y - a.pos.y) > 1.6) continue;
+      const dx = c.pos.x - a.pos.x, dz = c.pos.z - a.pos.z;
+      const d = Math.hypot(dx, dz) - c.radius;
+      if (d > range || d >= bd) continue;
+      if (d > 0.3 && (dx * fx + dz * fz) / (d + c.radius) < KNIFE.cone) continue;
+      if (this.world.segmentBlocked(_o.x, _o.y, _o.z, c.pos.x, c.pos.y + c.height * 0.55, c.pos.z)) continue;
+      best = c; bd = d;
+    }
+    return best;
+  }
+
+  /** Is `a` behind `v` (for a backstab)? `slack` loosens the test for network lag. */
+  isBehind(a, v, slack = 0) {
+    const dx = a.pos.x - v.pos.x, dz = a.pos.z - v.pos.z;
+    const l = Math.hypot(dx, dz) || 1;
+    return (dx * -Math.sin(v.yaw) + dz * -Math.cos(v.yaw)) / l < -0.25 + slack;
+  }
+
+  knifeAttack(a) {
+    this.audio.play('knife', a.isPlayer ? null : a.pos);
+    const v = this.meleeTarget(a, KNIFE.lunge);
+    if (v) {
+      // just out of reach: lunge in (the move is collision-checked like any other)
+      const dx = v.pos.x - a.pos.x, dz = v.pos.z - a.pos.z, l = Math.hypot(dx, dz) || 1;
+      const gap = l - v.radius - KNIFE.range * 0.55;
+      if (gap > 0) { a.extX += (dx / l) * gap; a.extZ += (dz / l) * gap; }
+    }
+    if (this.mode === 'client') {
+      // the host decides the damage; show the hit right away
+      const back = !!v && this.isBehind(a, v);
+      this.net.sendKnife(v ? v.id : -1, back);
+      if (v && !v.isProtected()) {
+        this.hud.hitmarker(back, false);
+        this.audio.play('stab');
+      }
+      return;
+    }
+    if (this.mode === 'host') this.net.onKnife(a);
+    this.emitNoise(a.pos.x, a.pos.y, a.pos.z, KNIFE.noise, a, 'step');
+    if (v) this.knifeHit(a, v, this.isBehind(a, v));
+  }
+
+  /** Authoritative knife damage. */
+  knifeHit(a, v, back) {
+    _d.set(v.pos.x, v.pos.y + v.height * 0.6, v.pos.z);
+    this.effects.hitBurst(_d.x, _d.y, _d.z, v.pos.x - a.pos.x, 0, v.pos.z - a.pos.z, v.isProtected() ? 0x8fd3ff : v.color, back);
+    this.audio.play('stab', a.isPlayer ? null : _d);
+    this.damage(v, back ? KNIFE.backstab : KNIFE.damage, a, back, KNIFE);
   }
 
   // ======================================================================

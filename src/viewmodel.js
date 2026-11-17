@@ -168,7 +168,21 @@ function buildLmg() {
   };
 }
 
+function buildKnife() {
+  const g = new THREE.Group();
+  const blade = std(0xd9dee4, 0.25, 0.85), handle = std(0x23262b, 0.8, 0), guard = std(0x55606c, 0.5, 0.5);
+  bx(g, 0.012, 0.035, 0.2, blade, 0, 0, -0.12);
+  bx(g, 0.012, 0.016, 0.05, blade, 0, 0.01, -0.235, 0.6); // tip
+  bx(g, 0.05, 0.016, 0.018, guard, 0, 0, -0.012);
+  bx(g, 0.026, 0.03, 0.11, handle, 0, -0.002, 0.05);
+  bx(g, 0.07, 0.07, 0.09, std(GLOVE, 0.9, 0), 0, -0.01, 0.06);
+  bx(g, 0.066, 0.066, 0.36, std(SLEEVE, 0.9, 0), 0.02, -0.06, 0.26, 0.25);
+  return g;
+}
+
 const FLASH_SCALE = { pistol: 0.85, smg: 0.9, rifle: 1.1, lmg: 1.25, shotgun: 1.5, sniper: 1.7 };
+
+const KNIFE_ANIM = 0.42;
 
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
@@ -196,6 +210,10 @@ export class ViewModel {
     }
     this.current = null;
     this.throwT = 0;
+    this.knifeT = 0;
+    this.knife = buildKnife();
+    this.knife.visible = false;
+    this.scene.add(this.knife); // camera space, independent of the gun's pose
     this.slidePose = 0;
 
     const fmat = new THREE.MeshBasicMaterial({
@@ -238,6 +256,9 @@ export class ViewModel {
 
   /** Weapon dips out of the way while the off hand throws a grenade. */
   throwAnim() { this.throwT = 0.55; }
+
+  /** Knife slash: the gun ducks out and the knife sweeps right to left. */
+  knifeAnim() { this.knifeT = KNIFE_ANIM; }
 
   /**
    * s = { weaponId, ads (0..1), hidden, speed, onGround, sprinting, sliding,
@@ -286,6 +307,23 @@ export class ViewModel {
     this.slidePose += ((s.sliding ? 1 : 0) - this.slidePose) * Math.min(1, dt * 10);
     p.y -= this.slidePose * 0.02;
     rz += this.slidePose * 0.32;
+
+    // knife slash
+    if (this.knifeT > 0) {
+      this.knifeT -= dt;
+      const u = 1 - Math.max(0, this.knifeT) / KNIFE_ANIM; // 0 -> 1
+      const duck = Math.sin(Math.min(1, u * 1.15) * Math.PI);
+      p.y -= duck * 0.22;
+      rx -= duck * 0.6;
+      const sw = smooth(0.1, 0.6, u); // the cut itself, right to left
+      const up = smooth(0, 0.14, u) * (1 - smooth(0.72, 1, u)); // rises in from below, drops away after
+      const k = this.knife;
+      k.visible = !s.hidden && u > 0.02 && u < 0.98;
+      k.position.set(0.34 - sw * 0.62, -0.42 + up * 0.22 + Math.sin(sw * Math.PI) * 0.1, -0.5);
+      k.rotation.set(0.2, -0.55 + sw * 1.5, -1.35 + sw * 0.5);
+    } else {
+      this.knife.visible = false;
+    }
 
     // grenade throw: dip down and back up
     if (this.throwT > 0) {

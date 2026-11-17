@@ -80,6 +80,7 @@ export class BotModel {
     this.group.add(this.shield);
 
     this.walk = 0;
+    this.meleeT = 0;
     this.deadT = 0;
     this.crouchT = 0;
   }
@@ -97,6 +98,9 @@ export class BotModel {
     this.tag.material.map = nameTexture(name, color);
     this.tag.material.needsUpdate = true;
   }
+
+  /** Knife jab: the upper body twists into it. */
+  melee() { this.meleeT = 0.32; }
 
   muzzleFlash() {
     this.flashT = 0.06;
@@ -145,6 +149,14 @@ export class BotModel {
     const lean = s.lean || 0; // Q/E lean: tip the torso sideways
     this.upper.rotation.z = -lean * 0.4;
     this.upper.position.x = lean * 0.22;
+    if (this.meleeT > 0) {
+      this.meleeT -= dt;
+      const jab = Math.sin(Math.max(0, this.meleeT / 0.32) * Math.PI);
+      this.upper.rotation.y = jab * 0.7;
+      this.upper.rotation.x += jab * 0.35;
+    } else {
+      this.upper.rotation.y = 0;
+    }
     this.upper.position.y += s.onGround ? Math.abs(Math.cos(this.walk)) * Math.min(0.04, s.speed * 0.008) : 0;
 
     if (this.flashT > 0) { this.flashT -= dt; this.flash.visible = true; } else this.flash.visible = false;

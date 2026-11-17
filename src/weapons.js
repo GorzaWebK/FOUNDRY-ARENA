@@ -88,6 +88,18 @@ export const GRENADE = {
   cooldown: 0.9, noise: 70,
 };
 
+/** Quick melee (V). Usable at any time, whatever gun is in your hands. */
+export const KNIFE = {
+  id: 'knife', name: 'Knife',
+  range: 2.3, // metres from you to a target that can be hit
+  lunge: 3.0, // a target this close (but out of reach) pulls you in
+  cone: 0.55, // cos of the half-angle in front of you that counts
+  damage: 55, // two from the front
+  backstab: 150, // one from behind
+  cooldown: 0.65, busy: 0.4, // busy = no shooting while the swing plays
+  noise: 6,
+};
+
 export const SWITCH_TIME = 0.35;
 
 function makeState(def) {

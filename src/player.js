@@ -129,7 +129,7 @@ export class Player extends Character {
       this.setCrouch(crouchKey);
       // Firing or aiming pauses the sprint for as long as you keep doing it. The short
       // window after each shot stops tap-firing a semi-auto from flickering back to a sprint.
-      const busy = input.left || input.right || w.sinceShot < 0.3;
+      const busy = input.left || input.right || w.sinceShot < 0.3 || this.meleeT > 0;
       this.sprinting = shift && mf > 0.5 && !this.crouching && !busy && this.ads < 0.3 && this.onGround;
       let speed = CFG.walkSpeed;
       if (this.crouching) speed = CFG.crouchSpeed;
@@ -204,6 +204,7 @@ export class Player extends Character {
     if (input.wheel !== 0 && this.switchT <= 0) this.switchWeapon(this.weaponIdx === 0 ? 1 : 0);
     if (input.hit('KeyR')) this.startReload();
     if (input.hit('KeyF')) this.throwGrenade();
+    if (input.hit('KeyV')) this.knife();
     this.tryFire(input.left, input.leftPressed, this.ads);
     const aw = this.weapon;
     if (aw.mag === 0 && aw.cooldown <= 0 && this.canReload()) this.startReload(); // empty: reload by itself
@@ -305,6 +306,7 @@ export class Player extends Character {
   }
 
   onThrow() { this.game.viewmodel.throwAnim(); }
+  onKnife() { this.game.viewmodel.knifeAnim(); }
 
   onGunLevel(lvl) {
     const def = this.weapon.def;

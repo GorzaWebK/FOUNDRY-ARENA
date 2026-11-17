@@ -292,6 +292,20 @@ export class AudioSys {
         this._tone(o, t + 0.06, 0.09, 'sine', 1320, 1320, 0.5);
         break;
       }
+      case 'knife': {
+        // whoosh
+        const o = this._out(pos, 0.45 * vol, 5); if (!o) return;
+        const f = this._noise(o, t, 0.22, 'bandpass', 2600, 1.4, 0.9, 0.03);
+        f.frequency.exponentialRampToValueAtTime(700, t + 0.22);
+        break;
+      }
+      case 'stab': {
+        const o = this._out(pos, 0.6 * vol, 6); if (!o) return;
+        this._noise(o, t, 0.12, 'lowpass', 900, 0.8, 1.1);
+        this._tone(o, t, 0.1, 'sine', 160, 70, 0.8);
+        this._noise(o, t, 0.04, 'bandpass', 3500, 3, 0.5);
+        break;
+      }
       case 'announce': {
         const o = this._out(null, 0.32 * vol); if (!o) return;
         this._noise(o, t, 0.5, 'lowpass', 900, 0.4, 0.6, 0.01);

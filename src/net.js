@@ -13,14 +13,15 @@
 //   shot              someone fired: where the tracers / impacts go
 //   kill, hurt, pick  events
 //   gr, ex            a grenade was thrown / went off
+//   kn                someone swung a knife
 //   c                 chat line
 //   end               match over
 // Client -> host messages
-//   hello, u (my state), f (I fired), g (I threw a grenade), c (chat)
+//   hello, u (my state), f (I fired), g (I threw a grenade), k (I knifed), c (chat)
 
 import { CFG, HUMAN_COLORS, MAX_HUMANS } from './config.js';
 import * as THREE from 'three';
-import { WEAPONS, WEAPON_BY_ID, isPrimary, damageAtDistance } from './weapons.js';
+import { WEAPONS, WEAPON_BY_ID, KNIFE, isPrimary, damageAtDistance } from './weapons.js';
 import { getMap } from './maps/index.js';
 import { getMode } from './modes.js';
 import { NetChar } from './netChar.js';
@@ -257,6 +258,7 @@ export class Net {
     if (m.t === 'u') this._hostState(c, m.d);
     else if (m.t === 'f') this._hostFire(c, m);
     else if (m.t === 'g') this._hostGrenade(c, m);
+    else if (m.t === 'k') this._hostKnife(c, m);
     else if (m.t === 'c') {
       const now = performance.now();
       const text = cleanChat(m.m);
@@ -281,6 +283,33 @@ export class Net {
     if (!text || !this.role) return;
     if (this.role === 'host') this._chat(this.game.player.name, this.game.player.color, text);
     else if (this.conn) this.conn.send({ t: 'c', m: text });
+  }
+
+  /** A remote player swung their knife: show it, and check the hit they claim. */
+  _hostKnife(c, m) {
+    const g = this.game;
+    if (!c.alive || g.over) return;
+    const now = performance.now() / 1000;
+    if (now - (c.lastKnifeT || 0) < KNIFE.cooldown * 0.6) return; // faster than a knife can swing
+    c.lastKnifeT = now;
+    c.protectedUntil = 0;
+    g.audio.play('knife', c.pos);
+    c.model.melee();
+    this.broadcast({ t: 'kn', id: c.id }, c.conn);
+    g.emitNoise(c.pos.x, c.pos.y, c.pos.z, KNIFE.noise, c, 'step');
+    const v = num(m.v) ? g.charById(m.v) : null;
+    if (!v || v === c || !v.alive || g.sameTeam(v, c)) return;
+    // plausible reach (with slack for lag), same floor, nothing solid in between
+    const d = Math.hypot(v.pos.x - c.pos.x, v.pos.z - c.pos.z) - v.radius;
+    if (d > KNIFE.range + 1.2 || Math.abs(v.pos.y - c.pos.y) > 1.8) return;
+    c.getEye(_eye);
+    if (g.world.segmentBlocked(_eye.x, _eye.y, _eye.z, v.pos.x, v.pos.y + v.height * 0.55, v.pos.z)) return;
+    g.knifeHit(c, v, !!m.b && g.isBehind(c, v, 0.45));
+  }
+
+  /** Client: tell the host we swung, and who (if anyone) we think we hit. */
+  sendKnife(victimId, back) {
+    if (this.conn) this.conn.send({ t: 'k', v: victimId, b: back ? 1 : 0 });
   }
 
   /** A remote player threw a grenade: the host owns it from here. */
@@ -402,6 +431,10 @@ export class Net {
     this.broadcast({ t: 'pick', i, id: c.id });
   }
 
+  onKnife(a) {
+    this.broadcast({ t: 'kn', id: a.id });
+  }
+
   onGrenade(gr) {
     this.broadcast({ t: 'gr', id: gr.id, own: gr.owner ? gr.owner.id : -1, o: [gr.x, gr.y, gr.z], v: [gr.vx, gr.vy, gr.vz] });
   }
@@ -507,6 +540,14 @@ export class Net {
         if (who === p) {
           pk.apply(p); // ammo is ours to track; health/armour is confirmed by the next snapshot
           g.hud.toast(pk.info.label, '#' + pk.info.color.toString(16).padStart(6, '0'));
+        }
+        break;
+      }
+      case 'kn': {
+        const c = m.id !== p.id && g.charById(m.id);
+        if (c && c.alive) {
+          g.audio.play('knife', c.pos);
+          if (c.model) c.model.melee();
         }
         break;
       }

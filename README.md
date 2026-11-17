@@ -82,6 +82,7 @@ sounds depends on the voices your browser and OS provide.
 | `C` or `Ctrl`         | crouch — press it **while sprinting to slide** |
 | `Q` / `E`             | lean left / right                             |
 | `F`                   | throw a grenade                               |
+| `V`                   | knife                                         |
 | `R`                   | reload                                        |
 | `1` / `2` / wheel     | primary / pistol / swap                       |
 | `Enter`               | chat (multiplayer)                            |
@@ -112,6 +113,7 @@ mode, map, bots, difficulty, loadout and your multiplayer name are saved to
 | LMG           | 60 / 120      | 17      | huge belt, heavy: slower movement, long reload       |
 | Pistol        | 12 / ∞        | 25      | everyone's sidearm                                   |
 | Grenade       | 2 (max 3)     | up to 130 | 2.3 s fuse, bounces, 7.5 m blast; walls block it; hurts you too |
+| Knife (`V`)   | —             | 55 / 150 | quick melee with any gun in hand: two stabs from the front, one from behind; lunges at targets just out of reach |
 
 All guns are hitscan, and reload by themselves when the magazine runs dry. Headshots deal 2×. Damage falls off with distance. Moving,
 jumping and holding the trigger widen the cone; crouching and aiming tighten it.
