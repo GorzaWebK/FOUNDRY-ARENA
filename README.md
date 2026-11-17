@@ -83,6 +83,7 @@ sounds depends on the voices your browser and OS provide.
 | `Q` / `E`             | lean left / right                             |
 | `F`                   | throw a grenade                               |
 | `V`                   | knife                                         |
+| `T`                   | inspect your weapon                           |
 | `R`                   | reload                                        |
 | `1` / `2` / wheel     | primary / pistol / swap                       |
 | `Enter`               | chat (multiplayer)                            |
@@ -114,6 +115,12 @@ mode, map, bots, difficulty, loadout and your multiplayer name are saved to
 | Pistol        | 12 / ∞        | 25      | everyone's sidearm                                   |
 | Grenade       | 2 (max 3)     | up to 130 | 2.3 s fuse, bounces, 7.5 m blast; walls block it; hurts you too |
 | Knife (`V`)   | —             | 55 / 150 | quick melee with any gun in hand: two stabs from the front, one from behind; lunges at targets just out of reach |
+
+Every gun is modelled in detail (rails, sights, scopes, moving slides, pumps and
+bolts), with hand-animated reloads, ejected casings, barrel smoke after sustained
+fire and a muzzle flash that lights up your hands. Other players carry the gun
+they are actually using: the primary in their hands with the pistol holstered on
+the hip, or the pistol out with the primary slung across their back.
 
 All guns are hitscan, and reload by themselves when the magazine runs dry. Headshots deal 2×. Damage falls off with distance. Moving,
 jumping and holding the trigger widen the cone; crouching and aiming tighten it.
@@ -219,7 +226,8 @@ src/character.js      shared state / weapon handling for player and bots
 src/player.js         player movement (sprint, slide, lean), camera, input
 src/bot.js            bot AI
 src/weapons.js        weapon + grenade definitions, loadouts
-src/viewmodel.js      first-person weapon models and animation
+src/gunModels.js      procedural gun models (first-person and on characters)
+src/viewmodel.js      first-person weapon view and animation
 src/botModel.js       humanoid model + name tag
 src/worldMesh.js      merged world meshes, sky shader, lights
 src/effects.js        particles, decals, tracers, explosions

@@ -156,7 +156,7 @@ export class Bot extends Character {
       yaw: this.yaw, pitch: this.pitch,
       speed: Math.hypot(this.vel.x, this.vel.z),
       onGround: this.onGround, crouch: this.crouching,
-      protected: this.isProtected(), time: g.time,
+      protected: this.isProtected(), time: g.time, gear: this.gear(),
     });
   }
 

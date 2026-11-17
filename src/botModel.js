@@ -2,6 +2,10 @@
 
 import * as THREE from 'three';
 import { nameTexture, flashTexture } from './textures.js';
+import { worldGun } from './gunModels.js';
+
+const GUN_SCALE = 0.95;
+const HAND = new THREE.Vector3(0.14, 0.4, -0.38); // right hand, in upper-body space
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const SHIELD = new THREE.SphereGeometry(1, 24, 16);
@@ -53,8 +57,31 @@ export class BotModel {
     armR.rotation.y = 0.25;
     const armL = part(this.upper, 0.13, 0.13, 0.55, body, -0.2, 0.4, -0.28);
     armL.rotation.y = -0.55;
-    part(this.upper, 0.08, 0.12, 0.62, gun, 0.14, 0.42, -0.52);
-    part(this.upper, 0.06, 0.16, 0.08, gun, 0.14, 0.31, -0.42);
+    // weapons: one in the hands, the other stowed (pistol on the hip, or primary on the back)
+    this.heldMount = new THREE.Group();
+    this.heldMount.position.copy(HAND);
+    this.heldMount.scale.setScalar(GUN_SCALE);
+    this.upper.add(this.heldMount);
+    this.hips = new THREE.Group(); // follows the waist when crouching, but not the aim pitch
+    this.tilt.add(this.hips);
+    this.holster = part(this.hips, 0.055, 0.15, 0.085, gun, 0.285, -0.12, 0.02);
+    this.hipMount = new THREE.Group();
+    this.hipMount.position.set(0.29, -0.04, 0.02);
+    this.hipMount.rotation.x = -Math.PI / 2 + 0.12; // muzzle down, grip up and back
+    this.hipMount.scale.setScalar(GUN_SCALE);
+    this.hips.add(this.hipMount);
+    this.backMount = new THREE.Group(); // slung diagonally across the backpack
+    this.backMount.position.set(0, 0.34, 0.31);
+    this.backMount.rotation.z = 0.62;
+    this.backMount.scale.setScalar(GUN_SCALE);
+    const backUp = new THREE.Group();
+    backUp.rotation.x = Math.PI / 2; // barrel up
+    this.backInner = new THREE.Group();
+    this.backInner.rotation.z = Math.PI / 2; // side flat against the back
+    backUp.add(this.backInner);
+    this.backMount.add(backUp);
+    this.upper.add(this.backMount);
+    this.gearKey = '';
 
     this.flash = new THREE.Sprite(new THREE.SpriteMaterial({
       map: flashTexture(), color: 0xffd9a0, transparent: true, blending: THREE.AdditiveBlending,
@@ -102,6 +129,39 @@ export class BotModel {
   /** Knife jab: the upper body twists into it. */
   melee() { this.meleeT = 0.32; }
 
+  /** Show `held` in the hands and `stowed` on the hip or back (`slot`). */
+  setGear(held, stowed, slot) {
+    const key = `${held}|${stowed}|${slot}`;
+    if (key === this.gearKey) return;
+    this.gearKey = key;
+    this.heldMount.clear();
+    this.hipMount.clear();
+    this.backInner.clear();
+    if (held) {
+      const g = worldGun(held);
+      const pt = g.userData.points;
+      g.position.copy(pt.grip).negate(); // grip in the hand
+      this.heldMount.add(g);
+      this.flash.position.set(
+        HAND.x + (pt.muzzle.x - pt.grip.x) * GUN_SCALE,
+        HAND.y + (pt.muzzle.y - pt.grip.y) * GUN_SCALE,
+        HAND.z + (pt.muzzle.z - pt.grip.z) * GUN_SCALE - 0.05,
+      );
+    }
+    this.holster.visible = !!stowed && slot === 'hip';
+    if (stowed) {
+      const g = worldGun(stowed);
+      const pt = g.userData.points;
+      if (slot === 'hip') {
+        g.position.set(0, 0.02, 0);
+        this.hipMount.add(g);
+      } else {
+        g.position.copy(pt.center).negate();
+        this.backInner.add(g);
+      }
+    }
+  }
+
   muzzleFlash() {
     this.flashT = 0.06;
     this.flash.material.rotation = Math.random() * 6.28;
@@ -132,6 +192,7 @@ export class BotModel {
     }
     g.position.set(s.x, s.y, s.z);
     g.rotation.y = s.yaw;
+    if (s.gear) this.setGear(s.gear[0], s.gear[1], s.gear[2]);
 
     this.crouchT += ((s.crouch ? 1 : 0) - this.crouchT) * Math.min(1, dt * 10);
     const cr = this.crouchT;
@@ -139,6 +200,7 @@ export class BotModel {
     this.legL.scale.y = this.legR.scale.y = legScale;
     this.legL.position.y = this.legR.position.y = 0.88 * legScale + 0.0;
     this.upper.position.y = 0.9 - cr * 0.52;
+    this.hips.position.y = this.upper.position.y;
     this.tag.position.y = 2.2 - cr * 0.5;
 
     if (s.onGround && s.speed > 0.4) this.walk += dt * (3 + s.speed * 1.5);

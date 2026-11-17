@@ -5,6 +5,7 @@
 import { Character } from './character.js';
 import { CFG } from './config.js';
 import { BotModel } from './botModel.js';
+import { WEAPONS } from './weapons.js';
 
 const DELAY = 0.1; // seconds of interpolation buffer
 const TWO_PI = Math.PI * 2;
@@ -31,6 +32,18 @@ export class NetChar extends Character {
     this.netGround = true;
     this.netProtected = false;
     this.netLean = 0;
+    this.netHeld = 1; // weapon indices from the host's snapshot (clients only)
+    this.netPrim = 1;
+    this.netSide = true;
+  }
+
+  /** On clients the host tells us what this player carries; the host itself knows. */
+  gear() {
+    if (this.game.mode !== 'client') return super.gear();
+    const held = (WEAPONS[this.netHeld] || WEAPONS[1]).id;
+    const prim = (WEAPONS[this.netPrim] || WEAPONS[1]).id;
+    if (!this.netSide) return [held, null, null];
+    return held === 'pistol' && prim !== 'pistol' ? [held, prim, 'back'] : [held, 'pistol', 'hip'];
   }
 
   /** Host: (re)spawn this remote player. */
@@ -122,7 +135,7 @@ export class NetChar extends Character {
       x: this.pos.x, y: this.pos.y, z: this.pos.z,
       yaw: this.yaw, pitch: this.pitch,
       speed, onGround: this.onGround, crouch: this.crouching, lean: this.lean,
-      protected: this.isProtected(), time: g.time,
+      protected: this.isProtected(), time: g.time, gear: this.gear(),
     });
   }
 

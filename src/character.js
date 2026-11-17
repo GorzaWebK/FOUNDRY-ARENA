@@ -193,6 +193,13 @@ export class Character {
     return !!w && (w.mag > 0 || w.reserve > 0);
   }
 
+  /** What a third-person model should show: [in hand, stowed, 'hip' | 'back']. */
+  gear() {
+    const ws = this.weapons, held = this.weapon.def.id;
+    if (ws.length < 2) return [held, null, null];
+    return this.weaponIdx === 0 ? [held, ws[1].def.id, 'hip'] : [held, ws[0].def.id, 'back'];
+  }
+
   /** Gun game: hand out the gun this kill count has earned. */
   applyGunLevel() {
     if (!this.game.rules.gunGame || !this.alive) return;

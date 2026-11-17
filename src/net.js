@@ -401,6 +401,7 @@ export class Net {
       (ch.alive ? 1 : 0) | (ch.crouching ? 2 : 0) | (ch.isProtected() ? 4 : 0) | (ch.onGround ? 8 : 0),
       Math.max(0, Math.round(ch.health * 10) / 10), Math.round(ch.armor * 10) / 10,
       ch.kills, ch.deaths, ch.weapon.def.index, r2(ch.lean), ch.lives,
+      ch.weapons[0].def.index, ch.weapons.length > 1 ? 1 : 0,
     ]);
     let p = '';
     for (const pk of g.pickups) p += pk.active ? '1' : '0';
@@ -586,7 +587,7 @@ export class Net {
     if (Array.isArray(m.c)) {
       for (const e of m.c) {
         if (!Array.isArray(e) || e.length < 12) continue;
-        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, , lean, lives] = e;
+        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, held, lean, lives, prim, side] = e;
         if (id === p.id) {
           p.kills = k; p.deaths = d;
           if (num(lives)) p.lives = lives;
@@ -607,6 +608,9 @@ export class Net {
         c.netLean = num(lean) ? clamp(lean, -1, 1) : 0;
         c.health = hp; c.armor = ar; c.kills = k; c.deaths = d;
         if (num(lives)) c.lives = lives;
+        if (num(held)) c.netHeld = held | 0;
+        if (num(prim)) c.netPrim = prim | 0;
+        if (num(side)) c.netSide = !!side;
       }
     }
     if (typeof m.p === 'string') {

@@ -205,6 +205,7 @@ export class Player extends Character {
     if (input.hit('KeyR')) this.startReload();
     if (input.hit('KeyF')) this.throwGrenade();
     if (input.hit('KeyV')) this.knife();
+    if (input.hit('KeyT')) this.game.viewmodel.inspect();
     this.tryFire(input.left, input.leftPressed, this.ads);
     const aw = this.weapon;
     if (aw.mag === 0 && aw.cooldown <= 0 && this.canReload()) this.startReload(); // empty: reload by itself
@@ -233,6 +234,9 @@ export class Player extends Character {
       reloadFrac: this.weapon.reloadT > 0 ? 1 - this.weapon.reloadT / this.weapon.def.reload : -1,
       switchT: this.switchT,
       mdx: input.mdx, mdy: input.mdy,
+      // anything that needs the gun cancels an inspect
+      busy: input.left || input.right || this.sprinting || this.sliding || this.weapon.reloadT > 0
+        || this.switchT > 0 || this.meleeT > 0,
     });
   }
 
@@ -302,7 +306,7 @@ export class Player extends Character {
     this.recoilP += def.recoil * ads * (this.crouching ? 0.8 : 1);
     this.recoilY += (Math.random() - 0.5) * def.recoil * 0.7 * ads;
     this.recoilP = Math.min(this.recoilP, 0.16);
-    this.game.viewmodel.fire(def);
+    this.game.viewmodel.fire(def, Math.min(1, this.weapon.heat + def.heatPerShot));
   }
 
   onThrow() { this.game.viewmodel.throwAnim(); }
