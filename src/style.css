@@ -686,3 +686,9 @@ kbd { font-family: var(--cond); font-size: 14px; font-weight: 600; background: v
 #menu .card { padding: 10px 14px 12px; }
 #menu .menu-grid { margin: 12px 0; }
 .col-stack { gap: 12px; }
+
+/* ping */
+td.ping { font-family: var(--cond); color: var(--dim); }
+td.ping.meh { color: var(--accent-hot); }
+td.ping.bad { color: #e0483e; }
+#net-warn { position: absolute; left: 50%; top: 104px; transform: translateX(-50%); padding: 3px 12px; background: rgba(13, 17, 21, 0.85); box-shadow: inset 3px 0 0 #e0483e; font-size: 14px; letter-spacing: 0.14em; color: #e9e4da; }

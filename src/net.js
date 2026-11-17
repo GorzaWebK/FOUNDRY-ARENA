@@ -206,6 +206,15 @@ export class Net {
       this.acc = 0;
       this._sendState();
     }
+    // host: time a round trip to every player every couple of seconds
+    if (this.role === 'host') {
+      this.pingSendT = (this.pingSendT || 0) + dt;
+      if (this.pingSendT >= 2) {
+        this.pingSendT = 0;
+        const ts = Math.round(performance.now());
+        for (const r of this.game.remotes) if (r.conn) r.conn.send({ t: 'pg', ts });
+      }
+    }
     // A dropped connection doesn't always announce itself: watch for silence.
     this.checkT += dt;
     if (this.checkT < 1) return;
@@ -379,6 +388,10 @@ export class Net {
     else if (m.t === 'k') this._hostKnife(c, m);
     else if (m.t === 'vote') this._vote(c.id, m.i);
     else if (m.t === 'bye') c.leftOnPurpose = true;
+    else if (m.t === 'po' && num(m.ts)) {
+      const rtt = Math.max(0, performance.now() - m.ts);
+      if (rtt < 10000) c.ping = c.ping ? Math.round(c.ping * 0.6 + rtt * 0.4) : Math.round(rtt);
+    }
     else if (m.t === 'team') {
       const now = performance.now();
       if ((m.tm === 0 || m.tm === 1) && now - (c.lastTeamT || 0) > 1000) { c.lastTeamT = now; g0.switchTeam(c, m.tm); }
@@ -554,6 +567,7 @@ export class Net {
       ch.kills, ch.deaths, ch.weapon.def.index, r2(ch.lean), ch.lives,
       ch.weapons[0].def.index, ch.weapons.length > 1 ? 1 : 0, Math.round(ch.hillTime || 0), ch.caps || 0,
       skinIndex(ch.skinOf(ch.weapons[0].def.id)), skinIndex(ch.skinOf('pistol')),
+      ch === g.player ? 0 : ch.isHuman ? (ch.ping ?? -2) : -1, // -2: not measured yet
     ]);
     let p = '';
     for (const pk of g.pickups) p += pk.active ? '1' : '0';
@@ -703,7 +717,8 @@ export class Net {
     this.lastHeard = performance.now();
     const g = this.game, p = g.player;
     switch (m.t) {
-      case 's': this._applySnapshot(m); break;
+      case 's': this.lastSnapT = performance.now(); this._applySnapshot(m); break;
+      case 'pg': if (this.conn && num(m.ts)) this.conn.send({ t: 'po', ts: m.ts }); break;
       case 'roster': this._applyRoster(m.r); break;
       case 'spawn':
         p.spawnAt(m.x, m.y, m.z, m.yaw);
@@ -815,10 +830,11 @@ export class Net {
     if (Array.isArray(m.c)) {
       for (const e of m.c) {
         if (!Array.isArray(e) || e.length < 12) continue;
-        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, held, lean, lives, prim, side, hillT, caps, skinP, skinS] = e;
+        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, held, lean, lives, prim, side, hillT, caps, skinP, skinS, ping] = e;
         if (id === p.id) {
           p.kills = k; p.deaths = d;
           if (num(caps)) p.caps = caps;
+          if (num(ping)) p.ping = ping;
           if (num(lives)) p.lives = lives;
           if (num(hillT)) p.hillTime = hillT;
           p.applyGunLevel(); // gun game: a kill may have earned the next gun
@@ -840,6 +856,7 @@ export class Net {
         if (num(lives)) c.lives = lives;
         if (num(hillT)) c.hillTime = hillT;
         if (num(caps)) c.caps = caps;
+        if (num(ping)) c.ping = ping;
         if (num(skinP)) c.netSkinP = skinP | 0;
         if (num(skinS)) c.netSkinS = skinS | 0;
         if (num(held)) c.netHeld = held | 0;

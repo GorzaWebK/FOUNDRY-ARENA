@@ -320,6 +320,9 @@ How it works:
 - Each build is stamped with the git commit it was built from (`src/version.js`,
   set in `vite.config.js`). Host and joiner swap stamps on connect and refuse to
   play together if they differ, since the message format can change between versions.
+- The scoreboard shows everyone's **ping** in multiplayer (amber over 120 ms, red
+  over 200 ms), measured by the host every 2 seconds. Players see a warning when
+  their ping is high or the host stops sending updates.
 - If a connection goes quiet for 10 seconds the player is dropped (or, for a
   client, returned to the menu, where it retries the room up to 5 times).
 

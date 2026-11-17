@@ -232,6 +232,15 @@ export class Hud {
 
     if (this.anT > 0) { this.anT -= dt; if (this.anT <= 0) e.announce.style.opacity = 0; }
     if (this.xpT > 0) { this.xpT -= dt; if (this.xpT <= 0) $('xp-pop').style.opacity = 0; }
+    // client: warn about a bad connection to the host
+    const net = game.net;
+    let warn = '';
+    if (net && net.role === 'client') {
+      const quiet = performance.now() - (net.lastSnapT || performance.now());
+      if (quiet > 800) warn = 'HOST NOT RESPONDING';
+      else if ((p.ping || 0) > 220) warn = `HIGH PING ${p.ping} MS`;
+    }
+    this._set('netWarn', warn, (v) => { const el = $('net-warn'); el.textContent = v; el.classList.toggle('hidden', !v); });
 
     // Capture the Flag: status line + a marker on each flag
     const ctf = game.ctf;
@@ -462,13 +471,23 @@ export class Hud {
     const rows = game.ranking();
     const col = game.rules.column;
     const head = tbody.parentElement.tHead;
-    const headHtml = `<tr><th>#</th><th class="l">Player</th>${col ? `<th>${col.title}</th>` : ''}<th>Kills</th><th>Deaths</th></tr>`;
+    const mp = !!game.net && game.net.active;
+    const headHtml = `<tr><th>#</th><th class="l">Player</th>${col ? `<th>${col.title}</th>` : ''}<th>Kills</th><th>Deaths</th>${mp ? '<th>Ping</th>' : ''}</tr>`;
+    // ping: the host is "host", bots are "bot", players show ms (red when it's bad)
+    const pingCell = (c) => {
+      if (!mp) return '';
+      const hostId = game.mode === 'host' ? game.player.id : 0;
+      if (c.id === hostId) return '<td class="ping">host</td>';
+      if (!c.isHuman) return '<td class="ping">bot</td>';
+      const v = c.ping ?? -2;
+      return `<td class="ping${v > 200 ? ' bad' : v > 120 ? ' meh' : ''}">${v < 0 ? '…' : v}</td>`;
+    };
     if (head.innerHTML !== headHtml) head.innerHTML = headHtml;
     tbody.innerHTML = rows.map((c, i) => (
       `<tr class="${c.isPlayer ? 'me' : ''}${c.alive ? '' : ' dead'}"><td>${i + 1}</td>`
       + `<td class="l"><i style="background:${hex(c.color)}"></i>${lvBadge(c)}${esc(c.name)}`
       + `<small class="sb-title">${esc(itemOf('title', c.cos ? c.cos.equipped.title : 'recruit').name)}</small></td>`
-      + `${col ? `<td>${esc(col.value(c))}</td>` : ''}<td>${c.kills}</td><td>${c.deaths}</td></tr>`
+      + `${col ? `<td>${esc(col.value(c))}</td>` : ''}<td>${c.kills}</td><td>${c.deaths}</td>${pingCell(c)}</tr>`
     )).join('');
   }
 }
