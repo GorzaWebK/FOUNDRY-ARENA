@@ -38,6 +38,7 @@ export class Player extends Character {
   spawnAt(x, y, z, yaw) {
     this.primary = this.game.settings.primary; // loadout choices apply on (re)spawn
     this.tacId = this.game.settings.tactical;
+    this.game.applyOwnSkins();
     super.spawnAt(x, y, z, yaw);
     const g = this.game;
     g.killcam.stop();

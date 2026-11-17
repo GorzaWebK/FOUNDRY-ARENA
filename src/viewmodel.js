@@ -7,7 +7,8 @@
 import * as THREE from 'three';
 import { flashTexture, glowTexture } from './textures.js';
 import { SWITCH_TIME } from './weapons.js';
-import { buildGun, makeMaterials } from './gunModels.js';
+import { buildGun, makeMaterials, PALETTE } from './gunModels.js';
+import { SKINNED, camoTexture } from './skins.js';
 
 const GLOVE = 0x3a3f47, SLEEVE = 0x34475c;
 const std = (color, rough = 0.6, metal = 0.1) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal });
@@ -80,7 +81,10 @@ export class ViewModel {
     this.mats = makeMaterials();
     this.models = {};
     for (const id of Object.keys(VIEW)) {
-      const spec = buildGun(id, this.mats);
+      const mats = makeMaterials(); // each gun gets its own, so each can wear its own skin
+      const spec = buildGun(id, mats);
+      spec.mats = mats;
+      spec.skin = 'none';
       const v = VIEW[id];
       spec.view = v;
       spec.hip = new THREE.Vector3(...v.hip);
@@ -192,6 +196,24 @@ export class ViewModel {
     if (def.id === 'shotgun') { this.delayedEject = 0.44; this.puff(3); }
     else if (def.id === 'sniper') { this.delayedEject = 0.5; this.puff(3); }
     else this.pendingEject++;
+  }
+
+  /** Paint a gun in a skin ('none' = factory finish). */
+  setSkin(id, skin) {
+    const m = this.models[id];
+    if (!m || m.skin === skin) return;
+    m.skin = skin;
+    const tex = skin && skin !== 'none' ? camoTexture(skin) : null;
+    for (const key of SKINNED) {
+      const mat = m.mats[key];
+      if (!mat) continue;
+      mat.map = tex;
+      // under a camo the material is near-white (the pattern carries the colour);
+      // lighter parts stay a touch lighter so the shapes still read
+      if (tex) mat.color.set(key === 'polymerLight' || key === 'metalLight' ? 0xffffff : 0xdedede);
+      else mat.color.set(PALETTE[key][0]);
+      mat.needsUpdate = true;
+    }
   }
 
   land(strength) { this.landDip = Math.min(0.06, strength * 0.006); }

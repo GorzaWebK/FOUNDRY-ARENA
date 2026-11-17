@@ -15,6 +15,7 @@ import { SmokeClouds } from './smoke.js';
 import { applyCrosshair } from './settings.js';
 import { Career } from './career.js';
 import { Ctf } from './ctf.js';
+import { SKIN_GUNS, SKIN_BY_ID, skinUnlocked } from './skins.js';
 import { getMode, makeRules, MODES, TEAM_COLORS, TEAM_NAMES, GUN_LADDER, gunLevel } from './modes.js';
 import { MAPS, getMap } from './maps/index.js';
 import { Announcer } from './announcer.js';
@@ -447,6 +448,22 @@ export class Game {
   clearRemotes() {
     for (const r of this.remotes) r.dispose();
     this.remotes = [];
+  }
+
+  /** The skins you've picked that you've also unlocked. */
+  ownSkins() {
+    const out = {}, picked = this.settings.skins || {};
+    for (const id of SKIN_GUNS) {
+      const k = picked[id];
+      if (k && SKIN_BY_ID[k] && skinUnlocked(this.career, id, k)) out[id] = k;
+    }
+    return out;
+  }
+
+  /** Put your skins on your guns (first person and your character). */
+  applyOwnSkins() {
+    this.player.skins = this.ownSkins();
+    for (const id of SKIN_GUNS) this.viewmodel.setSkin(id, this.player.skins[id] || 'none');
   }
 
   /** Does what happens now count towards your career stats? */

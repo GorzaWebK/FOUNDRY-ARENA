@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { skinColor } from './skins.js';
 
 // ------------------------------------------------------------------ palette
 
@@ -330,12 +331,13 @@ const WORLD_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness
 const worldCache = new Map();
 const _c = new THREE.Color();
 
-/** Merge a gun into one vertex-coloured geometry (built once per gun). */
-function worldSpec(id) {
-  if (worldCache.has(id)) return worldCache.get(id);
-  // record each part's colour through a throwaway material set
+/** Merge a gun into one vertex-coloured geometry (built once per gun and skin). */
+function worldSpec(id, skin = 'none') {
+  const cacheKey = `${id}|${skin}`;
+  if (worldCache.has(cacheKey)) return worldCache.get(cacheKey);
+  // record each part's colour through a throwaway material set (skins repaint the body parts)
   const mats = {};
-  for (const [key, [color]] of Object.entries(PALETTE)) mats[key] = { color: new THREE.Color(color) };
+  for (const [key, [color]] of Object.entries(PALETTE)) mats[key] = { color: new THREE.Color(skinColor(skin, key) || color) };
   LOW = true;
   let spec;
   try { spec = BUILDERS[id](mats); } finally { LOW = false; }
@@ -355,13 +357,13 @@ function worldSpec(id) {
   });
   const out = { geometry: mergeGeometries(geos, false), points: spec.points };
   for (const g of geos) g.dispose();
-  worldCache.set(id, out);
+  worldCache.set(cacheKey, out);
   return out;
 }
 
-/** A single-mesh copy of a gun for a character to hold or carry. */
-export function worldGun(id) {
-  const spec = worldSpec(id);
+/** A single-mesh copy of a gun (in a skin) for a character to hold or carry. */
+export function worldGun(id, skin = 'none') {
+  const spec = worldSpec(id, skin);
   const mesh = new THREE.Mesh(spec.geometry, WORLD_MAT);
   mesh.castShadow = true;
   mesh.userData.points = spec.points;

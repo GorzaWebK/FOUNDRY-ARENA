@@ -151,6 +151,15 @@ kills, time played, and kills with each weapon. The training range and the menu
 background don't count, and a match only counts once you've played 20 seconds
 of it. Career stats are part of your account, so they move with your account code.
 
+### Weapon skins
+
+Every gun has five camos: Woodland, Desert, Arctic, Crimson and Tiger. A gun's
+camos unlock once you have **50 kills with that gun** (career stats count them).
+Pick them under **Weapon skins…** (next to Loadout, or in Career): each gun
+shows its swatches, your progress towards 50, and which one you're wearing.
+Skins show on your gun in first person and on your character, other players
+see them in multiplayer, and some bots run camos too.
+
 ### Your account
 
 Every player gets a random, unique **player ID** (like `FA-7K3M-Q9XD`), shown at
@@ -311,6 +320,7 @@ src/modes.js          game modes: rules, scoring, ranking, HUD text, results
 src/killcam.js        rolling recording + kill cam replay
 src/ctf.js            Capture the Flag: flags, rules, flag models
 src/career.js         career stats (local, part of the account)
+src/skins.js          weapon camos: patterns, unlocks, colours
 src/smoke.js          smoke grenade clouds (visuals + line-of-sight blocking)
 src/account.js        player ID + account code export / import
 src/training.js       training range: targets, stands, challenge, stats

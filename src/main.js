@@ -16,6 +16,7 @@ import { cleanRoomCode } from './transport.js';
 import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
 import { BUILD, BUILD_TIME } from './version.js';
 import { getAccount, exportCode, parseCode, importAccount } from './account.js';
+import { SKINS, SKIN_KILLS, skinSwatchCss, skinUnlocked } from './skins.js';
 
 {
   // version stamp on the main menu, so players can compare before joining
@@ -606,7 +607,6 @@ $('btn-rules-reset').addEventListener('click', () => {
 });
 
 // ---------------------------------------------------------------- career
-const SKIN_KILLS = 50; // kills with a gun to unlock its skins
 const fmtTime = (s) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m`; };
 function renderCareer() {
   const c = game.career.stats;
@@ -644,18 +644,42 @@ function renderCareer() {
     const b = document.createElement('td'); b.textContent = n;
     const p = document.createElement('td'); p.className = 'l';
     if (gun) {
-      if (n >= SKIN_KILLS) { p.innerHTML = '<span class="done">Skins unlocked</span>'; }
-      else {
-        p.title = `${SKIN_KILLS - n} more kills to unlock its skins`;
-        p.innerHTML = `<div class="bar"><i style="width:${Math.round((n / SKIN_KILLS) * 100)}%"></i></div>`;
+      // skin swatches: click one to wear it (locked until SKIN_KILLS kills with this gun)
+      const row = document.createElement('div'); row.className = 'swatches';
+      const current = settings.skins[id] || 'none';
+      const open = n >= SKIN_KILLS;
+      for (const sk of SKINS) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'swatch' + (sk.id === current && skinUnlocked(game.career, id, sk.id) ? ' on' : '') + (skinUnlocked(game.career, id, sk.id) ? '' : ' locked');
+        b.style.background = skinSwatchCss(sk.id);
+        b.title = sk.id === 'none' || open ? sk.name : `${sk.name} — ${SKIN_KILLS - n} more ${name} kills to unlock`;
+        b.addEventListener('click', () => {
+          if (!skinUnlocked(game.career, id, sk.id)) return;
+          if (sk.id === 'none') delete settings.skins[id]; else settings.skins[id] = sk.id;
+          saveSettings(settings);
+          game.applyOwnSkins();
+          audio.play('ui');
+          renderCareer();
+        });
+        row.append(b);
       }
+      if (!open) {
+        const prog = document.createElement('span');
+        prog.className = 'prog';
+        prog.textContent = `${n}/${SKIN_KILLS}`;
+        row.append(prog);
+      }
+      p.append(row);
     }
     tr.append(a, b, p);
     body.append(tr);
   }
   $('career-id').textContent = account.id;
 }
-$('btn-career').addEventListener('click', () => { renderCareer(); $('career').classList.remove('hidden'); });
+function openCareer() { renderCareer(); $('career').classList.remove('hidden'); }
+$('btn-career').addEventListener('click', openCareer);
+for (const id of ['btn-skins', 'btn-skins-pause']) $(id).addEventListener('click', openCareer);
 $('btn-career-done').addEventListener('click', () => $('career').classList.add('hidden'));
 $('btn-career-reset').addEventListener('click', () => {
   if (!window.confirm('Reset all your career stats to zero? This also re-locks weapon skins. It can\'t be undone (unless you have an account code from before).')) return;

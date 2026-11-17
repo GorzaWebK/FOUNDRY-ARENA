@@ -6,6 +6,7 @@ import { Character } from './character.js';
 import { CFG } from './config.js';
 import { BotModel } from './botModel.js';
 import { WEAPONS } from './weapons.js';
+import { SKINS } from './skins.js';
 
 const DELAY = 0.1; // seconds of interpolation buffer
 const TWO_PI = Math.PI * 2;
@@ -35,6 +36,8 @@ export class NetChar extends Character {
     this.netHeld = 1; // weapon indices from the host's snapshot (clients only)
     this.netPrim = 1;
     this.netSide = true;
+    this.netSkinP = 0; // skin indices (primary, pistol) from snapshots
+    this.netSkinS = 0;
   }
 
   /** On clients the host tells us what this player carries; the host itself knows. */
@@ -42,8 +45,10 @@ export class NetChar extends Character {
     if (this.game.mode !== 'client') return super.gear();
     const held = (WEAPONS[this.netHeld] || WEAPONS[1]).id;
     const prim = (WEAPONS[this.netPrim] || WEAPONS[1]).id;
-    if (!this.netSide) return [held, null, null];
-    return held === 'pistol' && prim !== 'pistol' ? [held, prim, 'back'] : [held, 'pistol', 'hip'];
+    const skinP = (SKINS[this.netSkinP] || SKINS[0]).id, skinS = (SKINS[this.netSkinS] || SKINS[0]).id;
+    const sk = (id) => (id === 'pistol' && prim !== 'pistol' ? skinS : skinP);
+    if (!this.netSide) return [held, null, null, sk(held), 'none'];
+    return held === 'pistol' && prim !== 'pistol' ? [held, prim, 'back', skinS, skinP] : [held, 'pistol', 'hip', sk(held), skinS];
   }
 
   /** Host: (re)spawn this remote player. */

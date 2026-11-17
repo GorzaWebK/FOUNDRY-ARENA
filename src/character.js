@@ -56,6 +56,7 @@ export class Character {
     this.tacId = DEFAULT_TACTICAL; // loadout choice: flashbang or smoke
     this.tacDef = TACTICAL_BY_ID[this.tacId];
     this.tactical = this.tacDef.start;
+    this.skins = {}; // weapon id -> skin id (cosmetic)
     this.cook = null; // { def, t }: a grenade in hand with its pin pulled
     this.blindUntil = 0; // flashbanged until this game time
     this.grenadeT = 0; // throw cooldown
@@ -202,11 +203,15 @@ export class Character {
     return !!w && (w.mag > 0 || w.reserve > 0);
   }
 
-  /** What a third-person model should show: [in hand, stowed, 'hip' | 'back']. */
+  /** The skin this character's `weaponId` wears. */
+  skinOf(weaponId) { return (this.skins && this.skins[weaponId]) || 'none'; }
+
+  /** What a third-person model should show: [in hand, stowed, 'hip' | 'back', hand skin, stowed skin]. */
   gear() {
     const ws = this.weapons, held = this.weapon.def.id;
-    if (ws.length < 2) return [held, null, null];
-    return this.weaponIdx === 0 ? [held, ws[1].def.id, 'hip'] : [held, ws[0].def.id, 'back'];
+    if (ws.length < 2) return [held, null, null, this.skinOf(held), 'none'];
+    const stowed = this.weaponIdx === 0 ? ws[1].def.id : ws[0].def.id;
+    return [held, stowed, this.weaponIdx === 0 ? 'hip' : 'back', this.skinOf(held), this.skinOf(stowed)];
   }
 
   /** Gun game: hand out the gun this kill count has earned. */

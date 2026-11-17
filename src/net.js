@@ -28,6 +28,7 @@ import { NetChar } from './netChar.js';
 import { getTransport, makeRoomCode, cleanRoomCode } from './transport.js';
 import { BUILD, BUILD_TIME, OLD_CLIENT_MSG, OLD_HOST_MSG } from './version.js';
 import { getAccount, isPlayerId } from './account.js';
+import { SKINS, skinIndex } from './skins.js';
 
 const SNAP_INTERVAL = 1 / 20;
 const SEND_INTERVAL = 1 / 30;
@@ -446,6 +447,10 @@ export class Net {
     }
     c.weaponIdx = Math.min(c.weapons.length - 1, (d[6] | 0) === c.weapons[0].def.index ? 0 : 1);
     if (!g.rules.gunGame) c.weapons[0].reserve = clamp(d[7] | 0, 0, c.weapons[0].def.reserveMax);
+    // their weapon skins (cosmetic, so taken at their word)
+    if (num(d[12]) && num(d[13]) && SKINS[d[12] | 0] && SKINS[d[13] | 0]) {
+      c.skins = { [c.weapons[0].def.id]: SKINS[d[12] | 0].id, pistol: SKINS[d[13] | 0].id };
+    }
     const tac = TACTICALS[d[11] | 0];
     if (num(d[11]) && tac && tac !== c.tacId) {
       c.tacId = tac;
@@ -510,6 +515,7 @@ export class Net {
       Math.max(0, Math.round(ch.health * 10) / 10), Math.round(ch.armor * 10) / 10,
       ch.kills, ch.deaths, ch.weapon.def.index, r2(ch.lean), ch.lives,
       ch.weapons[0].def.index, ch.weapons.length > 1 ? 1 : 0, Math.round(ch.hillTime || 0), ch.caps || 0,
+      skinIndex(ch.skinOf(ch.weapons[0].def.id)), skinIndex(ch.skinOf('pistol')),
     ]);
     let p = '';
     for (const pk of g.pickups) p += pk.active ? '1' : '0';
@@ -770,7 +776,7 @@ export class Net {
     if (Array.isArray(m.c)) {
       for (const e of m.c) {
         if (!Array.isArray(e) || e.length < 12) continue;
-        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, held, lean, lives, prim, side, hillT, caps] = e;
+        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, held, lean, lives, prim, side, hillT, caps, skinP, skinS] = e;
         if (id === p.id) {
           p.kills = k; p.deaths = d;
           if (num(caps)) p.caps = caps;
@@ -795,6 +801,8 @@ export class Net {
         if (num(lives)) c.lives = lives;
         if (num(hillT)) c.hillTime = hillT;
         if (num(caps)) c.caps = caps;
+        if (num(skinP)) c.netSkinP = skinP | 0;
+        if (num(skinS)) c.netSkinS = skinS | 0;
         if (num(held)) c.netHeld = held | 0;
         if (num(prim)) c.netPrim = prim | 0;
         if (num(side)) c.netSide = !!side;
@@ -819,7 +827,8 @@ export class Net {
       d: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z), r3(p.yaw), r3(p.pitch),
         (p.crouching ? 2 : 0) | (p.onGround ? 8 : 0),
         p.weapon.def.index, p.weapons[0].reserve === Infinity ? 0 : p.weapons[0].reserve, this.mySeq,
-        r2(p.lean), WEAPON_BY_ID[p.primary].index, Math.max(0, TACTICALS.indexOf(p.tacId))],
+        r2(p.lean), WEAPON_BY_ID[p.primary].index, Math.max(0, TACTICALS.indexOf(p.tacId)),
+        skinIndex(p.skinOf(p.weapons[0].def.id)), skinIndex(p.skinOf('pistol'))],
     });
   }
 

@@ -105,7 +105,7 @@
             <label class="row"><span>Difficulty</span>
               <select id="set-diff"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select><output></output>
             </label>
-            <h4>Loadout</h4>
+            <h4 class="h-with-btn">Loadout <button id="btn-skins" class="link-btn">Weapon skins…</button></h4>
             <div id="menu-loadout" class="loadout"></div>
             <p class="note">Plus a pistol, 2 grenades and 2 flashbangs or smokes.</p>
           </div>
@@ -156,7 +156,7 @@
           <label class="row"><span>Map</span><select id="pause-map"></select><output></output></label>
           <p class="note">Press <b>Restart match</b> to play it.</p>
         </div>
-        <h4>Loadout <small>— applies on your next respawn</small></h4>
+        <h4 class="h-with-btn">Loadout <small>— applies on your next respawn</small> <button id="btn-skins-pause" class="link-btn">Weapon skins…</button></h4>
         <div id="pause-loadout" class="loadout compact"></div>
         <div id="pause-tac" class="loadout compact tac"></div>
         <p id="loadout-note" class="note"></p>
@@ -217,8 +217,8 @@
         <h2>CAREER</h2>
         <p class="acct-line">Player ID <b id="career-id" class="acct-id">—</b></p>
         <div id="career-grid" class="career-grid"></div>
-        <h4>Kills by weapon</h4>
-        <table class="career-weapons"><thead><tr><th class="l">Weapon</th><th>Kills</th><th class="l prog-h">Skins (at 50 kills)</th></tr></thead><tbody id="career-weapons"></tbody></table>
+        <h4>Kills and skins by weapon</h4>
+        <table class="career-weapons"><thead><tr><th class="l">Weapon</th><th>Kills</th><th class="l prog-h">Skins <small>(unlock at 50 kills with the gun)</small></th></tr></thead><tbody id="career-weapons"></tbody></table>
         <p class="note">Counts every match you play, solo or multiplayer (not the training range). It's part of your account, so
           it comes with you when you import your account code.</p>
         <div class="btn-row">

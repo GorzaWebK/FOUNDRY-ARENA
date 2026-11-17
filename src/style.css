@@ -364,17 +364,26 @@ h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 #rules .panel { width: min(480px, 100%); }
 #rules-rows { margin-top: 10px; }
 .acct-row .acct-line { white-space: nowrap; }
-#career .panel { width: min(620px, 100%); }
-.career-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; }
+#career .panel { width: min(680px, 100%); padding: 20px 26px; }
+#career h2 { margin-bottom: 6px; }
+.career-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 10px; }
 @media (max-width: 560px) { .career-grid { grid-template-columns: repeat(2, 1fr); } }
-.cstat { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
-.cstat b { display: block; font: 700 20px var(--mono); color: var(--ink); }
+.cstat { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; }
+.cstat b { display: block; font: 700 17px var(--mono); color: var(--ink); }
 .cstat span { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
 .cstat small { display: block; font-size: 11px; color: var(--dim); }
-.career-weapons td, .career-weapons th { padding: 4px 8px; font-size: 13px; }
+.career-weapons td, .career-weapons th { padding: 3px 8px; font-size: 13px; }
 .career-weapons .bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); overflow: hidden; min-width: 120px; }
 .career-weapons .bar i { display: block; height: 100%; background: var(--accent); }
 .career-weapons .done { color: #5dff9a; font-size: 11px; }
+.swatches { display: flex; align-items: center; gap: 4px; }
+.swatch { width: 26px; height: 18px; padding: 0; border-radius: 4px; border: 2px solid transparent; cursor: pointer; }
+.swatch.on { border-color: var(--accent); box-shadow: 0 0 0 1px #000 inset; }
+.swatch.locked { opacity: 0.3; cursor: not-allowed; filter: grayscale(0.4); }
+.swatches .prog { font: 11px var(--mono); color: var(--dim); margin-left: 4px; }
+.h-with-btn { display: flex; align-items: baseline; gap: 6px; }
+.link-btn { margin-left: auto; background: none; border: none; padding: 0; color: var(--accent); font: inherit; font-size: 11px; letter-spacing: 0.08em; cursor: pointer; text-transform: none; }
+.link-btn:hover { text-decoration: underline; background: none; }
 .acct-line { margin: 0; font-size: 13px; color: var(--dim); }
 .acct-id { font-family: var(--mono); color: var(--ink); letter-spacing: 0.06em; margin-left: 4px; user-select: all; }
 #account .panel { width: min(560px, 100%); }

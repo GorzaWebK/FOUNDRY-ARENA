@@ -26,6 +26,7 @@ export const DEFAULTS = {
   killcam: true,
   leanToggle: true, // tap Q / E to lean instead of holding
   rules: { limits: {}, time: 0, ff: false, pickups: true, hardcore: false }, // custom match rules (limits per mode)
+  skins: {}, // weapon id -> skin id (only used once unlocked)
   // crosshair
   xhColor: '#ffffff',
   xhLen: 9, // line length, px (0 = dot only)
@@ -55,6 +56,11 @@ export function loadSettings() {
   if (!MAPS.some((m) => m.id === s.map)) s.map = DEFAULT_MAP;
   if (!MODES.some((m) => m.id === s.mode)) s.mode = DEFAULT_MODE;
   s.binds = cleanBinds(s.binds);
+  {
+    const out = {};
+    if (s.skins && typeof s.skins === 'object') for (const [k, v] of Object.entries(s.skins)) if (typeof v === 'string' && v.length < 20 && k.length < 20) out[k] = v;
+    s.skins = out;
+  }
   {
     const r = s.rules && typeof s.rules === 'object' ? s.rules : {};
     const limits = {};

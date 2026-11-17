@@ -130,15 +130,15 @@ export class BotModel {
   melee() { this.meleeT = 0.32; }
 
   /** Show `held` in the hands and `stowed` on the hip or back (`slot`). */
-  setGear(held, stowed, slot) {
-    const key = `${held}|${stowed}|${slot}`;
+  setGear(held, stowed, slot, heldSkin = 'none', stowedSkin = 'none') {
+    const key = `${held}|${stowed}|${slot}|${heldSkin}|${stowedSkin}`;
     if (key === this.gearKey) return;
     this.gearKey = key;
     this.heldMount.clear();
     this.hipMount.clear();
     this.backInner.clear();
     if (held) {
-      const g = worldGun(held);
+      const g = worldGun(held, heldSkin);
       const pt = g.userData.points;
       g.position.copy(pt.grip).negate(); // grip in the hand
       this.heldMount.add(g);
@@ -150,7 +150,7 @@ export class BotModel {
     }
     this.holster.visible = !!stowed && slot === 'hip';
     if (stowed) {
-      const g = worldGun(stowed);
+      const g = worldGun(stowed, stowedSkin);
       const pt = g.userData.points;
       if (slot === 'hip') {
         g.position.set(0, 0.02, 0);
@@ -192,7 +192,7 @@ export class BotModel {
     }
     g.position.set(s.x, s.y, s.z);
     g.rotation.y = s.yaw;
-    if (s.gear) this.setGear(s.gear[0], s.gear[1], s.gear[2]);
+    if (s.gear) this.setGear(s.gear[0], s.gear[1], s.gear[2], s.gear[3], s.gear[4]);
 
     this.crouchT += ((s.crouch ? 1 : 0) - this.crouchT) * Math.min(1, dt * 10);
     const cr = this.crouchT;
