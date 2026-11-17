@@ -30,6 +30,7 @@ export class NetChar extends Character {
     this.netCrouch = false;
     this.netGround = true;
     this.netProtected = false;
+    this.netLean = 0;
   }
 
   /** Host: (re)spawn this remote player. */
@@ -95,6 +96,8 @@ export class NetChar extends Character {
         this.vel.set((c.x - a.x) / span, (c.y - a.y) / span, (c.z - a.z) / span);
       }
     }
+    this.lean += (this.netLean - this.lean) * Math.min(1, dt * 12);
+    this.leanOff = this.lean * 0.5;
     this.crouching = this.netCrouch;
     this.onGround = this.netGround;
     this.height = this.crouching ? CFG.heightCrouch : CFG.heightStand;
@@ -118,7 +121,7 @@ export class NetChar extends Character {
       alive: true,
       x: this.pos.x, y: this.pos.y, z: this.pos.z,
       yaw: this.yaw, pitch: this.pitch,
-      speed, onGround: this.onGround, crouch: this.crouching,
+      speed, onGround: this.onGround, crouch: this.crouching, lean: this.lean,
       protected: this.isProtected(), time: g.time,
     });
   }

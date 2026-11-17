@@ -163,10 +163,9 @@ export class Effects {
     g.life = 0.08;
   }
 
-  decal(x, y, z, nx, ny, nz) {
+  decal(x, y, z, nx, ny, nz, size = 0.14 + Math.random() * 0.08) {
     _n.set(nx, ny, nz);
     _q.setFromUnitVectors(_z, _n);
-    const size = 0.14 + Math.random() * 0.08;
     _s.set(size, size, 1);
     _p.set(x + nx * 0.012, y + ny * 0.012, z + nz * 0.012);
     _m.compose(_p, _q, _s);
@@ -191,6 +190,28 @@ export class Effects {
     m.material.opacity = 0.7;
     m.visible = true;
     t.life = t.max;
+  }
+
+  /** Grenade blast: fireball, sparks, smoke, a flash of light and a scorch mark. */
+  explosion(x, y, z, groundY) {
+    for (let i = 0; i < 46; i++) {
+      const a = Math.random() * Math.PI * 2, up = Math.random();
+      const sp = 4 + Math.random() * 13;
+      this._spawn(x, y + 0.1, z, Math.cos(a) * sp * (1 - up * 0.6), 2 + up * sp * 0.8, Math.sin(a) * sp * (1 - up * 0.6),
+        0.25 + Math.random() * 0.45, 0.07 + Math.random() * 0.09,
+        i % 3 === 0 ? 0xfff2b0 : i % 3 === 1 ? 0xffa436 : 0xff6a1a, 0.9);
+    }
+    for (let i = 0; i < 26; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 0.6 + Math.random() * 3;
+      this._spawn(x + Math.cos(a) * 0.6, y + 0.2 + Math.random() * 0.8, z + Math.sin(a) * 0.6, Math.cos(a) * sp, 1.2 + Math.random() * 2.6, Math.sin(a) * sp,
+        0.9 + Math.random() * 0.9, 0.22 + Math.random() * 0.22, i % 2 ? 0x5a5a58 : 0x3a3a3a, -0.05);
+    }
+    this.glow(x, y + 0.4, z, 9, 0xffc070);
+    this.glows[(this.gNext + this.glows.length - 1) % this.glows.length].life = 0.16;
+    this.flash.position.set(x, y + 0.6, z);
+    this.flash.intensity = 160;
+    this.flashT = 0.12;
+    if (groundY !== undefined) this.decal(x, groundY, z, 0, 1, 0, 3.2);
   }
 
   muzzleLight(x, y, z) {
@@ -238,7 +259,7 @@ export class Effects {
       if (g.life <= 0) continue;
       g.life -= dt;
       if (g.life <= 0) g.sp.visible = false;
-      else g.sp.material.opacity = g.life / 0.08;
+      else g.sp.material.opacity = Math.min(1, g.life / 0.08);
     }
     if (this.flashT > 0) {
       this.flashT -= dt;

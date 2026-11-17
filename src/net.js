@@ -12,12 +12,16 @@
 //   spawn             "you are now alive, here"
 //   shot              someone fired: where the tracers / impacts go
 //   kill, hurt, pick  events
+//   gr, ex            a grenade was thrown / went off
+//   c                 chat line
 //   end               match over
 // Client -> host messages
-//   hello, u (my state), f (I fired)
+//   hello, u (my state), f (I fired), g (I threw a grenade), c (chat)
 
 import { CFG, HUMAN_COLORS, MAX_HUMANS } from './config.js';
-import { WEAPONS, damageAtDistance } from './weapons.js';
+import * as THREE from 'three';
+import { WEAPONS, WEAPON_BY_ID, isPrimary, makeLoadout, damageAtDistance } from './weapons.js';
+import { getMap } from './maps/index.js';
 import { NetChar } from './netChar.js';
 import { getTransport, makeRoomCode, cleanRoomCode } from './transport.js';
 
@@ -29,6 +33,13 @@ const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const num = (v) => typeof v === 'number' && Number.isFinite(v);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const vec3 = (a) => Array.isArray(a) && a.length >= 3 && num(a[0]) && num(a[1]) && num(a[2]);
+const _eye = new THREE.Vector3();
+
+export function cleanChat(s) {
+  // eslint-disable-next-line no-control-regex
+  return String(s || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 140);
+}
 
 export function cleanName(s) {
   // eslint-disable-next-line no-control-regex
@@ -36,7 +47,7 @@ export function cleanName(s) {
 }
 
 export class Net {
-  /** hooks: { onRoster(), onLeft(reason), onMatchStart() } */
+  /** hooks: { onRoster(), onLeft(reason), onMatchStart(), onChat(name, color, text) } */
   constructor(game, hooks) {
     this.game = game;
     this.hooks = hooks;
@@ -213,10 +224,10 @@ export class Net {
     c.alive = false;
     c.respawnAt = Infinity;
     g.addRemote(c);
-    conn.send({ t: 'welcome', you: c.id, mt: r2(g.matchTime), over: g.over, r: this._roster() });
+    conn.send({ t: 'welcome', you: c.id, map: g.map.id, mt: r2(g.matchTime), over: g.over, r: this._roster() });
     if (!g.over) g.respawn(c, true);
     this.broadcast({ t: 'roster', r: this._roster() }, conn);
-    g.hud.toast(`${name} joined`, '#9fd8ff');
+    this.system(`${name} joined`);
     this.hooks.onRoster();
     return c;
   }
@@ -226,7 +237,7 @@ export class Net {
     if (!g.remotes.includes(c)) return;
     g.removeRemote(c);
     this.broadcast({ t: 'roster', r: this._roster() });
-    g.hud.toast(`${c.name} left`, '#9aa6b2');
+    this.system(`${c.name} left`);
     this.hooks.onRoster();
   }
 
@@ -238,21 +249,66 @@ export class Net {
     c.lastSeen = performance.now();
     if (m.t === 'u') this._hostState(c, m.d);
     else if (m.t === 'f') this._hostFire(c, m);
+    else if (m.t === 'g') this._hostGrenade(c, m);
+    else if (m.t === 'c') {
+      const now = performance.now();
+      const text = cleanChat(m.m);
+      if (!text || now - (c.lastChatT || 0) < 400) return; // no flooding
+      c.lastChatT = now;
+      this._chat(c.name, c.color, text);
+    }
+  }
+
+  /** Host: show a chat line here and send it to everyone. */
+  _chat(name, color, text) {
+    this.broadcast({ t: 'c', n: name, col: color, m: text });
+    this.hooks.onChat(name, color, text);
+  }
+
+  /** Host: a grey "so-and-so joined" style line for everyone. */
+  system(text) { this._chat('', 0, text); }
+
+  /** Say something (host or client). */
+  sendChat(text) {
+    text = cleanChat(text);
+    if (!text || !this.role) return;
+    if (this.role === 'host') this._chat(this.game.player.name, this.game.player.color, text);
+    else if (this.conn) this.conn.send({ t: 'c', m: text });
+  }
+
+  /** A remote player threw a grenade: the host owns it from here. */
+  _hostGrenade(c, m) {
+    const g = this.game;
+    if (!c.alive || g.over || c.grenades <= 0 || !vec3(m.o) || !vec3(m.v)) return;
+    const now = performance.now();
+    if (now - (c.lastNadeT || 0) < 500) return;
+    c.getEye(_eye);
+    if (Math.hypot(m.o[0] - _eye.x, m.o[1] - _eye.y, m.o[2] - _eye.z) > 3.5) return; // not from where they are
+    if (Math.hypot(m.v[0], m.v[1], m.v[2]) > 32) return; // nobody throws that hard
+    c.lastNadeT = now;
+    c.grenades--;
+    c.protectedUntil = 0;
+    g.spawnGrenade(g.nextGrenadeId++, c, m.o.slice(0, 3), m.v.slice(0, 3));
   }
 
   _hostState(c, d) {
-    if (!Array.isArray(d) || d.length < 10) return;
-    for (let i = 0; i < 10; i++) if (!num(d[i])) return;
+    if (!Array.isArray(d) || d.length < 11) return;
+    for (let i = 0; i < 11; i++) if (!num(d[i])) return;
     // ignore anything sent before the player knew about their latest (re)spawn
-    if (!c.alive || d[9] !== c.spawnSeq) return;
+    if (!c.alive || d[8] !== c.spawnSeq) return;
     const b = this.game.world.bounds;
     c.push(clamp(d[0], b.minX, b.maxX), clamp(d[1], -2, 40), clamp(d[2], b.minZ, b.maxZ), d[3], clamp(d[4], -1.6, 1.6));
     c.netCrouch = !!(d[5] & 2);
     c.netGround = !!(d[5] & 8);
-    c.weaponIdx = clamp(d[6] | 0, 0, WEAPONS.length - 1);
-    // mirrored only so pickups know whether this player could use more ammo
-    c.weapons[1].reserve = clamp(d[7] | 0, 0, WEAPONS[1].reserveMax);
-    c.weapons[2].reserve = clamp(d[8] | 0, 0, WEAPONS[2].reserveMax);
+    c.netLean = clamp(d[9], -1, 1);
+    // their loadout: mirrored so pickups know what this player could use
+    const prim = WEAPONS[d[10] | 0];
+    if (prim && isPrimary(prim.id) && prim.id !== c.primary) {
+      c.primary = prim.id;
+      c.weapons = makeLoadout(prim.id);
+    }
+    c.weaponIdx = (d[6] | 0) === c.weapons[0].def.index ? 0 : 1;
+    c.weapons[0].reserve = clamp(d[7] | 0, 0, c.weapons[0].def.reserveMax);
   }
 
   /** A remote player fired. Relay the visuals and check their hit claims. */
@@ -264,20 +320,21 @@ export class Net {
     const now = performance.now() / 1000;
     if (now - c.lastFireT < def.interval * 0.6) return; // faster than the gun can shoot
     c.lastFireT = now;
-    c.weaponIdx = def.slot;
+    c.weaponIdx = def.id === 'pistol' ? 1 : 0;
     c.protectedUntil = 0;
 
     const ends = [];
     for (const e of Array.isArray(m.e) ? m.e.slice(0, def.pellets) : []) {
       if (Array.isArray(e) && e.length >= 4 && e.every(num)) ends.push(e.slice(0, 7));
     }
-    const shot = { t: 'shot', id: c.id, w: def.slot, m: m.m.slice(0, 3), e: ends };
+    const shot = { t: 'shot', id: c.id, w: def.index, m: m.m.slice(0, 3), e: ends };
     this.showShot(shot);
     this.broadcast(shot, c.conn);
     g.emitNoise(c.pos.x, c.pos.y, c.pos.z, def.noise, c, 'shot');
 
     const world = g.world;
-    const ex = c.pos.x, ey = c.pos.y + c.eyeH, ez = c.pos.z;
+    c.getEye(_eye); // includes their lean, so shots around a corner check out
+    const ex = _eye.x, ey = _eye.y, ez = _eye.z;
     const totals = new Map();
     for (const h of Array.isArray(m.h) ? m.h.slice(0, def.pellets) : []) {
       if (!Array.isArray(h) || !num(h[0]) || !num(h[2])) continue;
@@ -306,7 +363,7 @@ export class Net {
       ch.id, r2(ch.pos.x), r2(ch.pos.y), r2(ch.pos.z), r3(ch.yaw), r3(ch.pitch),
       (ch.alive ? 1 : 0) | (ch.crouching ? 2 : 0) | (ch.isProtected() ? 4 : 0) | (ch.onGround ? 8 : 0),
       Math.max(0, Math.round(ch.health * 10) / 10), Math.round(ch.armor * 10) / 10,
-      ch.kills, ch.deaths, ch.weaponIdx,
+      ch.kills, ch.deaths, ch.weapon.def.index, r2(ch.lean),
     ]);
     let p = '';
     for (const pk of g.pickups) p += pk.active ? '1' : '0';
@@ -317,7 +374,7 @@ export class Net {
 
   onStart() {
     const g = this.game;
-    this.broadcast({ t: 'start', mt: r2(g.matchTime), r: this._roster() });
+    this.broadcast({ t: 'start', map: g.map.id, mt: r2(g.matchTime), r: this._roster() });
   }
 
   onSpawn(c) {
@@ -326,7 +383,7 @@ export class Net {
 
   onShot(shooter, def, muz, ends) {
     if (!this.game.remotes.some((r) => r.conn)) return;
-    this.broadcast({ t: 'shot', id: shooter.id, w: def.slot, m: [r2(muz.x), r2(muz.y), r2(muz.z)], e: ends });
+    this.broadcast({ t: 'shot', id: shooter.id, w: def.index, m: [r2(muz.x), r2(muz.y), r2(muz.z)], e: ends });
   }
 
   onKill(victim, attacker, head, weapon) {
@@ -335,6 +392,20 @@ export class Net {
 
   onPickup(i, c) {
     this.broadcast({ t: 'pick', i, id: c.id });
+  }
+
+  onGrenade(gr) {
+    this.broadcast({ t: 'gr', id: gr.id, own: gr.owner ? gr.owner.id : -1, o: [gr.x, gr.y, gr.z], v: [gr.vx, gr.vy, gr.vz] });
+  }
+
+  onExplode(id, x, y, z) {
+    this.broadcast({ t: 'ex', id, x: r2(x), y: r2(y), z: r2(z) });
+  }
+
+  /** Bots were switched on or off. */
+  onRosterChanged() {
+    this.broadcast({ t: 'roster', r: this._roster() });
+    this.hooks.onRoster();
   }
 
   onEnd() {
@@ -350,6 +421,7 @@ export class Net {
     const g = this.game;
     g.clearRemotes();
     if (num(m.you)) g.player.id = m.you;
+    g.loadMap(getMap(m.map));
     g.startClient(num(m.mt) ? m.mt : CFG.timeLimit);
     this._applyRoster(m.r);
     if (m.over) g.over = true;
@@ -422,6 +494,18 @@ export class Net {
         }
         break;
       }
+      case 'gr':
+        if (vec3(m.o) && vec3(m.v)) g.spawnGrenade(m.id, g.charById(m.own), m.o, m.v);
+        break;
+      case 'ex': {
+        const i = g.grenades.findIndex((gr) => gr.id === m.id);
+        if (i >= 0) g.removeGrenade(i);
+        if (num(m.x) && num(m.y) && num(m.z)) g.showExplosion(m.x, m.y, m.z);
+        break;
+      }
+      case 'c':
+        this.hooks.onChat(cleanName(m.n), num(m.col) ? m.col : 0, cleanChat(m.m));
+        break;
       case 'end':
         if (g.over) break;
         g.over = true;
@@ -429,6 +513,7 @@ export class Net {
         if (g.onMatchEnd) g.onMatchEnd(g.winner, g.ranking());
         break;
       case 'start':
+        g.loadMap(getMap(m.map));
         g.startClient(num(m.mt) ? m.mt : CFG.timeLimit);
         this._applyRoster(m.r);
         this.hooks.onMatchStart();
@@ -443,7 +528,7 @@ export class Net {
     if (Array.isArray(m.c)) {
       for (const e of m.c) {
         if (!Array.isArray(e) || e.length < 12) continue;
-        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, w] = e;
+        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, , lean] = e;
         if (id === p.id) {
           p.kills = k; p.deaths = d;
           if (p.alive) { p.health = hp; p.armor = ar; }
@@ -459,8 +544,8 @@ export class Net {
         c.netCrouch = !!(fl & 2);
         c.netProtected = !!(fl & 4);
         c.netGround = !!(fl & 8);
+        c.netLean = num(lean) ? clamp(lean, -1, 1) : 0;
         c.health = hp; c.armor = ar; c.kills = k; c.deaths = d;
-        c.weaponIdx = clamp(w | 0, 0, WEAPONS.length - 1);
       }
     }
     if (typeof m.p === 'string') {
@@ -481,14 +566,20 @@ export class Net {
       t: 'u',
       d: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z), r3(p.yaw), r3(p.pitch),
         (p.crouching ? 2 : 0) | (p.onGround ? 8 : 0),
-        p.weaponIdx, p.weapons[1].reserve, p.weapons[2].reserve, this.mySeq],
+        p.weapon.def.index, p.weapons[0].reserve === Infinity ? 0 : p.weapons[0].reserve, this.mySeq,
+        r2(p.lean), WEAPON_BY_ID[p.primary].index],
     });
   }
 
   /** Client: tell the host about a shot we just fired. */
   sendFire(def, muz, ends, claims) {
     if (!this.conn) return;
-    this.conn.send({ t: 'f', w: def.slot, m: [r2(muz.x), r2(muz.y), r2(muz.z)], e: ends, h: claims });
+    this.conn.send({ t: 'f', w: def.index, m: [r2(muz.x), r2(muz.y), r2(muz.z)], e: ends, h: claims });
+  }
+
+  /** Client: ask the host to spawn a grenade we just threw. */
+  sendGrenade(o, v) {
+    if (this.conn) this.conn.send({ t: 'g', o, v });
   }
 
   // ======================================================================

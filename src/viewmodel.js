@@ -94,6 +94,82 @@ function buildShotgun() {
   };
 }
 
+function buildSmg() {
+  const g = new THREE.Group();
+  const dark = std(GUN), mid = std(GUN2), black = std(0x2c3138);
+  bx(g, 0.046, 0.07, 0.26, mid, 0, 0, -0.02);
+  bx(g, 0.04, 0.045, 0.12, dark, 0, 0.002, -0.2);
+  cyl(g, 0.011, 0.1, dark, 0, 0.008, -0.3);
+  cyl(g, 0.02, 0.09, black, 0, 0.008, -0.37);
+  const mag = bx(g, 0.026, 0.17, 0.04, black, 0, -0.115, -0.07, 0.06);
+  bx(g, 0.03, 0.085, 0.04, dark, 0, -0.07, 0.07, -0.25);
+  bx(g, 0.03, 0.03, 0.16, dark, 0, 0.012, 0.18);
+  bx(g, 0.035, 0.07, 0.02, dark, 0, 0, 0.26);
+  bx(g, 0.016, 0.014, 0.2, dark, 0, 0.042, -0.04);
+  bx(g, 0.006, 0.026, 0.01, dark, 0, 0.058, -0.24);
+  bx(g, 0.008, 0.022, 0.012, dark, -0.011, 0.056, 0.05);
+  bx(g, 0.008, 0.022, 0.012, dark, 0.011, 0.056, 0.05);
+  bx(g, 0.048, 0.012, 0.07, std(0x4fc3f7, 0.5, 0.1), 0, 0.012, -0.14);
+  arm(g, 0.0, -0.078, 0.085);
+  supportArm(g, g, -0.005, -0.045, -0.18);
+  return {
+    group: g, muzzle: new THREE.Vector3(0, 0.008, -0.43), slide: null, mag, pump: null,
+    hip: new THREE.Vector3(0.15, -0.15, -0.36), ads: new THREE.Vector3(0, -0.068, -0.42),
+  };
+}
+
+function buildSniper() {
+  const g = new THREE.Group();
+  const dark = std(GUN), mid = std(GUN2), black = std(0x2c3138), green = std(0x56604a, 0.8, 0);
+  bx(g, 0.05, 0.07, 0.36, mid, 0, 0, 0.02);
+  bx(g, 0.045, 0.05, 0.3, green, 0, -0.012, -0.3);
+  cyl(g, 0.012, 0.5, dark, 0, 0.014, -0.62);
+  cyl(g, 0.02, 0.07, black, 0, 0.014, -0.9);
+  // scope
+  cyl(g, 0.026, 0.26, black, 0, 0.078, -0.02);
+  cyl(g, 0.034, 0.06, black, 0, 0.078, -0.17);
+  cyl(g, 0.03, 0.04, black, 0, 0.078, 0.12);
+  bx(g, 0.016, 0.03, 0.03, dark, 0, 0.045, -0.08);
+  bx(g, 0.016, 0.03, 0.03, dark, 0, 0.045, 0.05);
+  const bolt = bx(g, 0.05, 0.016, 0.016, std(0xb8c0c8, 0.4, 0.5), 0.04, 0.012, 0.1);
+  const mag = bx(g, 0.03, 0.07, 0.07, black, 0, -0.065, -0.03);
+  bx(g, 0.03, 0.085, 0.04, dark, 0, -0.07, 0.13, -0.3);
+  bx(g, 0.042, 0.075, 0.26, green, 0, -0.022, 0.33, -0.08);
+  arm(g, 0.0, -0.078, 0.145);
+  supportArm(g, g, -0.005, -0.055, -0.3);
+  return {
+    group: g, muzzle: new THREE.Vector3(0, 0.014, -0.94), slide: null, mag, pump: bolt,
+    hip: new THREE.Vector3(0.16, -0.165, -0.34), ads: new THREE.Vector3(0, -0.078, -0.3),
+  };
+}
+
+function buildLmg() {
+  const g = new THREE.Group();
+  const dark = std(GUN), mid = std(GUN2), black = std(0x2c3138);
+  bx(g, 0.06, 0.085, 0.36, mid, 0, 0, 0);
+  bx(g, 0.05, 0.05, 0.26, dark, 0, 0.006, -0.3);
+  cyl(g, 0.015, 0.3, dark, 0, 0.012, -0.55);
+  cyl(g, 0.021, 0.06, black, 0, 0.012, -0.72);
+  const mag = bx(g, 0.09, 0.1, 0.12, std(0x4b5a3a, 0.8, 0), -0.02, -0.095, -0.06);
+  bx(g, 0.03, 0.085, 0.04, dark, 0, -0.075, 0.12, -0.25);
+  bx(g, 0.045, 0.07, 0.24, dark, 0, -0.012, 0.29);
+  bx(g, 0.02, 0.018, 0.3, dark, 0, 0.052, -0.04);
+  bx(g, 0.006, 0.03, 0.01, dark, 0, 0.07, -0.4);
+  bx(g, 0.008, 0.026, 0.012, dark, -0.012, 0.07, 0.1);
+  bx(g, 0.008, 0.026, 0.012, dark, 0.012, 0.07, 0.1);
+  bx(g, 0.012, 0.012, 0.2, dark, -0.025, -0.03, -0.38);
+  bx(g, 0.012, 0.012, 0.2, dark, 0.025, -0.03, -0.38);
+  bx(g, 0.062, 0.012, 0.08, std(0xff8a2a, 0.5, 0.1), 0, 0.02, -0.19);
+  arm(g, 0.0, -0.085, 0.135);
+  supportArm(g, g, -0.005, -0.05, -0.28);
+  return {
+    group: g, muzzle: new THREE.Vector3(0, 0.012, -0.76), slide: null, mag, pump: null,
+    hip: new THREE.Vector3(0.17, -0.17, -0.36), ads: new THREE.Vector3(0, -0.084, -0.5),
+  };
+}
+
+const FLASH_SCALE = { pistol: 0.85, smg: 0.9, rifle: 1.1, lmg: 1.25, shotgun: 1.5, sniper: 1.7 };
+
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export class ViewModel {
@@ -107,15 +183,20 @@ export class ViewModel {
 
     this.root = new THREE.Group();
     this.scene.add(this.root);
-    this.models = [buildPistol(), buildRifle(), buildShotgun()];
-    for (const m of this.models) {
+    this.models = {
+      pistol: buildPistol(), rifle: buildRifle(), smg: buildSmg(),
+      shotgun: buildShotgun(), sniper: buildSniper(), lmg: buildLmg(),
+    };
+    for (const m of Object.values(this.models)) {
       m.group.visible = false;
       this.root.add(m.group);
       if (m.mag) m.magHome = m.mag.position.clone();
       if (m.pump) m.pumpHome = m.pump.position.clone();
       if (m.slide) m.slideHome = m.slide.position.clone();
     }
-    this.current = -1;
+    this.current = null;
+    this.throwT = 0;
+    this.slidePose = 0;
 
     const fmat = new THREE.MeshBasicMaterial({
       map: flashTexture(), transparent: true, blending: THREE.AdditiveBlending,
@@ -148,23 +229,27 @@ export class ViewModel {
     this.kickRot += def.kick * 1.6;
     this.flashT = 0.05;
     this.flash.rotation.z = Math.random() * Math.PI * 2;
-    this.flash.scale.setScalar((def.id === 'shotgun' ? 1.5 : def.id === 'rifle' ? 1.1 : 0.85) * (0.85 + Math.random() * 0.4));
-    if (def.id === 'shotgun') this.pumpT = 0;
+    this.flash.scale.setScalar((FLASH_SCALE[def.id] || 1) * (0.85 + Math.random() * 0.4));
+    if (def.id === 'shotgun' || def.id === 'sniper') this.pumpT = 0; // pump / bolt
     if (def.id === 'pistol') this.slideT = 0;
   }
 
   land(strength) { this.landDip = Math.min(0.06, strength * 0.006); }
 
+  /** Weapon dips out of the way while the off hand throws a grenade. */
+  throwAnim() { this.throwT = 0.55; }
+
   /**
-   * s = { weaponIdx, ads (0..1), speed, onGround, sprinting, reloadFrac (0..1 or -1),
-   *       switchT, mdx, mdy, crouch }
+   * s = { weaponId, ads (0..1), hidden, speed, onGround, sprinting, sliding,
+   *       reloadFrac (0..1 or -1), switchT, mdx, mdy }
    */
   update(dt, s) {
-    if (s.weaponIdx !== this.current) {
-      if (this.current >= 0) this.models[this.current].group.visible = false;
-      this.current = s.weaponIdx;
+    if (s.weaponId !== this.current) {
+      if (this.current) this.models[this.current].group.visible = false;
+      this.current = s.weaponId;
       this.models[this.current].group.visible = true;
     }
+    this.root.visible = !s.hidden; // looking through a scope
     const m = this.models[this.current];
     const hipW = 1 - s.ads;
 
@@ -196,6 +281,19 @@ export class ViewModel {
     this.sprintT = (this.sprintT || 0) + (sp - (this.sprintT || 0)) * Math.min(1, dt * 8);
     p.x -= this.sprintT * 0.05; p.y -= this.sprintT * 0.03;
     ry += this.sprintT * 0.55; rx -= this.sprintT * 0.25;
+
+    // slide: gun cants over
+    this.slidePose += ((s.sliding ? 1 : 0) - this.slidePose) * Math.min(1, dt * 10);
+    p.y -= this.slidePose * 0.02;
+    rz += this.slidePose * 0.32;
+
+    // grenade throw: dip down and back up
+    if (this.throwT > 0) {
+      this.throwT -= dt;
+      const bell = Math.sin(Math.max(0, this.throwT / 0.55) * Math.PI);
+      p.y -= bell * 0.16;
+      rx -= bell * 0.5;
+    }
 
     // reload: dip + tilt, magazine drops out and comes back
     if (s.reloadFrac >= 0) {

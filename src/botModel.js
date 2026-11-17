@@ -126,6 +126,9 @@ export class BotModel {
     this.legL.rotation.x = swing;
     this.legR.rotation.x = s.onGround ? -swing : -0.25;
     this.upper.rotation.x = s.pitch * 0.75;
+    const lean = s.lean || 0; // Q/E lean: tip the torso sideways
+    this.upper.rotation.z = -lean * 0.4;
+    this.upper.position.x = lean * 0.22;
     this.upper.position.y += s.onGround ? Math.abs(Math.cos(this.walk)) * Math.min(0.04, s.speed * 0.008) : 0;
 
     if (this.flashT > 0) { this.flashT -= dt; this.flash.visible = true; } else this.flash.visible = false;

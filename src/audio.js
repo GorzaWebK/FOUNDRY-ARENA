@@ -235,6 +235,63 @@ export class AudioSys {
         [392, 330, 262, 196].forEach((f, i) => this._tone(o, t + i * 0.16, 0.35, 'triangle', f, f, 0.6));
         break;
       }
+      case 'smg': {
+        const o = this._out(pos, 0.7 * vol, 11); if (!o) return;
+        this._noise(o, t, 0.08, 'bandpass', 1700, 0.7, 1.0);
+        this._noise(o, t, 0.04, 'highpass', 3500, 0.5, 0.4);
+        this._tone(o, t, 0.06, 'square', 210, 80, 0.4);
+        break;
+      }
+      case 'sniper': {
+        const o = this._out(pos, 1.0 * vol, 20); if (!o) return;
+        this._noise(o, t, 0.45, 'lowpass', 1500, 0.5, 1.3);
+        this._noise(o, t, 0.1, 'bandpass', 3000, 0.7, 0.8);
+        this._tone(o, t, 0.3, 'sine', 150, 36, 1.1);
+        this._noise(o, t + 0.12, 0.7, 'lowpass', 500, 0.4, 0.3, 0.1); // echo
+        // bolt
+        this._noise(o, t + 0.45, 0.05, 'bandpass', 2000, 4, 0.2);
+        this._noise(o, t + 0.7, 0.05, 'bandpass', 1500, 4, 0.2);
+        break;
+      }
+      case 'lmg': {
+        const o = this._out(pos, 0.9 * vol, 14); if (!o) return;
+        this._noise(o, t, 0.13, 'bandpass', 1000, 0.6, 1.0);
+        this._noise(o, t, 0.24, 'lowpass', 420, 0.5, 0.45);
+        this._tone(o, t, 0.1, 'square', 130, 45, 0.6);
+        break;
+      }
+      case 'explosion': {
+        const o = this._out(pos, 1.3 * vol, 22); if (!o) return;
+        this._noise(o, t, 0.9, 'lowpass', 700, 0.3, 1.6);
+        this._noise(o, t, 0.25, 'bandpass', 2200, 0.5, 0.9);
+        this._tone(o, t, 0.7, 'sine', 95, 26, 1.5);
+        this._noise(o, t + 0.15, 1.4, 'lowpass', 260, 0.3, 0.5, 0.2); // rumble
+        break;
+      }
+      case 'throw': {
+        const o = this._out(pos, 0.3 * vol, 5); if (!o) return;
+        this._noise(o, t, 0.16, 'bandpass', 700, 1, 0.9, 0.05);
+        this._noise(o, t, 0.03, 'bandpass', 2600, 5, 0.5); // pin
+        break;
+      }
+      case 'bounce': {
+        const o = this._out(pos, 0.3 * vol, 5); if (!o) return;
+        this._tone(o, t, 0.05, 'triangle', 900 + Math.random() * 300, 500, 0.5);
+        this._noise(o, t, 0.03, 'bandpass', 2400, 3, 0.5);
+        break;
+      }
+      case 'slide': {
+        const o = this._out(pos, 0.35 * vol, 5); if (!o) return;
+        const f = this._noise(o, t, 0.6, 'bandpass', 900, 0.8, 0.9, 0.04);
+        f.frequency.exponentialRampToValueAtTime(260, t + 0.6);
+        break;
+      }
+      case 'chat': {
+        const o = this._out(null, 0.18 * vol); if (!o) return;
+        this._tone(o, t, 0.06, 'sine', 880, 880, 0.5);
+        this._tone(o, t + 0.06, 0.09, 'sine', 1320, 1320, 0.5);
+        break;
+      }
       case 'ui': {
         const o = this._out(null, 0.2 * vol); if (!o) return;
         this._tone(o, t, 0.05, 'square', 700, 700, 0.3);

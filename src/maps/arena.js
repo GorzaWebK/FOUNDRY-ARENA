@@ -153,7 +153,9 @@ const solids = [
 ];
 
 export default {
+  id: 'foundry',
   name: 'Foundry',
+  blurb: 'Large mixed arena: plaza, bunker, sniper walkway.',
   bounds: { minX: -40, maxX: 40, minZ: -40, maxZ: 40 },
 
   // Look of each material key used above. `tex` is one of the procedural
@@ -213,7 +215,7 @@ export default {
     [-6.5, 0, 38.5, 0],
   ],
 
-  // type: health | armor | ammo | rifle | shotgun
+  // type: health | armor | ammo | crate (full ammo + grenades)
   pickups: [
     { type: 'health', pos: [-35.5, 0, 0.5] },
     { type: 'health', pos: [36.5, 0, 0.5] },
@@ -221,10 +223,10 @@ export default {
     { type: 'health', pos: [5.5, 0, 29.5] },
     { type: 'armor', pos: [0.5, 1, 3.5] },
     { type: 'armor', pos: [0.5, 4, 32.5] },
-    { type: 'rifle', pos: [0.5, 6.5, -38.5] },
-    { type: 'rifle', pos: [-35.5, 3, 0.5] },
-    { type: 'shotgun', pos: [25.5, 3, 0.5] },
-    { type: 'shotgun', pos: [-6.5, 0, 31.5] },
+    { type: 'crate', pos: [0.5, 6.5, -38.5] },
+    { type: 'crate', pos: [-35.5, 3, 0.5] },
+    { type: 'crate', pos: [25.5, 3, 0.5] },
+    { type: 'crate', pos: [-6.5, 0, 31.5] },
     { type: 'ammo', pos: [-25.5, 0, -25.5] },
     { type: 'ammo', pos: [22.5, 0, -22.5] },
     { type: 'ammo', pos: [-20.5, 0, 24.5] },

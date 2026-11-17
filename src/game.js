@@ -10,7 +10,7 @@ import { Pickup } from './pickups.js';
 import { ViewModel } from './viewmodel.js';
 import { Player } from './player.js';
 import { Bot } from './bot.js';
-import { damageAtDistance } from './weapons.js';
+import { damageAtDistance, GRENADE } from './weapons.js';
 
 const r2 = (v) => Math.round(v * 100) / 100;
 
@@ -28,7 +28,8 @@ const _ch = { t: 0, head: false };
 function rayChar(ox, oy, oz, dx, dy, dz, c, tMax, out) {
   let best = tMax, head = false, found = false;
   // head
-  const hx = ox - c.pos.x, hy = oy - (c.pos.y + c.height - 0.2), hz = oz - c.pos.z;
+  const lo = c.leanOff; // leaning moves the head sideways
+  const hx = ox - (c.pos.x + Math.cos(c.yaw) * lo), hy = oy - (c.pos.y + c.height - 0.2 - Math.abs(lo) * 0.14), hz = oz - (c.pos.z - Math.sin(c.yaw) * lo);
   const b = hx * dx + hy * dy + hz * dz;
   const cc = hx * hx + hy * hy + hz * hz - 0.24 * 0.24;
   const disc = b * b - cc;
@@ -57,13 +58,20 @@ function rayChar(ox, oy, oz, dx, dy, dz, c, tMax, out) {
   return true;
 }
 
+const GRENADE_GEO = new THREE.IcosahedronGeometry(0.11, 0);
+function makeGrenadeMesh() {
+  const m = new THREE.Mesh(GRENADE_GEO, new THREE.MeshLambertMaterial({ color: 0x3f4a2c, emissive: 0xff2200, emissiveIntensity: 0 }));
+  m.castShadow = true;
+  return m;
+}
+
 export class Game {
   constructor({ canvas, settings, audio, hud, input, map }) {
     this.settings = settings;
     this.audio = audio;
     this.hud = hud;
     this.input = input;
-    this.map = map;
+    this.map = null;
 
     // ---- renderer
     const r = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -79,19 +87,15 @@ export class Game {
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.08, 500);
     this.camera.rotation.order = 'YXZ';
 
-    // ---- world
-    this.world = new World(map);
-    this.nav = new NavGrid(this.world);
-    const s0 = map.spawns[0];
-    this.nav.markReachable(s0[0], s0[1], s0[2]);
-    buildWorldMeshes(this.world, this.scene);
-    buildSky(this.scene, map.sky);
-    this.lights = buildLights(this.scene, map, settings.shadows);
-
     this.effects = new Effects(this.scene);
     this.viewmodel = new ViewModel();
-    this.pickups = map.pickups.map((p) => new Pickup(p, this.scene));
-    this.spawns = map.spawns.map((s) => ({ x: s[0], y: s[1], z: s[2], yaw: ((s[3] || 0) * Math.PI) / 180, lastUsed: -99 }));
+    this.pickups = [];
+    this.worldObjs = [];
+    this.grenades = [];
+    this.grenadePool = [];
+    this.nextGrenadeId = 1;
+    this.botsOn = true;
+    this.loadMap(map);
 
     this.player = new Player(this);
     this.bots = [];
@@ -119,10 +123,44 @@ export class Game {
     this.viewmodel.setAspect(w / h);
   }
 
+  /** (Re)build the world from map data: collision, nav grid, meshes, sky, lights, pickups. */
+  loadMap(map) {
+    if (this.map === map) return;
+    for (const o of this.worldObjs) {
+      this.scene.remove(o);
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) o.material.dispose();
+    }
+    for (const p of this.pickups) p.dispose();
+    this.map = map;
+    this.world = new World(map);
+    this.nav = new NavGrid(this.world);
+    const s0 = map.spawns[0];
+    this.nav.markReachable(s0[0], s0[1], s0[2]);
+    const meshes = buildWorldMeshes(this.world, this.scene);
+    const sky = buildSky(this.scene, map.sky);
+    this.lights = buildLights(this.scene, map, true);
+    this.worldObjs = [...meshes, sky, ...this.lights.all];
+    this.pickups = map.pickups.map((p) => new Pickup(p, this.scene));
+    this.spawns = map.spawns.map((s) => ({ x: s[0], y: s[1], z: s[2], yaw: ((s[3] || 0) * Math.PI) / 180, lastUsed: -99 }));
+    const b = map.bounds;
+    this.orbitR = Math.max(b.maxX - b.minX, b.maxZ - b.minZ) * 0.72;
+    this.effects.clear();
+    this.clearGrenades();
+    this.applySettings('quality');
+  }
+
   applySettings(key) {
-    if (!key || key === 'shadows') {
-      this.lights.sun.castShadow = this.settings.shadows;
+    if (!key || key === 'quality') {
+      // High: shadows, full resolution, fill lights. Low: none of those, 75% resolution.
+      const high = this.settings.quality !== 'low';
+      const dpr = window.devicePixelRatio || 1;
+      this.renderer.setPixelRatio(high ? Math.min(dpr, 1.5) : Math.min(dpr, 1) * 0.75);
+      this.lights.sun.castShadow = high;
       this.renderer.shadowMap.needsUpdate = true;
+      for (const p of this.lights.points) p.visible = high;
+      this.effects.lowDetail = !high;
+      this.resize();
     }
     if (!key || key === 'volume') this.audio.setVolume(this.settings.volume);
   }
@@ -131,9 +169,13 @@ export class Game {
   // match flow
   // ======================================================================
 
-  newMatch({ botCount, difficulty, attract = false }) {
+  newMatch({ botCount, bots = true, difficulty, attract = false, map = null }) {
     for (const b of this.bots) b.dispose();
     this.bots = [];
+    if (map) this.loadMap(map);
+    this.clearGrenades();
+    this.botCount = Math.max(1, Math.min(10, botCount | 0));
+    this.botsOn = bots;
     this.mode = this.net && !attract ? 'host' : 'sp';
     if (this.mode !== 'host') this.clearRemotes();
     this.skill = DIFFICULTY[difficulty] || DIFFICULTY.normal;
@@ -149,7 +191,7 @@ export class Game {
     for (const p of this.pickups) p.reset();
     for (const s of this.spawns) s.lastUsed = -99;
 
-    const n = Math.max(1, Math.min(10, botCount | 0));
+    const n = bots ? this.botCount : 0;
     for (let i = 0; i < n; i++) this.bots.push(new Bot(this, i + 1, BOT_ROSTER[i % BOT_ROSTER.length]));
     const p = this.player;
     p.kills = 0; p.deaths = 0; p.alive = false;
@@ -158,6 +200,25 @@ export class Game {
     if (this.mode === 'host') this.net.onStart(); // tell clients before anyone spawns
     for (const c of this.chars) this.respawn(c, true);
     if (!attract) this.hud.centerMessage('FIGHT', `First to ${CFG.killLimit} kills`, 2.2, '#ff8a2a');
+  }
+
+  /** Add or remove the bots mid-match (host / solo only). */
+  setBots(on) {
+    if (this.attract || this.mode === 'client' || on === this.botsOn) return;
+    this.botsOn = on;
+    if (!on) {
+      for (const b of this.bots) { b.alive = false; b.dispose(); }
+      this.chars = this.chars.filter((c) => !this.bots.includes(c));
+      this.bots = [];
+    } else {
+      for (let i = 0; i < this.botCount; i++) {
+        const b = new Bot(this, i + 1, BOT_ROSTER[i % BOT_ROSTER.length]);
+        this.bots.push(b);
+        this.chars.push(b);
+        if (!this.over) this.respawn(b, true);
+      }
+    }
+    if (this.mode === 'host') this.net.onRosterChanged();
   }
 
   /** Multiplayer client: reset to a clean slate; the host drives everything else. */
@@ -171,6 +232,7 @@ export class Game {
     this.over = false;
     this.winner = null;
     this.effects.clear();
+    this.clearGrenades();
     this.hud.reset();
     for (const p of this.pickups) p.reset();
     const p = this.player;
@@ -330,7 +392,7 @@ export class Game {
     victim.lastHurtBy = attacker;
     victim.lastHurtT = this.time;
     const killed = victim.health <= 0;
-    if (attacker.isPlayer) {
+    if (attacker.isPlayer && attacker !== victim) {
       this.hud.hitmarker(head, killed);
       this.audio.play(head ? 'headshot' : 'hit');
     }
@@ -365,6 +427,135 @@ export class Game {
       this.audio.play('kill');
       const sub = head ? 'Headshot' : this.mode === 'client' ? '' : `${attacker.kills} / ${CFG.killLimit}`;
       this.hud.centerMessage(`ELIMINATED ${victim.name.toUpperCase()}`, sub, 1.6, '#' + victim.color.toString(16).padStart(6, '0'));
+    }
+  }
+
+  // ======================================================================
+  // grenades
+  // ======================================================================
+
+  throwGrenade(char, dir) {
+    char.getEye(_o);
+    if (dir) _dir.copy(dir);
+    else { char.aimDir(_dir); _dir.y += 0.1; _dir.normalize(); } // a little loft
+    const sp = GRENADE.speed;
+    const o = [r2(_o.x + _dir.x * 0.25), r2(_o.y + _dir.y * 0.25 - 0.1), r2(_o.z + _dir.z * 0.25)];
+    const v = [r2(_dir.x * sp + char.vel.x * 0.4), r2(_dir.y * sp + Math.max(0, char.vel.y) * 0.3), r2(_dir.z * sp + char.vel.z * 0.4)];
+    if (this.mode === 'client') { this.net.sendGrenade(o, v); return; } // the host spawns it for everyone
+    this.spawnGrenade(this.nextGrenadeId++, char, o, v);
+  }
+
+  spawnGrenade(id, owner, o, v) {
+    const mesh = this.grenadePool.pop() || makeGrenadeMesh();
+    mesh.visible = true;
+    this.scene.add(mesh);
+    const g = { id, owner, x: o[0], y: o[1], z: o[2], vx: v[0], vy: v[1], vz: v[2], fuse: GRENADE.fuse, mesh, resting: false, bounceT: 0 };
+    this.grenades.push(g);
+    _d.set(g.x, g.y, g.z);
+    this.audio.play('throw', owner && owner.isPlayer ? null : _d);
+    if (this.mode === 'host') this.net.onGrenade(g);
+    return g;
+  }
+
+  removeGrenade(i) {
+    const g = this.grenades[i];
+    this.scene.remove(g.mesh);
+    this.grenadePool.push(g.mesh);
+    this.grenades.splice(i, 1);
+  }
+
+  clearGrenades() {
+    for (let i = this.grenades.length - 1; i >= 0; i--) this.removeGrenade(i);
+  }
+
+  updateGrenades(dt) {
+    const R = 0.12, world = this.world;
+    for (let i = this.grenades.length - 1; i >= 0; i--) {
+      const g = this.grenades[i];
+      g.fuse -= dt;
+      g.bounceT -= dt;
+      if (!g.resting) {
+        g.vy -= GRENADE.gravity * dt;
+        let remaining = dt;
+        for (let iter = 0; iter < 3 && remaining > 1e-5; iter++) {
+          const sp = Math.hypot(g.vx, g.vy, g.vz);
+          if (sp < 1e-3) break;
+          const dx = g.vx / sp, dy = g.vy / sp, dz = g.vz / sp;
+          const dist = sp * remaining;
+          if (!world.raycast(g.x, g.y, g.z, dx, dy, dz, dist + R, _hit)) {
+            g.x += dx * dist; g.y += dy * dist; g.z += dz * dist;
+            break;
+          }
+          const travel = Math.max(0, _hit.t - R);
+          g.x += dx * travel; g.y += dy * travel; g.z += dz * travel;
+          remaining -= travel / sp;
+          const vn = g.vx * _hit.nx + g.vy * _hit.ny + g.vz * _hit.nz;
+          if (vn >= 0) break; // already heading away from the surface
+          // bounce: lose energy along the normal, scrub some along the surface
+          const k = 1.42 * vn;
+          g.vx = (g.vx - k * _hit.nx) * 0.8;
+          g.vy = (g.vy - k * _hit.ny) * 0.9;
+          g.vz = (g.vz - k * _hit.nz) * 0.8;
+          if (-vn > 2.5 && g.bounceT <= 0) {
+            g.bounceT = 0.12;
+            _d.set(g.x, g.y, g.z);
+            this.audio.play('bounce', _d);
+          }
+          if (_hit.ny > 0.6 && Math.hypot(g.vx, g.vy, g.vz) < 1.3) {
+            g.resting = true;
+            g.vx = g.vy = g.vz = 0;
+            break;
+          }
+        }
+        if (g.y < -5) g.fuse = Math.min(g.fuse, 0);
+        g.mesh.rotation.x += dt * 9;
+        g.mesh.rotation.z += dt * 6;
+      }
+      g.mesh.position.set(g.x, g.y, g.z);
+      // blink faster as the fuse runs down
+      g.mesh.material.emissiveIntensity = Math.sin(g.fuse * (g.fuse < 0.8 ? 40 : 14)) > 0 ? 1.6 : 0;
+      if (g.fuse <= 0) {
+        if (this.mode === 'client') {
+          if (g.fuse < -1.5) this.removeGrenade(i); // the host's "boom" never arrived
+        } else {
+          this.removeGrenade(i);
+          this.explode(g.x, g.y, g.z, g.owner, g.id);
+        }
+      }
+    }
+  }
+
+  /** Authoritative detonation: effects + damage to everyone in range and in sight. */
+  explode(x, y, z, owner, id) {
+    this.showExplosion(x, y, z);
+    if (this.mode === 'host') this.net.onExplode(id, x, y, z);
+    this.emitNoise(x, y, z, GRENADE.noise, owner, 'shot');
+    const sy = y + 0.3;
+    for (const c of [...this.chars]) {
+      if (!c.alive) continue;
+      const cy = c.pos.y + c.height * 0.5;
+      const d = Math.hypot(c.pos.x - x, cy - y, c.pos.z - z);
+      if (d >= GRENADE.radius) continue;
+      // walls stop the blast
+      if (this.world.segmentBlocked(x, sy, z, c.pos.x, cy, c.pos.z)
+        && this.world.segmentBlocked(x, sy, z, c.pos.x, c.pos.y + c.eyeH, c.pos.z)) continue;
+      let dmg = GRENADE.damage * (1 - d / GRENADE.radius);
+      if (c === owner) dmg *= GRENADE.selfScale;
+      this.damage(c, dmg, owner || c, false, GRENADE);
+    }
+  }
+
+  /** What an explosion looks and sounds like (also used by multiplayer clients). */
+  showExplosion(x, y, z) {
+    let groundY;
+    if (this.world.raycast(x, y + 0.3, z, 0, -1, 0, 3, _hit)) groundY = y + 0.3 - _hit.t;
+    this.effects.explosion(x, y, z, groundY);
+    _d.set(x, y, z);
+    this.audio.play('explosion', _d);
+    const p = this.player;
+    if (!this.attract && p.alive) {
+      const d = Math.hypot(p.pos.x - x, p.pos.y - y, p.pos.z - z);
+      if (d < 22) p.shake = Math.min(0.1, p.shake + 0.1 * (1 - d / 22));
     }
   }
 
@@ -446,6 +637,7 @@ export class Game {
     else this.player.update(dt, this.input);
     for (const r of this.remotes) r.update(dt);
     for (const b of this.bots) b.update(dt);
+    this.updateGrenades(dt);
     this.updatePickups(dt);
     this.effects.update(dt);
 
@@ -462,6 +654,7 @@ export class Game {
     this.player.update(dt, this.input);
     for (const r of this.remotes) r.update(dt);
     for (const p of this.pickups) p.update(dt, this.time, false);
+    this.updateGrenades(dt);
     this.effects.update(dt);
     const cam = this.camera;
     this.audio.setListener(cam.position.x, cam.position.y, cam.position.z, this.player.yaw);
@@ -471,7 +664,8 @@ export class Game {
   orbitCamera(dt, speed) {
     this.orbit = (this.orbit || 0.6) + dt * speed;
     const cam = this.camera;
-    cam.position.set(Math.cos(this.orbit) * 60, 34, Math.sin(this.orbit) * 60);
+    const R = this.orbitR;
+    cam.position.set(Math.cos(this.orbit) * R, R * 0.56, Math.sin(this.orbit) * R);
     cam.rotation.set(0, 0, 0);
     cam.lookAt(0, -4, 0);
     if (Math.abs(cam.fov - 55) > 0.01) { cam.fov = 55; cam.updateProjectionMatrix(); }

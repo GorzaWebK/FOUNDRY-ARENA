@@ -18,8 +18,11 @@ export class Hud {
       protect: $('protect-label'), protectFrame: $('protect-frame'),
       death: $('death'), deathName: $('death-name'), deathCount: $('death-count'),
       sb: $('scoreboard'), sbBody: $('sb-body'), fps: $('fps'), lockHint: $('lock-hint'),
+      slotPrim: $('slot-prim'), nade: $('slot-nade'), nadeCount: $('nade-count'), scope: $('scope'),
+      chat: $('chat'), chatLog: $('chat-log'), chatHint: $('chat-hint'),
     };
-    this.slots = [...document.querySelectorAll('#slots .slot')];
+    this.chatLines = [];
+    this.slots = [...document.querySelectorAll('#slots .slot[data-i]')];
     this.cache = {};
     this.hitT = 0;
     this.vigT = 0;
@@ -78,6 +81,9 @@ export class Hud {
     for (let i = 0; i < this.slots.length; i++) {
       this._set('se' + i, !p.hasAmmo(i), (v) => this.slots[i].classList.toggle('empty', v));
     }
+    this._set('prim', p.weapons[0].def.name, (v) => { e.slotPrim.textContent = v; });
+    this._set('nades', p.grenades, (v) => { e.nadeCount.textContent = v; e.nade.classList.toggle('empty', v === 0); });
+    this._set('scope', p.alive && p.scoped, (v) => e.scope.classList.toggle('hidden', !v));
 
     // match info
     const t = Math.max(0, Math.ceil(game.matchTime));
@@ -99,7 +105,7 @@ export class Hud {
     const gap = Math.max(3, (Math.tan(spread) / Math.tan(fovRad / 2)) * (window.innerHeight / 2));
     this._set('gap', Math.round(gap), (v) => e.cross.style.setProperty('--gap', v + 'px'));
     // iron sights replace the crosshair when aiming (the shotgun keeps its spread ring)
-    const showCross = p.alive && !(p.ads > 0.6 && w.def.id !== 'shotgun');
+    const showCross = p.alive && !(p.ads > 0.6 && w.def.id !== 'shotgun') && !p.scoped;
     this._set('cross', showCross, (v) => { e.cross.style.opacity = v ? 1 : 0; });
 
     // hit marker / vignettes
@@ -141,6 +147,11 @@ export class Hud {
       f.life -= dt;
       if (f.life < 0.4) f.el.style.opacity = 0;
       if (f.life <= 0) { f.el.remove(); this.feedItems.splice(i, 1); }
+    }
+
+    // chat lines fade out after a while (they come back while the chat box is open)
+    for (const c of this.chatLines) {
+      if (c.life > 0) { c.life -= dt; if (c.life <= 0) c.el.classList.add('old'); }
     }
 
     if (this.sbVisible) {
@@ -190,6 +201,31 @@ export class Hud {
     this.feedItems.push({ el, life: 6 });
     while (this.feedItems.length > 6) this.feedItems.shift().el.remove();
   }
+
+  /** Add a chat line. An empty name means a system message. */
+  chatAdd(name, color, text) {
+    const el = document.createElement('div');
+    el.className = 'chat-line' + (name ? '' : ' sys');
+    if (name) {
+      const b = document.createElement('b');
+      b.textContent = name + ': ';
+      b.style.color = hex(color);
+      el.append(b);
+    }
+    el.append(document.createTextNode(text));
+    this.el.chatLog.append(el);
+    this.chatLines.push({ el, life: 9 });
+    while (this.chatLines.length > 8) this.chatLines.shift().el.remove();
+  }
+
+  chatClear() {
+    for (const c of this.chatLines) c.el.remove();
+    this.chatLines.length = 0;
+  }
+
+  /** While the chat box is open, show the recent history too. */
+  chatOpen(v) { this.el.chat.classList.toggle('open', v); }
+  chatHint(v) { this.el.chatHint.classList.toggle('hidden', !v); }
 
   toast(text, color = '#fff') {
     const t = this.el.toast;

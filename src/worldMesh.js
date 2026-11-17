@@ -164,7 +164,8 @@ export function buildLights(scene, map, shadows) {
   const sky = map.sky;
   const hemi = new THREE.HemisphereLight(0xcfe2ff, 0x8d877b, 1.2);
   scene.add(hemi);
-  scene.add(new THREE.AmbientLight(0xdde6f2, 0.45)); // keeps ceilings and deep shade readable
+  const ambient = new THREE.AmbientLight(0xdde6f2, 0.45); // keeps ceilings and deep shade readable
+  scene.add(ambient);
   const sun = new THREE.DirectionalLight(new THREE.Color(sky.sunColor), 2.6);
   const dir = new THREE.Vector3(...sky.sunDir).normalize();
   sun.position.copy(dir).multiplyScalar(90);
@@ -179,10 +180,12 @@ export function buildLights(scene, map, shadows) {
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.04;
   scene.add(sun, sun.target);
+  const points = [];
   for (const l of map.lights || []) {
     const p = new THREE.PointLight(new THREE.Color(l.color), l.intensity, l.distance, 2);
     p.position.set(...l.pos);
     scene.add(p);
+    points.push(p);
   }
-  return { hemi, sun };
+  return { hemi, sun, points, all: [hemi, ambient, sun, sun.target, ...points] };
 }

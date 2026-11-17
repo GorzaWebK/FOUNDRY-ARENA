@@ -1,0 +1,13 @@
+// Map registry. To add a map: create a data file like the ones here, import it
+// and add it to MAPS. `npm run check:map` validates every map in this list.
+
+import foundry from './arena.js';
+import span from './span.js';
+import cloister from './cloister.js';
+
+export const MAPS = [foundry, span, cloister];
+export const DEFAULT_MAP = foundry.id;
+
+export function getMap(id) {
+  return MAPS.find((m) => m.id === id) || MAPS[0];
+}

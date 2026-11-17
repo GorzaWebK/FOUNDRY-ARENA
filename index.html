@@ -49,9 +49,9 @@
         <div id="ammo-count"><span id="ammo-mag">30</span><span class="sep">/</span><span id="ammo-res">60</span></div>
         <div id="reload-hint"></div>
         <div id="slots">
-          <div class="slot" data-i="0"><b>1</b> Pistol</div>
-          <div class="slot" data-i="1"><b>2</b> Rifle</div>
-          <div class="slot" data-i="2"><b>3</b> Shotgun</div>
+          <div class="slot" data-i="0"><b>1</b> <span id="slot-prim">Rifle</span></div>
+          <div class="slot" data-i="1"><b>2</b> Pistol</div>
+          <div class="slot nade" id="slot-nade"><b>F</b> Grenade × <span id="nade-count">2</span></div>
         </div>
       </div>
 
@@ -66,6 +66,12 @@
       </div>
       <div id="fps" class="hidden"></div>
       <div id="room" class="hidden"></div>
+      <div id="scope" class="hidden"><i class="sc-h"></i><i class="sc-v"></i></div>
+      <div id="chat">
+        <div id="chat-log"></div>
+        <input type="text" id="chat-input" class="hidden" maxlength="140" placeholder="Message everyone — Enter to send" autocomplete="off" spellcheck="false" />
+        <div id="chat-hint" class="hidden">Enter to chat</div>
+      </div>
     </div>
 
     <!-- ============================== MAIN MENU ============================== -->
@@ -76,12 +82,15 @@
         <div class="cols">
           <div class="col">
             <h4>Match</h4>
-            <label class="row"><span>Bots</span><input type="range" id="set-bots" min="1" max="10" step="1" /><output id="out-bots"></output></label>
+            <label class="row"><span>Map</span><select id="set-map"></select><output></output></label>
+            <label class="row"><span>Bots</span><input type="checkbox" id="set-bots-on" /><output></output></label>
+            <label class="row" id="row-botcount"><span>Bot count</span><input type="range" id="set-bots" min="1" max="10" step="1" /><output id="out-bots"></output></label>
             <label class="row"><span>Difficulty</span>
               <select id="set-diff"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select><output></output>
             </label>
-            <h4>Settings</h4>
-            <div id="menu-settings"></div>
+            <h4>Loadout</h4>
+            <div id="menu-loadout" class="loadout"></div>
+            <p class="note">You carry your primary, a pistol and 2 grenades.</p>
           </div>
           <div class="col">
             <h4>Multiplayer</h4>
@@ -93,14 +102,20 @@
               <button id="btn-join">Join</button>
             </div>
             <p id="mp-status" class="note"></p>
+            <h4>Settings</h4>
+            <div id="menu-settings"></div>
+          </div>
+          <div class="col">
             <h4>Controls</h4>
             <ul class="keys">
               <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</li>
               <li><kbd>Mouse</kbd> look · <kbd>LMB</kbd> fire · <kbd>RMB</kbd> aim</li>
               <li><kbd>Space</kbd> jump · <kbd>Shift</kbd> sprint</li>
-              <li><kbd>C</kbd> / <kbd>Ctrl</kbd> crouch</li>
-              <li><kbd>R</kbd> reload</li>
-              <li><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> / <kbd>Wheel</kbd> weapons</li>
+              <li><kbd>C</kbd> / <kbd>Ctrl</kbd> crouch · while sprinting: slide</li>
+              <li><kbd>Q</kbd> lean left · <kbd>E</kbd> lean right</li>
+              <li><kbd>F</kbd> throw grenade · <kbd>R</kbd> reload</li>
+              <li><kbd>1</kbd> primary · <kbd>2</kbd> pistol · <kbd>Wheel</kbd> swap</li>
+              <li><kbd>Enter</kbd> chat (multiplayer)</li>
               <li><kbd>Tab</kbd> scoreboard · <kbd>Esc</kbd> / <kbd>P</kbd> pause</li>
             </ul>
             <p class="note">Tip: prefer <kbd>C</kbd> to crouch — browsers reserve <kbd>Ctrl</kbd>+<kbd>W</kbd> for closing the tab.</p>
@@ -121,8 +136,12 @@
           <button id="btn-copy">Copy invite link</button>
           <p id="copy-note" class="note"></p>
         </div>
+        <h4>Loadout <small>— applies on your next respawn</small></h4>
+        <div id="pause-loadout" class="loadout compact"></div>
+        <h4>Settings</h4>
         <div id="pause-settings"></div>
         <div class="btn-row">
+          <button id="btn-bots">Bots: On</button>
           <button id="btn-restart">Restart match</button>
           <button id="btn-quit">Main menu</button>
         </div>

@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { CFG } from './config.js';
-import { makeWeaponStates, SWITCH_TIME } from './weapons.js';
+import { makeLoadout, SWITCH_TIME, GRENADE, DEFAULT_PRIMARY } from './weapons.js';
 import { hasHeadroom } from './physics.js';
 
 export class Character {
@@ -40,9 +40,14 @@ export class Character {
     this.lastHurtBy = null;
     this.lastHurtT = -99;
 
-    this.weapons = makeWeaponStates();
-    this.weaponIdx = 1;
+    this.primary = DEFAULT_PRIMARY; // loadout choice, applied on (re)spawn
+    this.weapons = makeLoadout(this.primary); // [primary, pistol]
+    this.weaponIdx = 0;
     this.switchT = 0;
+    this.grenades = GRENADE.start;
+    this.grenadeT = 0; // throw cooldown
+    this.lean = 0; // -1 (left) .. 1 (right)
+    this.leanOff = 0; // metres the head is actually shifted sideways
     this.stepDist = 0;
   }
 
@@ -50,7 +55,15 @@ export class Character {
 
   isProtected() { return this.game.time < this.protectedUntil; }
 
-  getEye(out) { return out.set(this.pos.x, this.pos.y + this.eyeH, this.pos.z); }
+  /** Eye position, including any sideways lean. */
+  getEye(out) {
+    const o = this.leanOff;
+    return out.set(
+      this.pos.x + Math.cos(this.yaw) * o,
+      this.pos.y + this.eyeH - Math.abs(o) * 0.14,
+      this.pos.z - Math.sin(this.yaw) * o,
+    );
+  }
 
   aimDir(out) {
     const cp = Math.cos(this.pitch);
@@ -82,9 +95,13 @@ export class Character {
     this.armor = 0;
     this.alive = true;
     this.protectedUntil = this.game.time + CFG.spawnProtection;
-    this.weapons = makeWeaponStates();
-    this.weaponIdx = 1;
+    this.weapons = makeLoadout(this.primary);
+    this.weaponIdx = 0;
     this.switchT = 0;
+    this.grenades = GRENADE.start;
+    this.grenadeT = 0;
+    this.lean = 0;
+    this.leanOff = 0;
     this.lastHurtBy = null;
   }
 
@@ -105,7 +122,7 @@ export class Character {
     let s = def.spreadMin + (def.spreadMax - def.spreadMin) * w.heat;
     if (def.pellets === 1) {
       const speed = Math.hypot(this.vel.x, this.vel.z);
-      s *= 1 + Math.min(1, speed / CFG.sprintSpeed) * 1.2;
+      s *= 1 + Math.min(1, speed / CFG.sprintSpeed) * def.moveSpread;
       if (!this.onGround) s *= 2.2;
       if (this.crouching) s *= 0.7;
     }
@@ -114,6 +131,7 @@ export class Character {
 
   updateWeapons(dt) {
     if (this.switchT > 0) this.switchT = Math.max(0, this.switchT - dt);
+    if (this.grenadeT > 0) this.grenadeT -= dt;
     for (let i = 0; i < this.weapons.length; i++) {
       const w = this.weapons[i];
       if (w.cooldown > 0) w.cooldown -= dt;
@@ -181,7 +199,18 @@ export class Character {
     return true;
   }
 
+  /** Throw a grenade along the aim direction (or `dir`, if given). */
+  throwGrenade(dir = null) {
+    if (!this.alive || this.grenades <= 0 || this.grenadeT > 0) return false;
+    this.grenades--;
+    this.grenadeT = GRENADE.cooldown;
+    this.game.throwGrenade(this, dir);
+    this.onThrow();
+    return true;
+  }
+
   // hooks
+  onThrow() {}
   onReload() {}
   onSwitch() {}
   onDryFire() {}

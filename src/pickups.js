@@ -1,16 +1,19 @@
-// Health / armour / ammo / weapon pickups that respawn on a timer.
+// Health / armour / ammo / supply-crate pickups that respawn on a timer.
 
 import * as THREE from 'three';
 import { CFG } from './config.js';
+import { GRENADE } from './weapons.js';
 import { glowTexture } from './textures.js';
 
 export const PICKUP_TYPES = {
   health: { label: '+50 Health', color: 0x4dff88, respawn: 30, tone: 520 },
   armor: { label: '+50 Armour', color: 0x4db8ff, respawn: 30, tone: 440 },
-  ammo: { label: 'Ammo', color: 0xffd24d, respawn: 20, tone: 620 },
-  rifle: { label: 'Rifle ammo crate', color: 0xff9a3d, respawn: 30, tone: 660 },
-  shotgun: { label: 'Shotgun shells', color: 0xff5f5f, respawn: 30, tone: 580 },
+  ammo: { label: 'Ammo + grenade', color: 0xffd24d, respawn: 20, tone: 620 },
+  crate: { label: 'Supply crate: full ammo + grenades', color: 0xff9a3d, respawn: 30, tone: 660 },
 };
+
+/** Older map files used per-weapon crates. */
+const ALIAS = { rifle: 'crate', shotgun: 'crate' };
 
 function mat(color, emissive = 0) {
   return new THREE.MeshLambertMaterial({ color, emissive, emissiveIntensity: 0.6 });
@@ -41,25 +44,22 @@ function buildModel(type) {
     g.add(bx(0.52, 0.06, 0.34, mat(0xffd24d, 0xaa8a20), 0, 0.08, 0));
     g.add(bx(0.2, 0.05, 0.08, mat(0x222222), 0, 0.18, 0));
   } else {
-    // weapon silhouette
-    const dark = mat(0x2a2d33, 0x111111);
+    // supply crate
+    const body = mat(0x3d4652, 0x14181d);
     const acc = mat(c, c);
-    if (type === 'rifle') {
-      g.add(bx(0.07, 0.11, 0.5, dark), bx(0.04, 0.04, 0.3, dark, 0, 0.01, -0.38), bx(0.05, 0.2, 0.08, acc, 0, -0.14, -0.05));
-      g.add(bx(0.06, 0.1, 0.24, dark, 0, -0.02, 0.36), bx(0.05, 0.12, 0.06, dark, 0, -0.1, 0.16));
-    } else {
-      g.add(bx(0.07, 0.1, 0.36, dark), bx(0.05, 0.05, 0.5, dark, 0, 0.02, -0.42), bx(0.08, 0.07, 0.2, acc, 0, -0.04, -0.34));
-      g.add(bx(0.06, 0.1, 0.3, mat(0x7a5230, 0x2a1a0c), 0, -0.04, 0.32));
-    }
-    g.rotation.z = 0.25;
+    g.add(bx(0.62, 0.4, 0.44, body));
+    g.add(bx(0.64, 0.07, 0.46, acc, 0, 0.1, 0), bx(0.64, 0.07, 0.46, acc, 0, -0.1, 0));
+    g.add(bx(0.16, 0.12, 0.48, mat(0x1c2026), 0, 0, 0));
+    g.add(bx(0.3, 0.06, 0.1, mat(0x1c2026), 0, 0.23, 0));
   }
   return g;
 }
 
 export class Pickup {
   constructor(def, scene) {
-    this.type = def.type;
-    this.info = PICKUP_TYPES[def.type];
+    this.type = ALIAS[def.type] || def.type;
+    this.info = PICKUP_TYPES[this.type];
+    this.scene = scene;
     this.pos = new THREE.Vector3(def.pos[0], def.pos[1], def.pos[2]);
     this.active = true;
     this.respawnT = 0;
@@ -97,25 +97,30 @@ export class Pickup {
 
   /** Would this pickup do anything for the character? */
   usefulTo(c) {
+    const prim = c.weapons[0];
     switch (this.type) {
       case 'health': return c.health < CFG.maxHealth;
       case 'armor': return c.armor < CFG.maxArmor;
-      case 'rifle': return c.weapons[1].reserve < c.weapons[1].def.reserveMax;
-      case 'shotgun': return c.weapons[2].reserve < c.weapons[2].def.reserveMax;
       case 'ammo':
-        return c.weapons[1].reserve < c.weapons[1].def.reserveMax || c.weapons[2].reserve < c.weapons[2].def.reserveMax;
+      case 'crate':
+        return prim.reserve < prim.def.reserveMax || c.grenades < GRENADE.max;
       default: return false;
     }
   }
 
   apply(c) {
-    const add = (i, n) => { const w = c.weapons[i]; w.reserve = Math.min(w.def.reserveMax, w.reserve + n); };
+    const prim = c.weapons[0];
     switch (this.type) {
       case 'health': c.health = Math.min(CFG.maxHealth, c.health + 50); break;
       case 'armor': c.armor = Math.min(CFG.maxArmor, c.armor + 50); break;
-      case 'rifle': add(1, 60); break;
-      case 'shotgun': add(2, 12); break;
-      case 'ammo': add(1, 30); add(2, 6); break;
+      case 'ammo':
+        prim.reserve = Math.min(prim.def.reserveMax, prim.reserve + prim.def.ammoBox);
+        c.grenades = Math.min(GRENADE.max, c.grenades + 1);
+        break;
+      case 'crate':
+        prim.reserve = prim.def.reserveMax;
+        c.grenades = GRENADE.max;
+        break;
       default: break;
     }
   }
@@ -147,5 +152,13 @@ export class Pickup {
     this.model.rotation.y = t * 0.9;
     this.model.position.y = 0.75 + Math.sin(t) * 0.08;
     this.pad.material.emissiveIntensity = 0.3 + Math.sin(t * 1.5) * 0.12;
+  }
+
+  dispose() {
+    this.scene.remove(this.group);
+    this.group.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) o.material.dispose();
+    });
   }
 }

@@ -2,12 +2,15 @@
 // the game does, prints an ASCII overview and checks that all spawns, pickups
 // and points of interest sit on nav nodes the bots can reach.
 //
-//   npm run check:map
+//   npm run check:map            all maps
+//   npm run check:map -- --quiet no ASCII overview
 
-import map from '../src/maps/arena.js';
+import { MAPS } from '../src/maps/index.js';
 import { World } from '../src/world.js';
 import { NavGrid } from '../src/navgrid.js';
 
+let failed = 0;
+for (const map of MAPS) {
 const world = new World(map);
 const t0 = performance.now();
 const nav = new NavGrid(world);
@@ -38,7 +41,7 @@ for (let iz = 0; iz < nav.h; iz++) {
   }
   rows.push(row);
 }
-console.log(rows.join('\n'));
+if (!process.argv.includes('--quiet')) console.log(rows.join('\n'));
 console.log('\nlegend: . ground  : low  + mid (x = walkable underneath)  # high (H = walkable underneath)  @ top\n');
 
 let bad = 0;
@@ -69,5 +72,7 @@ for (let i = 0; i < 500; i++) {
   if (r && r.complete) total++;
 }
 console.log(`500 random paths: ${total} complete, ${((performance.now() - t1) / 500).toFixed(3)} ms each`);
-console.log(bad ? `\n${bad} problem(s) found` : '\nmap OK');
-process.exit(bad ? 1 : 0);
+console.log(bad ? `\n${bad} problem(s) found in ${map.name}\n` : `\n${map.name} OK\n`);
+failed += bad;
+}
+process.exit(failed ? 1 : 0);

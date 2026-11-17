@@ -15,6 +15,7 @@ import { Character } from './character.js';
 import { CFG } from './config.js';
 import { moveBody } from './physics.js';
 import { BotModel } from './botModel.js';
+import { GRENADE } from './weapons.js';
 
 export const STATE = {
   PATROL: 'patrol',
@@ -28,6 +29,15 @@ export const STATE = {
 const _eye = new THREE.Vector3();
 const _t = new THREE.Vector3();
 const _d = new THREE.Vector3();
+const _e2 = new THREE.Vector3();
+
+// what bots like to carry (weights)
+const PRIMARY_WEIGHTS = [['rifle', 34], ['smg', 24], ['shotgun', 16], ['lmg', 14], ['sniper', 12]];
+function rollPrimary() {
+  let r = Math.random() * 100;
+  for (const [id, w] of PRIMARY_WEIGHTS) { r -= w; if (r <= 0) return id; }
+  return 'rifle';
+}
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
@@ -50,7 +60,7 @@ export class Bot extends Character {
       aim: rand(0.85, 1.2),
       react: rand(0.85, 1.2),
       headBias: rand(0.5, 1.2),
-      shotgunLove: rand(0.7, 1.4),
+      favorite: rollPrimary(), // each bot has a go-to gun, but mixes it up
     };
     this.goal = new THREE.Vector3();
     this.spot = new THREE.Vector3();
@@ -94,11 +104,13 @@ export class Bot extends Character {
     this.nudgeT = 0; this.nudgeX = 0; this.nudgeZ = 0;
     this.nextNeedCheck = 0; this.nextSwitchOk = 0; this.repathT = 0;
     this.lastCombatT = -99;
+    this.nextGrenadeT = this.game.time + rand(2, 6);
     this.lastPoi = null;
     for (const m of this.mem.values()) { m.visible = false; m.lastSeenT = -99; m.hurtT = -99; }
   }
 
   spawnAt(x, y, z, yaw) {
+    this.primary = Math.random() < 0.7 ? this.pers.favorite : rollPrimary();
     super.spawnAt(x, y, z, yaw);
     this.resetAI();
     this.lastStuckPos.copy(this.pos);
@@ -164,7 +176,8 @@ export class Bot extends Character {
       const dot = (dx * -Math.sin(this.yaw) + dz * -Math.cos(this.yaw)) / flat;
       if (dot < (m.visible ? 0.2 : 0.46)) return false;
     }
-    if (!w.segmentBlocked(_eye.x, _eye.y, _eye.z, c.pos.x, c.pos.y + c.eyeH, c.pos.z)) return true;
+    c.getEye(_e2); // a leaning head pokes out from cover
+    if (!w.segmentBlocked(_eye.x, _eye.y, _eye.z, _e2.x, _e2.y, _e2.z)) return true;
     return !w.segmentBlocked(_eye.x, _eye.y, _eye.z, c.pos.x, c.pos.y + c.height * 0.5, c.pos.z);
   }
 
@@ -287,6 +300,7 @@ export class Bot extends Character {
         const m = this.memOf(e);
         // head for where they were going, not just where they were
         _t.copy(m.lastPos).addScaledVector(m.lastVel, 0.6);
+        if (Math.random() < 0.5 * this.pers.aggression) this.tryGrenadeAt(m.lastPos.x, m.lastPos.y, m.lastPos.z); // flush them out
         this.enterChase(_t, e, 'enemy');
       } else {
         this.pickNext();
@@ -450,9 +464,9 @@ export class Bot extends Character {
   /** Most valuable pickup worth walking to right now, or null. */
   choosePickup(maxDist) {
     let best = null, bestScore = 0;
-    const rifle = this.weapons[1], sg = this.weapons[2];
-    const rNeed = Math.max(0, 1 - (rifle.mag + rifle.reserve) / 90);
-    const sNeed = Math.max(0, 1 - (sg.mag + sg.reserve) / 18);
+    const prim = this.weapons[0];
+    const need = Math.max(0, 1 - (prim.mag + prim.reserve) / (prim.def.magSize + prim.def.reserveStart));
+    const gNeed = (GRENADE.max - this.grenades) / GRENADE.max;
     for (const p of this.game.pickups) {
       if (!p.active && p.respawnT > 3) continue;
       if (!p.usefulTo(this)) continue;
@@ -460,9 +474,8 @@ export class Bot extends Character {
       switch (p.type) {
         case 'health': u = this.health >= 85 ? 0 : ((100 - this.health) / 100) * 1.8; break;
         case 'armor': u = this.armor >= 60 ? 0 : ((100 - this.armor) / 100) * 0.8; break;
-        case 'rifle': u = rNeed > 0.2 ? rNeed * 0.9 : 0; break;
-        case 'shotgun': u = sNeed > 0.3 ? sNeed * 0.6 * this.pers.shotgunLove : 0; break;
-        case 'ammo': u = Math.max(rNeed > 0.2 ? rNeed * 0.7 : 0, sNeed > 0.3 ? sNeed * 0.4 : 0); break;
+        case 'ammo': u = (need > 0.25 ? need * 0.7 : 0) + gNeed * 0.12; break;
+        case 'crate': u = (need > 0.25 ? need * 0.95 : 0) + gNeed * 0.2; break;
         default: break;
       }
       if (u <= 0.05) continue;
@@ -741,7 +754,20 @@ export class Bot extends Character {
       this.nudgeT -= dt;
       wx += this.nudgeX; wz += this.nudgeZ;
     }
-    const maxSp = Math.max(this.wishSpeed, pushed ? 2.5 : 0);
+    // a live grenade nearby trumps everything: get away from it
+    let flee = false;
+    for (const gr of g.grenades) {
+      if (gr.fuse > 1.7) continue; // takes a moment to notice it
+      const dx = this.pos.x - gr.x, dz = this.pos.z - gr.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > 56 || Math.abs(this.pos.y - gr.y) > 3) continue;
+      const d = Math.sqrt(d2) || 0.01;
+      wx = (dx / d) * CFG.botSprint;
+      wz = (dz / d) * CFG.botSprint;
+      flee = true;
+      break;
+    }
+    const maxSp = Math.max(this.wishSpeed, pushed ? 2.5 : 0, flee ? CFG.botSprint : 0);
     const wl = Math.hypot(wx, wz);
     if (wl > maxSp && wl > 0) { wx *= maxSp / wl; wz *= maxSp / wl; }
 
@@ -879,28 +905,40 @@ export class Bot extends Character {
     this.aimOff = mode === 'target' ? Math.max(Math.abs(dy), Math.abs(dp)) : 9;
   }
 
+  /** Primary or pistol? (slot 0 / slot 1) */
   chooseWeapon(d) {
     const now = this.game.time;
     if (this.switchT > 0 || now < this.nextSwitchOk) return;
-    const sgOk = this.hasAmmo(2), rifleOk = this.hasAmmo(1);
+    const prim = this.weapons[0], side = this.weapons[1];
     const cur = this.weaponIdx;
-    const sgRange = (cur === 2 ? 12 : 8.5) * Math.min(1.15, this.pers.shotgunLove);
-    let want;
-    if (sgOk && d < sgRange) want = 2;
-    else if (rifleOk) want = 1;
-    else if (sgOk && d < 16) want = 2;
-    else want = 0;
-    // caught empty at close range: drawing another gun beats reloading
-    const w = this.weapon;
-    if (want === cur && w.mag === 0 && d < 14) {
-      if (cur !== 2 && this.weapons[2].mag > 0 && d < 12) want = 2;
-      else if (cur !== 1 && this.weapons[1].mag > 0) want = 1;
-      else if (cur !== 0 && this.weapons[0].mag > 0) want = 0;
-    }
+    let want = 0;
+    if (!this.hasAmmo(0)) want = 1; // primary is dry
+    else if (prim.def.pellets > 1 && d > prim.def.botMaxRange * (cur === 1 ? 0.9 : 1.2)) want = 1; // shotgun can't reach
+    else if (prim.def.scope && d < (cur === 1 ? 9 : 6)) want = 1; // too close for a scope
+    else if (prim.mag === 0 && d < 12 && side.mag > 0) want = 1; // drawing the pistol beats reloading under fire
     if (want !== cur) {
       this.switchWeapon(want);
-      this.nextSwitchOk = now + 1.6;
+      this.nextSwitchOk = now + 1.4;
     }
+  }
+
+  /** Lob a grenade at a spot, if the throw is makeable. */
+  tryGrenadeAt(x, y, z) {
+    const g = this.game;
+    if (this.grenades <= 0 || this.grenadeT > 0 || g.time < this.nextGrenadeT) return false;
+    this.getEye(_eye);
+    const dx = x - _eye.x, dz = z - _eye.z, dy = y + 0.3 - _eye.y;
+    const dh = Math.hypot(dx, dz);
+    if (dh < 8 || dh > 26) return false; // too close hurts us, too far won't reach
+    const v = GRENADE.speed, gr = GRENADE.gravity;
+    const disc = v * v * v * v - gr * (gr * dh * dh + 2 * dy * v * v);
+    if (disc < 0) return false;
+    const ang = Math.atan2(v * v - Math.sqrt(disc), gr * dh); // the flatter of the two arcs
+    const c = Math.cos(ang);
+    _d.set((dx / dh) * c, Math.sin(ang), (dz / dh) * c);
+    if (g.world.raycast(_eye.x, _eye.y, _eye.z, _d.x, _d.y, _d.z, 3.5, null)) return false; // wall in the way
+    this.nextGrenadeT = g.time + rand(5, 10);
+    return this.throwGrenade(_d);
   }
 
   updateCombat(dt) {
@@ -918,17 +956,23 @@ export class Bot extends Character {
         const d = this.pos.distanceTo(t.pos);
         const tol = 0.05 + Math.atan2(0.4, d) + (w.def.pellets > 1 ? 0.05 : 0);
         // would the shot have a chance? (moving + sustained fire bloom the cone)
-        const cone = w.def.pellets > 1 ? 0 : this.currentSpread() * d;
+        // scoped rifles are only steady when standing still
+        const ads = w.def.scope && Math.hypot(this.vel.x, this.vel.z) < 2 ? 1 : 0;
+        const cone = w.def.pellets > 1 ? 0 : this.currentSpread(ads) * d;
+        // a settled fight at mid range is a good moment for a grenade
+        if (d > 9 && d < 24 && this.trackTime > 0.8 && Math.random() < dt * 0.6 * this.pers.aggression) {
+          this.tryGrenadeAt(t.pos.x + t.vel.x * 0.8, t.pos.y, t.pos.z + t.vel.z * 0.8);
+        }
         if (this.aimOff < tol && d < w.def.botMaxRange * 1.4 && cone < 0.95) {
           if (w.def.auto) {
-            if (this.burstPause <= 0 && this.tryFire(true, true)) {
+            if (this.burstPause <= 0 && this.tryFire(true, true, ads)) {
               if (--this.burstLeft <= 0) {
                 // short controlled bursts at range, longer sprays up close
                 this.burstPause = rand(0.12, 0.4) * clamp(d / 18, 0.4, 1.6);
                 this.burstLeft = d < 8 ? 14 : 3 + ((Math.random() * 6) | 0);
               }
             }
-          } else if (this.semiT <= 0 && this.tryFire(true, true)) {
+          } else if (this.semiT <= 0 && this.tryFire(true, true, ads)) {
             this.semiT = w.def.pellets > 1 ? 0 : rand(0.2, 0.36);
           }
         }
@@ -940,7 +984,7 @@ export class Bot extends Character {
       if (now - this.lastCombatT > 1.2 && w.reloadT <= 0 && this.switchT <= 0) {
         if (w.mag < w.def.magSize * 0.6 && this.canReload()) this.startReload();
         else if (now > this.nextSwitchOk) {
-          const want = this.hasAmmo(1) ? 1 : this.hasAmmo(2) ? 2 : 0;
+          const want = this.hasAmmo(0) ? 0 : 1;
           if (want !== this.weaponIdx) { this.switchWeapon(want); this.nextSwitchOk = now + 2; }
         }
       }

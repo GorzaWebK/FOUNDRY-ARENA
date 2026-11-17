@@ -1,8 +1,9 @@
-// App bootstrap: menus, pointer lock, pause, multiplayer lobby, main loop.
+// App bootstrap: menus, pointer lock, pause, multiplayer lobby, chat, main loop.
 
 import './style.css';
-import arena from './maps/arena.js';
+import { MAPS, getMap } from './maps/index.js';
 import { CFG } from './config.js';
+import { WEAPON_BY_ID, PRIMARIES } from './weapons.js';
 import { loadSettings, saveSettings, buildSettingsUI } from './settings.js';
 import { AudioSys } from './audio.js';
 import { Hud } from './hud.js';
@@ -21,11 +22,12 @@ const audio = new AudioSys();
 audio.volume = settings.volume;
 const hud = new Hud();
 const input = new Input(canvas);
-const game = new Game({ canvas, settings, audio, hud, input, map: arena });
+const game = new Game({ canvas, settings, audio, hud, input, map: getMap(settings.map) });
 
 // 'menu' (attract mode) | 'playing' | 'paused' | 'ended'
 // In multiplayer the match never stops: 'paused' is just the menu overlay.
 let state = 'menu';
+let chatting = false;
 
 const ui = { menu: $('menu'), pause: $('pause'), end: $('end') };
 
@@ -40,9 +42,14 @@ const net = new Net(game, {
     setState('playing');
     hud.setLockHint(!input.locked);
   },
+  onChat: (name, color, text) => {
+    hud.chatAdd(name, color, text);
+    if (name) audio.play('chat');
+  },
 });
 
 function setState(s) {
+  if (chatting) closeChat(false);
   state = s;
   ui.menu.classList.toggle('hidden', s !== 'menu');
   ui.pause.classList.toggle('hidden', s !== 'paused');
@@ -61,16 +68,75 @@ const syncMenu = buildSettingsUI($('menu-settings'), settings, onSetting);
 const syncPause = buildSettingsUI($('pause-settings'), settings, onSetting);
 function syncAll() { syncMenu(); syncPause(); }
 
-const bots = $('set-bots'), botsOut = $('out-bots'), diff = $('set-diff');
+// match options
+const bots = $('set-bots'), botsOut = $('out-bots'), botsOn = $('set-bots-on'), diff = $('set-diff'), mapSel = $('set-map');
+for (const m of MAPS) {
+  const o = document.createElement('option');
+  o.value = m.id;
+  o.textContent = m.name;
+  o.title = m.blurb || '';
+  mapSel.append(o);
+}
+mapSel.value = settings.map;
 bots.value = settings.botCount;
 botsOut.textContent = settings.botCount;
+botsOn.checked = settings.bots;
 diff.value = settings.difficulty;
+function syncBotsUi() {
+  botsOn.checked = settings.bots;
+  $('row-botcount').style.opacity = settings.bots ? 1 : 0.4;
+  bots.disabled = !settings.bots;
+  $('btn-bots').textContent = `Bots: ${game.botsOn ? 'On' : 'Off'}`;
+}
 bots.addEventListener('input', () => {
   settings.botCount = parseInt(bots.value, 10);
   botsOut.textContent = settings.botCount;
   saveSettings(settings);
 });
+botsOn.addEventListener('change', () => { settings.bots = botsOn.checked; saveSettings(settings); syncBotsUi(); });
 diff.addEventListener('change', () => { settings.difficulty = diff.value; saveSettings(settings); });
+mapSel.addEventListener('change', () => {
+  settings.map = mapSel.value;
+  saveSettings(settings);
+  if (state === 'menu') startAttract(); // show the chosen map behind the menu
+});
+// host / solo: switch the bots on or off in the middle of a match
+$('btn-bots').addEventListener('click', () => {
+  if (net.role === 'client') return;
+  settings.bots = !game.botsOn;
+  saveSettings(settings);
+  game.setBots(settings.bots);
+  syncBotsUi();
+  if (net.role === 'host') net.system(`Bots turned ${settings.bots ? 'on' : 'off'}`);
+});
+
+// loadout picker (main menu + pause menu share the same choice)
+const loadoutButtons = [];
+function buildLoadoutUI(container) {
+  for (const id of PRIMARIES) {
+    const def = WEAPON_BY_ID[id];
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = def.name;
+    const small = document.createElement('small');
+    small.textContent = def.blurb;
+    b.append(small);
+    b.addEventListener('click', () => {
+      settings.primary = id;
+      saveSettings(settings);
+      syncLoadout();
+      if (state === 'paused') $('pause-hint').textContent = `${def.name} selected — you'll have it when you next respawn.`;
+    });
+    container.append(b);
+    loadoutButtons.push([id, b]);
+  }
+}
+function syncLoadout() {
+  for (const [id, b] of loadoutButtons) b.classList.toggle('on', id === settings.primary);
+}
+buildLoadoutUI($('menu-loadout'));
+buildLoadoutUI($('pause-loadout'));
+syncLoadout();
 
 // ---------------------------------------------------------------- multiplayer lobby UI
 const nameInput = $('mp-name'), codeInput = $('mp-code');
@@ -108,10 +174,13 @@ function updateRoomUi() {
   $('room-count').textContent = on ? `${n} player${n === 1 ? '' : 's'} connected` : '';
   $('pause-title').textContent = on ? 'MENU' : 'PAUSED';
   $('btn-restart').classList.toggle('hidden', net.role === 'client');
+  $('btn-bots').classList.toggle('hidden', net.role === 'client');
   $('btn-quit').textContent = on ? (net.role === 'host' ? 'Close room' : 'Leave game') : 'Main menu';
   $('btn-again').classList.toggle('hidden', net.role === 'client');
   $('btn-menu').textContent = on ? (net.role === 'host' ? 'Close room' : 'Leave game') : 'Main menu';
   $('end-wait').classList.toggle('hidden', net.role !== 'client');
+  hud.chatHint(on && state === 'playing' && !chatting);
+  syncBotsUi();
 }
 
 $('btn-copy').addEventListener('click', async () => {
@@ -120,6 +189,38 @@ $('btn-copy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(link); ok = true; } catch (e) { /* fall through */ }
   $('copy-note').textContent = ok ? 'Invite link copied.' : link;
 });
+
+// ---------------------------------------------------------------- chat (multiplayer)
+const chatInput = $('chat-input');
+
+function openChat() {
+  if (chatting || !net.active || state !== 'playing') return;
+  chatting = true;
+  input.active = false; // keys go to the text box, not the game
+  chatInput.value = '';
+  chatInput.classList.remove('hidden');
+  chatInput.focus();
+  hud.chatOpen(true);
+  hud.chatHint(false);
+}
+
+function closeChat(send) {
+  if (!chatting) return;
+  chatting = false;
+  const text = chatInput.value;
+  chatInput.classList.add('hidden');
+  chatInput.blur();
+  hud.chatOpen(false);
+  if (state === 'playing') { input.active = true; hud.chatHint(net.active); }
+  if (send) net.sendChat(text);
+}
+
+chatInput.addEventListener('keydown', (e) => {
+  e.stopPropagation();
+  if (e.code === 'Enter' || e.code === 'NumpadEnter') { e.preventDefault(); closeChat(true); }
+  else if (e.code === 'Escape') closeChat(false);
+});
+chatInput.addEventListener('blur', () => closeChat(false));
 
 // ---------------------------------------------------------------- flow
 async function lock() {
@@ -131,7 +232,9 @@ async function startMatch() {
   if (net.role === 'client') return; // only the host starts matches
   audio.resume();
   audio.setVolume(settings.volume);
-  game.newMatch({ botCount: settings.botCount, difficulty: settings.difficulty });
+  game.newMatch({
+    botCount: settings.botCount, bots: settings.bots, difficulty: settings.difficulty, map: getMap(settings.map),
+  });
   setState('playing');
   const ok = await lock();
   if (!ok && state === 'playing') hud.setLockHint(true);
@@ -150,6 +253,7 @@ async function hostGame() {
     setMpBusy(false);
   }
   setMpStatus('');
+  hud.chatClear();
   await startMatch();
   hud.centerMessage(`ROOM ${net.code}`, 'Press Esc for the invite link', 5, '#4fc3f7');
 }
@@ -160,6 +264,7 @@ async function joinGame() {
   audio.resume();
   setMpBusy(true);
   setMpStatus(`Connecting to room ${code}…`);
+  hud.chatClear();
   try {
     await net.join(code, settings.name);
   } catch (e) {
@@ -177,7 +282,8 @@ async function joinGame() {
 }
 
 function startAttract() {
-  game.newMatch({ botCount: 6, difficulty: 'normal', attract: true });
+  game.newMatch({ botCount: 6, bots: true, difficulty: 'normal', attract: true, map: getMap(settings.map) });
+  hud.chatClear();
   setState('menu');
 }
 
@@ -222,6 +328,11 @@ canvas.addEventListener('click', () => {
 window.addEventListener('keydown', (e) => {
   const typing = e.target instanceof HTMLInputElement && e.target.type === 'text';
   if (typing) return;
+  if ((e.code === 'Enter' || e.code === 'NumpadEnter') && state === 'playing' && net.active) {
+    e.preventDefault();
+    openChat();
+    return;
+  }
   if (e.code === 'Escape' || e.code === 'KeyP') {
     if (state === 'playing') {
       if (NOLOCK || !input.locked) pause();
@@ -302,4 +413,4 @@ requestAnimationFrame(frame);
 // handy for debugging / automated tests
 window.__game = game;
 window.__net = net;
-window.__app = { get state() { return state; }, startMatch, hostGame, joinGame, pause, resume, setState, input, settings };
+window.__app = { get state() { return state; }, startMatch, hostGame, joinGame, pause, resume, setState, openChat, closeChat, input, settings };
