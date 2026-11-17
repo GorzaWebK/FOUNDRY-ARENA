@@ -24,8 +24,39 @@ export class AudioSys {
       this.noiseBuf = this.ctx.createBuffer(1, len, len);
       const d = this.noiseBuf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      this._buildVerb();
     }
     if (this.ctx.state === 'suspended') this.ctx.resume();
+  }
+
+  /**
+   * A shared room reverb: gunfire, explosions and impacts send some of their
+   * sound here, more the further away they are, so distant fights sound distant.
+   * The impulse response is generated: a few early reflections, then a decaying
+   * noise tail that darkens as it fades.
+   */
+  _buildVerb() {
+    const ctx = this.ctx, rate = ctx.sampleRate, len = Math.floor(rate * 1.9);
+    const ir = ctx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch);
+      let lp = 0;
+      for (let i = 0; i < len; i++) {
+        const t = i / rate;
+        const k = 0.35 + 0.6 * Math.min(1, t / 1.2); // the tail loses its top end
+        lp += (Math.random() * 2 - 1 - lp) * (1 - k);
+        d[i] = lp * Math.pow(1 - i / len, 2.6) * (t < 0.008 ? t / 0.008 : 1);
+      }
+      for (const [at, g] of [[0.011, 0.7], [0.019, 0.5], [0.031, 0.42], [0.047, 0.3]]) {
+        const i = Math.floor((at + ch * 0.003) * rate);
+        d[i] += g; d[i + 1] -= g * 0.6;
+      }
+    }
+    this.verb = ctx.createConvolver();
+    this.verb.buffer = ir;
+    this.verbIn = ctx.createGain();
+    this.verbIn.gain.value = 0.55;
+    this.verbIn.connect(this.verb).connect(this.master);
   }
 
   setVolume(v) {
@@ -75,12 +106,12 @@ export class AudioSys {
   // --- building blocks -----------------------------------------------------
 
   /** Output node for a sound at `pos` (or centred if null). Returns null if inaudible. */
-  _out(pos, vol, refDist = 9) {
+  _out(pos, vol, refDist = 9, verb = 0) {
     const ctx = this.ctx;
-    let gain = vol, pan = 0, lp = 0;
+    let gain = vol, pan = 0, lp = 0, d = 0;
     if (pos) {
       const dx = pos.x - this.lx, dy = pos.y - this.ly, dz = pos.z - this.lz;
-      const d = Math.hypot(dx, dy, dz);
+      d = Math.hypot(dx, dy, dz);
       gain *= 1 / Math.pow(1 + d / refDist, 1.5);
       if (gain < 0.004) return null;
       if (d > 0.5) {
@@ -89,7 +120,7 @@ export class AudioSys {
       }
       lp = 16000 / (1 + d / 14);
     }
-    if (this.voices > 40 && gain < 0.08) return null;
+    if (this.voices > 90 && gain < 0.1) return null; // a busy fight: drop the faint stuff first
     const g = ctx.createGain();
     g.gain.value = gain;
     let node = g;
@@ -98,6 +129,12 @@ export class AudioSys {
       f.type = 'lowpass'; f.frequency.value = lp;
       g.connect(f); node = f;
     }
+    // reverb send: a little up close, more with distance (a far shot is mostly room)
+    if (verb > 0 && this.verbIn) {
+      const s = ctx.createGain();
+      s.gain.value = verb * (pos ? 0.3 + Math.min(1.2, d / 25) : 0.3);
+      node.connect(s).connect(this.verbIn);
+    }
     if (pan && ctx.createStereoPanner) {
       const p = ctx.createStereoPanner();
       p.pan.value = pan;
@@ -105,6 +142,68 @@ export class AudioSys {
     }
     node.connect(this.master);
     return g;
+  }
+
+  /**
+   * A gunshot in layers: a sharp crack, the body of the blast, a low thump you
+   * feel more than hear, the gun's own mechanism, and the slap of the room.
+   * Every shot is detuned a touch so automatic fire doesn't sound like a loop.
+   */
+  _shot(pos, vol, ref, p) {
+    const o = this._out(pos, vol, ref, p.verb ?? 1); if (!o) return null;
+    const t = this.ctx.currentTime, r = 0.95 + Math.random() * 0.1;
+    const [cf, cd, cp] = p.crack;
+    this._noise(o, t, cd, 'highpass', cf * r, 0.7, cp, 0.0008);
+    const [bf, bq, bd, bp] = p.body;
+    this._noise(o, t, bd, 'bandpass', bf * r, bq, bp, 0.001);
+    const [lf0, lf1, ld, lp] = p.low;
+    this._tone(o, t, ld, 'sine', lf0 * r, lf1, lp, 0.002);
+    if (p.sub) this._tone(o, t, p.sub[2], 'triangle', p.sub[0] * r, p.sub[1], p.sub[3], 0.002);
+    if (p.tail) this._noise(o, t + 0.01, p.tail[0], 'lowpass', p.tail[1], 0.5, p.tail[2], 0.02);
+    // mechanism: [delay, freq, q, peak] clicks (only heard up close)
+    if (p.mech && (!pos || Math.hypot(pos.x - this.lx, pos.z - this.lz) < 14)) {
+      for (const [at, f, q, pk] of p.mech) this._noise(o, t + at, 0.035, 'bandpass', f * r, q, pk, 0.001);
+    }
+    return o;
+  }
+
+  /** A struck metal thing: inharmonic partials ringing down. */
+  _clang(o, t, f, dur, peak) {
+    for (const [ratio, g] of [[1, 1], [2.76, 0.55], [5.4, 0.3], [8.93, 0.16]]) this._tone(o, t, dur / Math.sqrt(ratio), 'sine', f * ratio, f * ratio * 0.998, peak * g, 0.001);
+  }
+
+  /** A detuned saw pad through a sweeping low-pass: the body of the music stings. */
+  _pad(o, t, freqs, dur, peak, sweep = [400, 2400]) {
+    const ctx = this.ctx;
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass'; f.Q.value = 2;
+    f.frequency.setValueAtTime(sweep[0], t);
+    f.frequency.exponentialRampToValueAtTime(sweep[1], t + dur * 0.45);
+    f.frequency.exponentialRampToValueAtTime(sweep[0], t + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + Math.min(0.35, dur * 0.25));
+    g.gain.setValueAtTime(peak, t + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    f.connect(g).connect(o);
+    for (const fr of freqs) {
+      for (const det of [-7, 6]) {
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.value = fr;
+        osc.detune.value = det;
+        osc.connect(f);
+        osc.start(t); osc.stop(t + dur + 0.05);
+        this.voices++;
+        osc.onended = () => { this.voices--; };
+      }
+    }
+  }
+
+  /** A big low drum hit. */
+  _drum(o, t, peak = 1, f = 70) {
+    this._tone(o, t, 0.5, 'sine', f * 1.8, f * 0.6, peak, 0.002);
+    this._noise(o, t, 0.12, 'lowpass', 900, 0.6, peak * 0.6, 0.001);
   }
 
   _noise(out, t, dur, type, freq, q, peak, attack = 0.002) {
@@ -147,36 +246,31 @@ export class AudioSys {
   // --- sounds --------------------------------------------------------------
 
   play(name, pos = null, vol = 1, arg = 0) {
-    if (!this.ctx || this.muted || this.ctx.state !== 'running') return;
+    if (!this.ctx || this.muted || (this.ctx.state !== 'running' && !this.offline)) return;
     const t = this.ctx.currentTime;
     switch (name) {
       case 'pistol': {
-        const o = this._out(pos, 0.9 * vol, 12); if (!o) return;
-        this._noise(o, t, 0.13, 'bandpass', 1900, 0.7, 1.0);
-        this._noise(o, t, 0.05, 'highpass', 4000, 0.5, 0.5);
-        this._tone(o, t, 0.09, 'triangle', 260, 70, 0.9);
+        this._shot(pos, 0.9 * vol, 12, { crack: [3800, 0.025, 0.9], body: [1700, 0.9, 0.12, 1.0], low: [240, 70, 0.09, 0.8], tail: [0.18, 700, 0.18], mech: [[0.05, 2600, 5, 0.25]] });
         break;
       }
       case 'rifle': {
-        const o = this._out(pos, 0.85 * vol, 13); if (!o) return;
-        this._noise(o, t, 0.11, 'bandpass', 1300, 0.6, 1.0);
-        this._noise(o, t, 0.2, 'lowpass', 500, 0.5, 0.35);
-        this._tone(o, t, 0.08, 'square', 170, 55, 0.5);
+        this._shot(pos, 0.85 * vol, 13, { crack: [3200, 0.022, 1.0], body: [1150, 0.75, 0.11, 1.0], low: [170, 52, 0.1, 0.75], sub: [95, 40, 0.07, 0.35], tail: [0.24, 520, 0.3], mech: [[0.035, 2100, 6, 0.2]] });
         break;
       }
       case 'shotgun': {
-        const o = this._out(pos, 1.0 * vol, 14); if (!o) return;
-        this._noise(o, t, 0.32, 'lowpass', 1100, 0.4, 1.2);
-        this._noise(o, t, 0.08, 'bandpass', 2600, 0.6, 0.7);
-        this._tone(o, t, 0.26, 'sine', 120, 38, 1.1);
-        // pump
-        this._noise(o, t + 0.36, 0.05, 'bandpass', 1700, 3, 0.25);
-        this._noise(o, t + 0.5, 0.05, 'bandpass', 1300, 3, 0.25);
+        const o = this._shot(pos, 1.0 * vol, 14, { crack: [2600, 0.04, 1.0], body: [900, 0.5, 0.3, 1.25], low: [120, 36, 0.28, 1.15], sub: [70, 30, 0.2, 0.6], tail: [0.5, 420, 0.45], verb: 1.3 });
+        if (!o) return;
+        // pump: back, then forward
+        this._noise(o, t + 0.36, 0.06, 'bandpass', 1500, 3, 0.35);
+        this._tone(o, t + 0.36, 0.05, 'square', 260, 180, 0.08);
+        this._noise(o, t + 0.5, 0.05, 'bandpass', 1100, 3, 0.35);
+        this._tone(o, t + 0.5, 0.04, 'square', 200, 150, 0.08);
         break;
       }
       case 'impact': {
-        const o = this._out(pos, 0.25 * vol, 5); if (!o) return;
+        const o = this._out(pos, 0.25 * vol, 5, 0.4); if (!o) return;
         this._noise(o, t, 0.05, 'bandpass', 3000 + Math.random() * 2500, 2, 0.8);
+        this._tone(o, t, 0.04, 'triangle', 1400 + Math.random() * 900, 600, 0.15);
         break;
       }
       case 'hit': {
@@ -211,14 +305,33 @@ export class AudioSys {
         break;
       }
       case 'step': {
+        // arg: the surface underfoot ('metal', 'wood', 'concrete', 'sand')
         const o = this._out(pos, 0.2 * vol, 4); if (!o) return;
-        this._noise(o, t, 0.07, 'bandpass', 260 + Math.random() * 180, 1.2, 0.9, 0.005);
+        const r = 0.9 + Math.random() * 0.2;
+        if (arg === 'metal') {
+          this._noise(o, t, 0.06, 'bandpass', 380 * r, 1.4, 0.8, 0.003);
+          this._clang(o, t, 520 * r, 0.16, 0.14);
+          this._noise(o, t, 0.05, 'bandpass', 2600 * r, 5, 0.25);
+        } else if (arg === 'wood') {
+          this._noise(o, t, 0.07, 'bandpass', 520 * r, 2.5, 0.9, 0.003);
+          this._tone(o, t, 0.08, 'sine', 190 * r, 130, 0.45);
+          this._noise(o, t + 0.01, 0.03, 'highpass', 2500, 0.6, 0.12);
+        } else if (arg === 'sand') {
+          for (let i = 0; i < 4; i++) this._noise(o, t + i * 0.014 + Math.random() * 0.01, 0.03, 'highpass', 2200 + Math.random() * 1800, 0.8, 0.09);
+          this._noise(o, t, 0.08, 'lowpass', 400, 0.8, 0.7, 0.008);
+        } else {
+          // concrete: a dull heel strike plus a little grit
+          this._noise(o, t, 0.065, 'bandpass', (240 + Math.random() * 120) * r, 1.2, 0.95, 0.004);
+          this._noise(o, t + 0.008, 0.03, 'highpass', 3200, 0.6, 0.16);
+        }
         break;
       }
       case 'land': {
         const o = this._out(pos, 0.4 * vol, 5); if (!o) return;
         this._noise(o, t, 0.12, 'lowpass', 300, 0.8, 1.0);
         this._tone(o, t, 0.1, 'sine', 100, 50, 0.6);
+        if (arg === 'metal') this._clang(o, t, 300 + Math.random() * 60, 0.35, 0.22);
+        else if (arg === 'wood') this._tone(o, t, 0.14, 'sine', 150, 100, 0.5);
         break;
       }
       case 'jump': {
@@ -273,32 +386,26 @@ export class AudioSys {
         break;
       }
       case 'smg': {
-        const o = this._out(pos, 0.7 * vol, 11); if (!o) return;
-        this._noise(o, t, 0.08, 'bandpass', 1700, 0.7, 1.0);
-        this._noise(o, t, 0.04, 'highpass', 3500, 0.5, 0.4);
-        this._tone(o, t, 0.06, 'square', 210, 80, 0.4);
+        this._shot(pos, 0.7 * vol, 11, { crack: [4200, 0.018, 0.85], body: [1600, 0.9, 0.075, 1.0], low: [210, 85, 0.06, 0.45], tail: [0.16, 650, 0.2], mech: [[0.028, 2900, 6, 0.18]], verb: 0.8 });
         break;
       }
       case 'sniper': {
-        const o = this._out(pos, 1.0 * vol, 20); if (!o) return;
-        this._noise(o, t, 0.45, 'lowpass', 1500, 0.5, 1.3);
-        this._noise(o, t, 0.1, 'bandpass', 3000, 0.7, 0.8);
-        this._tone(o, t, 0.3, 'sine', 150, 36, 1.1);
-        this._noise(o, t + 0.12, 0.7, 'lowpass', 500, 0.4, 0.3, 0.1); // echo
-        // bolt
-        this._noise(o, t + 0.45, 0.05, 'bandpass', 2000, 4, 0.2);
-        this._noise(o, t + 0.7, 0.05, 'bandpass', 1500, 4, 0.2);
+        const o = this._shot(pos, 1.0 * vol, 20, { crack: [2800, 0.05, 1.3], body: [1250, 0.55, 0.4, 1.2], low: [150, 34, 0.32, 1.15], sub: [62, 26, 0.3, 0.7], tail: [0.9, 380, 0.4], verb: 1.6 });
+        if (!o) return;
+        // supersonic crack decaying into a rolling echo, then the bolt
+        this._noise(o, t + 0.16, 0.9, 'lowpass', 480, 0.4, 0.28, 0.12);
+        this._noise(o, t + 0.5, 0.05, 'bandpass', 2100, 4, 0.25);
+        this._tone(o, t + 0.5, 0.04, 'square', 300, 220, 0.06);
+        this._noise(o, t + 0.75, 0.06, 'bandpass', 1500, 4, 0.28);
+        this._noise(o, t + 0.83, 0.03, 'bandpass', 3000, 6, 0.2);
         break;
       }
       case 'lmg': {
-        const o = this._out(pos, 0.9 * vol, 14); if (!o) return;
-        this._noise(o, t, 0.13, 'bandpass', 1000, 0.6, 1.0);
-        this._noise(o, t, 0.24, 'lowpass', 420, 0.5, 0.45);
-        this._tone(o, t, 0.1, 'square', 130, 45, 0.6);
+        this._shot(pos, 0.75 * vol, 14, { crack: [2900, 0.025, 0.95], body: [950, 0.65, 0.13, 1.05], low: [135, 44, 0.12, 0.8], sub: [80, 34, 0.1, 0.5], tail: [0.3, 450, 0.36], mech: [[0.04, 1700, 5, 0.22], [0.06, 3200, 7, 0.12]], verb: 1.1 });
         break;
       }
       case 'explosion': {
-        const o = this._out(pos, 1.3 * vol, 22); if (!o) return;
+        const o = this._out(pos, 1.3 * vol, 22, 1.4); if (!o) return;
         this._noise(o, t, 0.9, 'lowpass', 700, 0.3, 1.6);
         this._noise(o, t, 0.25, 'bandpass', 2200, 0.5, 0.9);
         this._tone(o, t, 0.7, 'sine', 95, 26, 1.5);
@@ -318,7 +425,7 @@ export class AudioSys {
         break;
       }
       case 'flashbang': {
-        const o = this._out(pos, 1.4 * vol, 24); if (!o) return;
+        const o = this._out(pos, 1.4 * vol, 24, 1.2); if (!o) return;
         this._noise(o, t, 0.35, 'highpass', 1800, 0.4, 1.6);
         this._noise(o, t, 0.6, 'lowpass', 900, 0.3, 1.0);
         this._tone(o, t, 0.25, 'square', 180, 60, 0.7);
@@ -368,6 +475,47 @@ export class AudioSys {
         this._noise(o, t, 0.5, 'lowpass', 900, 0.4, 0.6, 0.01);
         [392, 587, 784].forEach((f, i) => this._tone(o, t + i * 0.05, 0.45, 'sawtooth', f, f * 1.01, 0.22, 0.01));
         this._tone(o, t, 0.6, 'sine', 98, 70, 0.7);
+        break;
+      }
+      // ---- music stings: synthesised, a couple of seconds each, foundry flavoured
+      case 'sting-start': {
+        // two drum hits, an anvil strike, and a rising open fifth
+        const o = this._out(null, 0.42 * vol); if (!o) return;
+        this._drum(o, t, 0.9, 60);
+        this._drum(o, t + 0.28, 0.9, 60);
+        this._clang(o, t + 0.56, 880, 1.4, 0.22);
+        this._drum(o, t + 0.56, 1.0, 52);
+        this._pad(o, t + 0.5, [110, 165, 220], 2.2, 0.16, [300, 2600]);
+        break;
+      }
+      case 'sting-minute': {
+        // a clock-tick pulse under a tense, close-voiced pad
+        const o = this._out(null, 0.4 * vol); if (!o) return;
+        for (let i = 0; i < 6; i++) {
+          this._noise(o, t + i * 0.25, 0.03, 'bandpass', i % 2 ? 2400 : 3200, 8, 0.5);
+          if (i % 2 === 0) this._drum(o, t + i * 0.25, 0.55, 58);
+        }
+        this._pad(o, t, [98, 104, 147], 2.0, 0.15, [250, 1400]);
+        this._clang(o, t + 1.5, 660, 1.0, 0.16);
+        break;
+      }
+      case 'sting-win': {
+        const o = this._out(null, 0.45 * vol); if (!o) return;
+        this._drum(o, t, 1.0, 55);
+        this._clang(o, t, 1046, 1.6, 0.2);
+        this._pad(o, t, [131, 196, 262, 330], 1.2, 0.16, [500, 3200]);
+        this._drum(o, t + 0.9, 0.8, 55);
+        this._pad(o, t + 0.9, [175, 262, 349, 440], 2.4, 0.18, [500, 3600]);
+        [523, 659, 784, 1047].forEach((f, i) => this._tone(o, t + 0.9 + i * 0.09, 0.9, 'triangle', f, f, 0.22));
+        break;
+      }
+      case 'sting-lose': {
+        const o = this._out(null, 0.42 * vol); if (!o) return;
+        this._drum(o, t, 0.9, 50);
+        this._pad(o, t, [110, 131, 165], 1.3, 0.15, [300, 1500]);
+        this._pad(o, t + 1.1, [87, 104, 131], 2.4, 0.15, [250, 1000]);
+        [330, 262, 220, 165].forEach((f, i) => this._tone(o, t + 1.1 + i * 0.22, 0.6, 'triangle', f, f, 0.18));
+        this._clang(o, t + 1.1, 220, 1.8, 0.12);
         break;
       }
       case 'ui': {

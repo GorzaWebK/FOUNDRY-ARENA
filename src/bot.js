@@ -936,7 +936,7 @@ export class Bot extends Character {
       this.stepDist += moved;
       if (this.stepDist > 2.3) {
         this.stepDist = 0;
-        g.audio.play('step', this.pos, 0.9);
+        g.audio.play('step', this.pos, 0.9, g.world.surfaceAt(this.pos.x, this.pos.y, this.pos.z));
         if (this.wishSpeed > 5) g.emitNoise(this.pos.x, this.pos.y, this.pos.z, 7, this, 'step');
       }
     }

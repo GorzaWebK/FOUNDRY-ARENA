@@ -201,7 +201,7 @@ export class Player extends Character {
     if (this.onGround && !wasGround && fallV < -6) {
       this.camDip = Math.min(0.28, -fallV * 0.014);
       g.viewmodel.land(-fallV);
-      g.audio.play('land', null, Math.min(1, -fallV / 14));
+      g.audio.play('land', null, Math.min(1, -fallV / 14), g.world.surfaceAt(this.pos.x, this.pos.y, this.pos.z));
       g.emitNoise(this.pos.x, this.pos.y, this.pos.z, 9, this, 'step');
     }
 
@@ -213,7 +213,7 @@ export class Player extends Character {
       this.bobPhase += moved * 1.45;
       if (this.stepDist > (this.sprinting ? 2.5 : 2.1)) {
         this.stepDist = 0;
-        g.audio.play('step', null, this.crouching ? 0.35 : this.sprinting ? 1 : 0.7);
+        g.audio.play('step', null, this.crouching ? 0.35 : this.sprinting ? 1 : 0.7, g.world.surfaceAt(this.pos.x, this.pos.y, this.pos.z));
         if (!this.crouching) g.emitNoise(this.pos.x, this.pos.y, this.pos.z, this.sprinting ? 10 : 6, this, 'step');
       }
     }

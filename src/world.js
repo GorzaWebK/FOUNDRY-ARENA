@@ -9,6 +9,7 @@
 //                bullets and line-of-sight tests.
 
 const GRID = 4; // broadphase cell size
+const SURFACE_BY_TEX = { plates: 'metal', corrugated: 'metal', crate: 'wood', concrete: 'concrete', tiles: 'concrete', brick: 'concrete' };
 const RAMP_STEP = 0.125;
 
 function mk(x0, y0, z0, x1, y1, z1) {
@@ -36,6 +37,24 @@ export class World {
     this._stamp = 0;
     for (const s of map.solids) this._addSolid(s);
     this._buildGrid();
+    // what each material sounds like underfoot: a map can say (materials[m].surface),
+    // otherwise it follows from the texture
+    this.surfaces = {};
+    for (const [name, def] of Object.entries(map.materials || {})) {
+      this.surfaces[name] = def.surface || SURFACE_BY_TEX[def.tex] || (/sand|dirt|gravel/.test(name) ? 'sand' : 'concrete');
+    }
+  }
+
+  /** The surface under a point at foot level: 'metal', 'wood', 'concrete' or 'sand'. */
+  surfaceAt(x, y, z) {
+    const out = this._surfQ || (this._surfQ = []);
+    this.query(x - 0.05, y - 0.4, z - 0.05, x + 0.05, y + 0.05, z + 0.05, out);
+    let best = null;
+    for (const c of out) {
+      if (x < c.x0 || x > c.x1 || z < c.z0 || z > c.z1 || c.y1 > y + 0.08) continue;
+      if (!best || c.y1 > best.y1) best = c;
+    }
+    return (best && this.surfaces[best.mat]) || 'concrete';
   }
 
   _addSolid(s) {
@@ -44,6 +63,7 @@ export class World {
     const mat = s.mat || 'concrete';
     if (s.type === 'box') {
       const c = mk(x0, y0, z0, x1, y1, z1);
+      c.mat = mat;
       this.colliders.push(c);
       this.rayShapes.push(c);
       this.renderItems.push({ kind: 'box', x0, y0, z0, x1, y1, z1, mat });
@@ -53,6 +73,7 @@ export class World {
         const [sx0, sz0, sx1, sz1] = slice(s.dir, i / n, (i + 1) / n, x0, z0, x1, z1);
         const top = y0 + ((y1 - y0) * (i + 1)) / n;
         const c = mk(sx0, y0, sz0, sx1, top, sz1);
+        c.mat = mat;
         this.colliders.push(c);
         this.rayShapes.push(c);
         this.renderItems.push({ kind: 'box', x0: sx0, y0, z0: sz0, x1: sx1, y1: top, z1: sz1, mat });
@@ -62,7 +83,9 @@ export class World {
       const n = Math.max(1, Math.ceil(rise / RAMP_STEP));
       for (let i = 0; i < n; i++) {
         const [sx0, sz0, sx1, sz1] = slice(s.dir, i / n, (i + 1) / n, x0, z0, x1, z1);
-        this.colliders.push(mk(sx0, y0, sz0, sx1, y0 + (rise * (i + 0.5)) / n, sz1));
+        const c = mk(sx0, y0, sz0, sx1, y0 + (rise * (i + 0.5)) / n, sz1);
+        c.mat = mat;
+        this.colliders.push(c);
       }
       // exact wedge for rays: box ∩ { n·p <= d }
       const w = mk(x0, y0, z0, x1, y1, z1);

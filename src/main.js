@@ -1207,7 +1207,7 @@ game.onMatchEnd = () => {
   renderVote();
   setState('ended');
   audio.muted = false;
-  audio.play(won ? 'win' : 'lose');
+  audio.play(won && !res.draw ? 'sting-win' : 'sting-lose');
   input.exitLock();
 };
 

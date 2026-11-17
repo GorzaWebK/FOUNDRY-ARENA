@@ -233,6 +233,7 @@ export class Game {
     this.firstBlood = false;
     this.time = 0;
     this.matchTime = this.rules.training ? Infinity : this.rules.timeLimit || CFG.timeLimit;
+    this.minuteDone = false;
     this.over = false;
     this.winner = null;
     this.awards = []; this.voteOptions = null; this.votes = new Map(); this.voteDeadline = 0;
@@ -259,6 +260,23 @@ export class Game {
     if (this.mode === 'host') this.net.onStart(); // tell clients before anyone spawns
     for (const c of this.chars) this.respawn(c, true);
     if (!attract) this.hud.centerMessage(this.rules.name.toUpperCase(), this.rules.blurb, 3.2, '#ff8a2a');
+    if (!attract && !this.rules.training) this.sting('sting-start');
+  }
+
+  /** A music sting (a beat later, so a just-resumed audio context is running). */
+  sting(name) {
+    clearTimeout(this.stingT);
+    this.stingT = setTimeout(() => this.audio.play(name), 200);
+  }
+
+  /** Every frame: the last minute of the clock gets a sting (once a match). */
+  clockTick() {
+    if (this.attract || this.over || this.minuteDone || !Number.isFinite(this.matchTime)) return;
+    if (this.matchTime <= 60 && this.matchTime > 55 && (this.rules.timeLimit || CFG.timeLimit) > 90) {
+      this.minuteDone = true;
+      this.audio.play('sting-minute');
+      this.hud.centerMessage('ONE MINUTE', 'Last minute of the match', 2.4, '#ff8a2a');
+    }
   }
 
   /** Add or remove the bots mid-match (host / solo only). */
@@ -295,6 +313,8 @@ export class Game {
     this.attract = false;
     this.time = 0;
     this.matchTime = matchTime;
+    this.minuteDone = matchTime <= 60; // joined inside the last minute: no sting
+    this.sting('sting-start');
     this.over = false;
     this.winner = null;
     this.awards = []; this.voteOptions = null; this.votes = new Map(); this.voteDeadline = 0; this.voteCounts = [];
@@ -1301,6 +1321,7 @@ export class Game {
     if (!this.attract) {
       this.matchTime -= dt;
       if (this.matchTime <= 0) { this.matchTime = 0; this.endMatch(); return; }
+      this.clockTick();
     }
     for (const c of this.chars) if (!c.alive && this.time >= c.respawnAt) this.respawn(c);
 
@@ -1331,6 +1352,7 @@ export class Game {
   updateClient(dt) {
     this.time += dt;
     this.matchTime = Math.max(0, this.matchTime - dt); // re-synced by every snapshot
+    this.clockTick();
     this.separate();
     this.player.update(dt, this.input);
     for (const r of this.remotes) r.update(dt);

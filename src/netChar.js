@@ -129,7 +129,7 @@ export class NetChar extends Character {
       if (this.stepDist > 2.3) {
         this.stepDist = 0;
         if (!this.crouching) {
-          g.audio.play('step', this.pos, 0.9);
+          g.audio.play('step', this.pos, 0.9, g.world.surfaceAt(this.pos.x, this.pos.y, this.pos.z));
           if (this.isHuman && speed > 5) g.emitNoise(this.pos.x, this.pos.y, this.pos.z, 8, this, 'step');
         }
       }

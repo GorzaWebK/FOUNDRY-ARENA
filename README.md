@@ -106,6 +106,21 @@ banner and a sting. Other players' big streaks show up in the kill feed. Turn on
 **Spoken call-outs** in settings to also hear them read out (the browser's
 text-to-speech, so how it sounds depends on your browser and OS).
 
+## Sound
+
+Everything is synthesised in the browser (`src/audio.js`), no audio files:
+
+- **Guns** are built in layers: a sharp crack, the body of the blast, a low thump,
+  the gun's own mechanism (bolt, pump, belt) up close, and a tail. Each shot is
+  detuned slightly so automatic fire doesn't loop.
+- A shared **room reverb** (a generated impulse response) takes more of a sound the
+  further away it is, so a distant fight sounds distant instead of silent.
+- **Footsteps** change with what you're standing on: metal plating and sheet
+  rings, wood knocks, concrete thuds, sand crunches. Maps can override a
+  material's surface with `surface:` in their materials list.
+- **Music stings** for the match starting, the last minute (with an on-screen
+  call), and the end (victory or defeat).
+
 ## Rules
 
 - Bots fill the match (1–10, or switch them off entirely) and fight each other as
