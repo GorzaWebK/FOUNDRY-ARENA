@@ -47,6 +47,13 @@ The pause menu's **Next match** section changes mode and map between matches.
 
 Every mode has a 10 minute clock; when it runs out the mode's best score wins.
 
+**Rules…** (next to the mode, on the main menu and in the pause menu's Next match
+section) customises the next match: the score limit (kills, points or lives,
+depending on the mode), the time limit (5–30 minutes), friendly fire in team
+modes (team kills hurt but score nothing), pickups on or off, and **hardcore**:
+50 HP, with no crosshair, health or ammo on screen. In multiplayer the host's
+rules apply to everyone.
+
 ## End of a match
 
 The end screen shows the final scores, **awards** (Sharpshooter for best

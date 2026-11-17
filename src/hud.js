@@ -79,9 +79,10 @@ export class Hud {
     const w = p.weapon;
 
     const hp = Math.max(0, Math.ceil(p.health));
+    this._set('hc', !!game.rules.hardcore, (v) => this.root.classList.toggle('hardcore', v));
     this._set('hp', hp, (v) => {
       e.hpNum.textContent = v;
-      e.hpBar.style.width = v + '%';
+      e.hpBar.style.width = Math.min(100, (v / game.maxHealth) * 100) + '%';
       e.hpNum.classList.toggle('low', v <= 30);
       e.hpBar.style.background = v <= 30 ? '#ff5a5a' : '#5dff9a';
     });

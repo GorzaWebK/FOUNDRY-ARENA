@@ -99,7 +99,7 @@ export class Pickup {
   usefulTo(c) {
     const prim = c.weapons[0];
     switch (this.type) {
-      case 'health': return c.health < CFG.maxHealth;
+      case 'health': return c.health < c.game.maxHealth;
       case 'armor': return c.armor < CFG.maxArmor;
       case 'ammo':
       case 'crate':
@@ -111,7 +111,7 @@ export class Pickup {
   apply(c) {
     const prim = c.weapons[0];
     switch (this.type) {
-      case 'health': c.health = Math.min(CFG.maxHealth, c.health + 50); break;
+      case 'health': c.health = Math.min(c.game.maxHealth, c.health + 50); break;
       case 'armor': c.armor = Math.min(CFG.maxArmor, c.armor + 50); break;
       case 'ammo':
         prim.reserve = Math.min(prim.def.reserveMax, prim.reserve + prim.def.ammoBox);

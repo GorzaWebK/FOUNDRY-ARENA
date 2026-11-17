@@ -13,8 +13,13 @@
 //   lives          limited lives; nobody respawns after their last
 //   hill           King of the Hill: a scoring zone that moves (see map.hills)
 //   forcePrimary   everyone gets this primary regardless of their loadout
+//
+// A match plays with makeRules(id, custom): the mode plus the host's custom rules
+// (score limit / lives, time limit, friendly fire, pickups, hardcore). Mode
+// functions read limits from game.rules, never from the mode itself.
 
 import { WEAPON_BY_ID } from './weapons.js';
+import { CFG } from './config.js';
 
 export const TEAM_COLORS = [0x3d8bff, 0xff4d4d];
 export const TEAM_NAMES = ['Blue', 'Red'];
@@ -25,6 +30,7 @@ const GUN_WIN = (GUN_LADDER.length - 1) * KILLS_PER_GUN + 1; // one kill with th
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
 const byKills = (a, b) => b.kills - a.kills || a.deaths - b.deaths || a.id - b.id;
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const mins = (r) => `${Math.round((r.timeLimit || CFG.timeLimit) / 60)} minutes`;
 
 /** Gun-game weapon index for a kill count. */
 export function gunLevel(kills) {
@@ -42,18 +48,19 @@ function killLimitMode(base) {
   return {
     ...base,
     rank: (chars) => [...chars].sort(byKills),
-    won: (game) => game.chars.some((c) => c.kills >= base.scoreLimit),
+    limit: { key: 'scoreLimit', label: 'Kill limit', unit: 'kills', options: [5, 10, 15, 20, 25, 30, 40, 50] },
+    won: (game) => game.chars.some((c) => c.kills >= game.rules.scoreLimit),
     hud(game) {
       const lead = bestOther(game);
       return {
         left: ['YOU', game.player.kills], right: [lead ? lead.name.toUpperCase() : '—', lead ? lead.kills : 0],
-        sub: `first to ${base.scoreLimit}`,
+        sub: `first to ${game.rules.scoreLimit}`,
       };
     },
     column: null,
     result(game) {
-      const rank = game.ranking(), w = rank[0], me = game.player;
-      const why = w.kills >= base.scoreLimit ? `reached ${base.scoreLimit} kills` : `led with ${plural(w.kills, 'kill')} when time ran out`;
+      const rank = game.ranking(), w = rank[0], me = game.player, lim = game.rules.scoreLimit;
+      const why = w.kills >= lim ? `reached ${lim} kills` : `led with ${plural(w.kills, 'kill')} when time ran out`;
       if (w === me) return { won: true, sub: `You ${why}.` };
       return { won: false, sub: `${w.name} ${why}. You placed #${rank.indexOf(me) + 1} of ${rank.length}.` };
     },
@@ -63,20 +70,21 @@ function killLimitMode(base) {
 export const MODES = [
   killLimitMode({
     id: 'ffa', name: 'Deathmatch', scoreLimit: 20,
-    blurb: 'Free-for-all. First to 20 kills, or the most kills after 10 minutes.',
+    desc: (r) => `Free-for-all. First to ${r.scoreLimit} kills, or the most kills after ${mins(r)}.`,
   }),
 
   {
     id: 'tdm', name: 'Team Deathmatch', scoreLimit: 40, teams: true,
-    blurb: 'Blue vs Red. First team to 40 kills wins. No friendly fire.',
+    desc: (r) => `Blue vs Red. First team to ${r.scoreLimit} kills wins. ${r.friendlyFire ? 'Friendly fire is on.' : 'No friendly fire.'}`,
+    limit: { key: 'scoreLimit', label: 'Team kill limit', unit: 'kills', options: [10, 20, 30, 40, 50, 75, 100] },
     rank: (chars) => [...chars].sort((a, b) => a.team - b.team || byKills(a, b)),
-    won: (game) => game.teamScore[0] >= 40 || game.teamScore[1] >= 40,
+    won: (game) => game.teamScore[0] >= game.rules.scoreLimit || game.teamScore[1] >= game.rules.scoreLimit,
     hud(game) {
       const mine = Math.max(0, game.player.team), other = 1 - mine;
       return {
         left: [TEAM_NAMES[mine].toUpperCase(), game.teamScore[mine], hex(TEAM_COLORS[mine])],
         right: [TEAM_NAMES[other].toUpperCase(), game.teamScore[other], hex(TEAM_COLORS[other])],
-        sub: 'first team to 40',
+        sub: `first team to ${game.rules.scoreLimit}`,
       };
     },
     column: { title: 'Team', value: (c) => (c.team >= 0 ? TEAM_NAMES[c.team] : '—') },
@@ -92,15 +100,16 @@ export const MODES = [
 
   {
     id: 'koth', name: 'King of the Hill', teams: true, hill: true, scoreLimit: 100,
-    blurb: 'Blue vs Red fight over a zone that moves every minute. Hold it with no enemies inside to score. First to 100.',
+    desc: (r) => `Blue vs Red fight over a zone that moves every minute. Hold it with no enemies inside to score. First to ${r.scoreLimit}.`,
+    limit: { key: 'scoreLimit', label: 'Points to win', unit: 'points', options: [50, 75, 100, 150, 200, 300] },
     rank: (chars) => [...chars].sort((a, b) => a.team - b.team || b.hillTime - a.hillTime || byKills(a, b)),
-    won: (game) => game.teamScore[0] >= 100 || game.teamScore[1] >= 100,
+    won: (game) => game.teamScore[0] >= game.rules.scoreLimit || game.teamScore[1] >= game.rules.scoreLimit,
     hud(game) {
       const mine = Math.max(0, game.player.team), other = 1 - mine;
       return {
         left: [TEAM_NAMES[mine].toUpperCase(), game.teamScore[mine], hex(TEAM_COLORS[mine])],
         right: [TEAM_NAMES[other].toUpperCase(), game.teamScore[other], hex(TEAM_COLORS[other])],
-        sub: 'king of the hill · 100',
+        sub: `king of the hill · ${game.rules.scoreLimit}`,
       };
     },
     column: { title: 'Hill', value: (c) => `${Math.round(c.hillTime || 0)}s` },
@@ -115,7 +124,7 @@ export const MODES = [
 
   {
     id: 'gungame', name: 'Gun Game', gunGame: true,
-    blurb: `Every ${KILLS_PER_GUN} kills swap you to the next gun: LMG, rifle, SMG, shotgun, sniper, pistol. One pistol kill wins.`,
+    desc: () => `Every ${KILLS_PER_GUN} kills swap you to the next gun: LMG, rifle, SMG, shotgun, sniper, pistol. One pistol kill wins.`,
     rank: (chars) => [...chars].sort(byKills),
     won: (game) => game.chars.some((c) => c.kills >= GUN_WIN),
     hud(game) {
@@ -138,7 +147,8 @@ export const MODES = [
 
   {
     id: 'lms', name: 'Last One Standing', lives: 5,
-    blurb: '5 lives each. Lose them all and you are out. The last player alive wins.',
+    desc: (r) => `${plural(r.lives, 'life')} each. Lose ${r.lives === 1 ? 'it' : 'them all'} and you are out. The last player alive wins.`.replace('lifes', 'lives'),
+    limit: { key: 'lives', label: 'Lives', unit: 'lives', options: [1, 2, 3, 5, 7, 10] },
     rank: (chars) => [...chars].sort((a, b) => b.lives - a.lives || byKills(a, b)),
     // only ends early when somebody was actually eliminated down to one survivor
     won: (game) => game.chars.length >= 2 && game.chars.filter((c) => c.lives > 0).length <= 1,
@@ -158,12 +168,59 @@ export const MODES = [
 
   killLimitMode({
     id: 'snipers', name: 'Snipers Only', scoreLimit: 15, forcePrimary: 'sniper',
-    blurb: 'Free-for-all with sniper rifles and pistols only. First to 15 kills.',
+    desc: (r) => `Free-for-all with sniper rifles and pistols only. First to ${r.scoreLimit} kills.`,
   }),
 ];
+
+// every mode's standard description (used in the mode pickers)
+for (const m of MODES) m.blurb = m.desc({ ...m, timeLimit: CFG.timeLimit });
 
 export const DEFAULT_MODE = 'ffa';
 
 export function getMode(id) {
   return MODES.find((m) => m.id === id) || MODES[0];
+}
+
+export const TIME_OPTIONS = [5, 10, 15, 20, 30]; // minutes
+export const HARDCORE_HEALTH = 50;
+
+/** Custom rules, cleaned (from settings, or from the host over the network). */
+export function cleanCustom(id, cr) {
+  const m = getMode(id);
+  const c = cr && typeof cr === 'object' ? cr : {};
+  return {
+    limit: m.limit && m.limit.options.includes(c.limit) ? c.limit : 0, // 0 = the mode's standard
+    time: TIME_OPTIONS.includes(c.time) ? c.time : 0, // 0 = standard (10 minutes)
+    ff: !!(m.teams && c.ff),
+    pickups: c.pickups !== false,
+    hardcore: !!c.hardcore,
+  };
+}
+
+/** The rules a match plays by: mode `id` plus custom rules. */
+export function makeRules(id, cr) {
+  const m = getMode(id);
+  const custom = cleanCustom(id, cr);
+  const r = { ...m, custom };
+  if (custom.limit) r[m.limit.key] = custom.limit;
+  r.timeLimit = custom.time ? custom.time * 60 : CFG.timeLimit;
+  r.friendlyFire = custom.ff;
+  r.pickups = custom.pickups;
+  r.hardcore = custom.hardcore;
+  r.maxHealth = custom.hardcore ? HARDCORE_HEALTH : CFG.maxHealth;
+  r.blurb = m.desc(r);
+  r.isCustom = !!(custom.limit || custom.time || custom.ff || !custom.pickups || custom.hardcore);
+  return r;
+}
+
+/** One line listing what's custom about these rules ('' when nothing is). */
+export function customSummary(r) {
+  if (!r.isCustom) return '';
+  const c = r.custom, out = [];
+  if (c.limit) out.push(`${c.limit} ${r.limit.unit}`);
+  if (c.time) out.push(`${c.time} min`);
+  if (c.ff) out.push('friendly fire');
+  if (!c.pickups) out.push('no pickups');
+  if (c.hardcore) out.push('hardcore');
+  return 'Custom: ' + out.join(' · ');
 }

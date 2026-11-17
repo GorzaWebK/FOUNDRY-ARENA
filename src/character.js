@@ -106,7 +106,7 @@ export class Character {
     this.height = CFG.heightStand;
     this.eyeH = CFG.eyeStand;
     this.onGround = false;
-    this.health = CFG.maxHealth;
+    this.health = this.game.maxHealth;
     this.armor = 0;
     this.alive = true;
     this.protectedUntil = this.game.time + CFG.spawnProtection;

@@ -14,7 +14,7 @@ import { damageAtDistance, GRENADE, FLASH, KNIFE, makeLoadout, makeSingle } from
 import { SmokeClouds } from './smoke.js';
 import { applyCrosshair } from './settings.js';
 import { Career } from './career.js';
-import { getMode, MODES, TEAM_COLORS, TEAM_NAMES, GUN_LADDER, gunLevel } from './modes.js';
+import { getMode, makeRules, MODES, TEAM_COLORS, TEAM_NAMES, GUN_LADDER, gunLevel } from './modes.js';
 import { MAPS, getMap } from './maps/index.js';
 import { Announcer } from './announcer.js';
 import { KillCam } from './killcam.js';
@@ -215,11 +215,11 @@ export class Game {
     this.skill = DIFFICULTY[difficulty] || DIFFICULTY.normal;
     this.difficulty = difficulty;
     this.attract = attract;
-    this.rules = attract ? getMode('ffa') : rules || getMode('ffa');
+    this.rules = attract || !rules ? makeRules('ffa') : rules; // rules come from makeRules (or the training range)
     this.teamScore = [0, 0];
     this.firstBlood = false;
     this.time = 0;
-    this.matchTime = this.rules.training ? Infinity : CFG.timeLimit;
+    this.matchTime = this.rules.training ? Infinity : this.rules.timeLimit || CFG.timeLimit;
     this.over = false;
     this.winner = null;
     this.awards = []; this.voteOptions = null; this.votes = new Map(); this.voteDeadline = 0;
@@ -229,7 +229,7 @@ export class Game {
     if (this.rules.training) this.range = new Range(this);
     this.effects.clear();
     this.hud.reset();
-    for (const p of this.pickups) p.reset();
+    this.resetPickups();
     for (const s of this.spawns) s.lastUsed = -99;
 
     const n = bots ? this.botCount : 0;
@@ -286,7 +286,7 @@ export class Game {
     this.effects.clear();
     this.clearGrenades();
     this.hud.reset();
-    for (const p of this.pickups) p.reset();
+    this.resetPickups();
     this.killcam.reset();
     const p = this.player;
     p.alive = false;
@@ -578,7 +578,7 @@ export class Game {
   damage(victim, amount, attacker, head, def) {
     if (!victim.alive || this.over) return;
     if (victim.isProtected()) return;
-    if (this.sameTeam(victim, attacker)) return; // no friendly fire
+    if (this.sameTeam(victim, attacker) && !this.rules.friendlyFire) return; // no friendly fire (unless the host turned it on)
     if (!attacker.isHuman && victim.isHuman) amount *= this.skill.dmgVsPlayer;
     const absorbed = Math.min(victim.armor, amount * CFG.armorAbsorb);
     victim.armor -= absorbed;
@@ -604,7 +604,8 @@ export class Game {
       victim.lives = Math.max(0, victim.lives - 1);
       if (victim.lives === 0) victim.respawnAt = Infinity; // out for the rest of the match
     }
-    if (attacker !== victim) {
+    const teamKill = this.sameTeam(victim, attacker);
+    if (attacker !== victim && !teamKill) { // a team kill earns nothing
       attacker.kills++;
       if (this.rules.teams && !this.rules.hill && attacker.team >= 0) this.teamScore[attacker.team]++;
       const st = attacker.st;
@@ -1086,7 +1087,21 @@ export class Game {
     }
   }
 
+  /** Pickups back to the start of a match (or gone, if the rules say no pickups). */
+  resetPickups() {
+    const on = this.rules.pickups !== false;
+    for (const p of this.pickups) {
+      p.reset();
+      p.group.visible = on;
+      if (!on) p.take();
+    }
+  }
+
+  /** Most health a character can have under these rules. */
+  get maxHealth() { return this.rules.maxHealth || CFG.maxHealth; }
+
   updatePickups(dt) {
+    if (this.rules.pickups === false) return;
     for (let i = 0; i < this.pickups.length; i++) {
       const p = this.pickups[i];
       p.update(dt, this.time);

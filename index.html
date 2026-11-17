@@ -96,7 +96,7 @@
           <div class="col">
             <h4>Match</h4>
             <label class="row"><span>Mode</span><select id="set-mode"></select><output></output></label>
-            <p id="mode-blurb" class="note"></p>
+            <div class="mode-line"><p id="mode-blurb" class="note"></p><button id="btn-rules" class="small-btn">Rules…</button></div>
             <label class="row"><span>Map</span><select id="set-map"></select><output></output></label>
             <label class="row"><span>Bots</span><input type="checkbox" id="set-bots-on" /><output></output></label>
             <label class="row" id="row-botcount"><span>Bot count</span><input type="range" id="set-bots" min="1" max="10" step="1" /><output id="out-bots"></output></label>
@@ -150,7 +150,7 @@
         <div id="next-match">
           <h4>Next match</h4>
           <label class="row"><span>Mode</span><select id="pause-mode"></select><output></output></label>
-          <p id="pause-mode-blurb" class="note"></p>
+          <div class="mode-line"><p id="pause-mode-blurb" class="note"></p><button id="btn-rules-pause" class="small-btn">Rules…</button></div>
           <label class="row"><span>Map</span><select id="pause-map"></select><output></output></label>
           <p class="note">Press <b>Restart match</b> to play it.</p>
         </div>
@@ -191,6 +191,20 @@
         <div class="btn-row">
           <button id="btn-again" class="primary">PLAY AGAIN</button>
           <button id="btn-menu">Main menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================== MATCH RULES ============================== -->
+    <div id="rules" class="overlay hidden">
+      <div class="panel">
+        <h2>MATCH RULES</h2>
+        <p class="tag" id="rules-mode"></p>
+        <div id="rules-rows"></div>
+        <p class="note">Rules apply to the next match you start. In multiplayer they're the host's, and everyone plays by them.</p>
+        <div class="btn-row">
+          <button id="btn-rules-reset">Standard rules</button>
+          <button id="btn-rules-done" class="primary">DONE</button>
         </div>
       </div>
     </div>

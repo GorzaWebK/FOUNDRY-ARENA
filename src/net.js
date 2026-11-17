@@ -23,7 +23,7 @@ import { CFG, HUMAN_COLORS, MAX_HUMANS } from './config.js';
 import * as THREE from 'three';
 import { WEAPONS, WEAPON_BY_ID, KNIFE, GRENADE, NADES, TACTICALS, TACTICAL_BY_ID, isPrimary, damageAtDistance } from './weapons.js';
 import { getMap } from './maps/index.js';
-import { getMode } from './modes.js';
+import { getMode, makeRules } from './modes.js';
 import { NetChar } from './netChar.js';
 import { getTransport, makeRoomCode, cleanRoomCode } from './transport.js';
 import { BUILD, BUILD_TIME, OLD_CLIENT_MSG, OLD_HOST_MSG } from './version.js';
@@ -308,7 +308,7 @@ export class Net {
     // (someone coming back keeps whatever lives they had left)
     const spectate = !!g.rules.lives && (!saved || c.lives <= 0);
     if (spectate) c.lives = 0;
-    const welcome = { t: 'welcome', v: this.version, vt: this.versionTime, you: c.id, map: g.map.id, mode: g.rules.id, mt: r2(g.matchTime), over: g.over, r: this._roster(), ts: g.teamScore };
+    const welcome = { t: 'welcome', v: this.version, vt: this.versionTime, you: c.id, map: g.map.id, mode: g.rules.id, cr: g.rules.custom, mt: r2(g.matchTime), over: g.over, r: this._roster(), ts: g.teamScore };
     if (g.over) Object.assign(welcome, { aw: g.awards, vo: g.voteOptions, vn: g.voteTally(), vl: Math.round((g.voteDeadline - performance.now()) / 1000) });
     conn.send(welcome);
     if (!g.over && !spectate) g.respawn(c, true);
@@ -523,7 +523,7 @@ export class Net {
   onStart() {
     const g = this.game;
     this.parked.clear(); // scores belong to the match that just ended
-    this.broadcast({ t: 'start', map: g.map.id, mode: g.rules.id, mt: r2(g.matchTime), r: this._roster() });
+    this.broadcast({ t: 'start', map: g.map.id, mode: g.rules.id, cr: g.rules.custom, mt: r2(g.matchTime), r: this._roster() });
   }
 
   onSpawn(c) {
@@ -598,7 +598,7 @@ export class Net {
     g.clearRemotes();
     if (num(m.you)) g.player.id = m.you;
     g.loadMap(getMap(m.map));
-    g.startClient(num(m.mt) ? m.mt : CFG.timeLimit, getMode(m.mode));
+    g.startClient(num(m.mt) ? m.mt : CFG.timeLimit, makeRules(getMode(m.mode).id, m.cr));
     this._applyRoster(m.r);
     if (Array.isArray(m.ts)) g.teamScore = [m.ts[0] | 0, m.ts[1] | 0];
     if (m.over) { this._readEnd(m); g.over = true; }
@@ -737,7 +737,7 @@ export class Net {
         break;
       case 'start':
         g.loadMap(getMap(m.map));
-        g.startClient(num(m.mt) ? m.mt : CFG.timeLimit, getMode(m.mode));
+        g.startClient(num(m.mt) ? m.mt : CFG.timeLimit, makeRules(getMode(m.mode).id, m.cr));
         this._applyRoster(m.r);
         this.hooks.onMatchStart();
         break;

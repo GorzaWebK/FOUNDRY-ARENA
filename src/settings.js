@@ -25,6 +25,7 @@ export const DEFAULTS = {
   announcer: true, // spoken killstreak call-outs
   killcam: true,
   leanToggle: true, // tap Q / E to lean instead of holding
+  rules: { limits: {}, time: 0, ff: false, pickups: true, hardcore: false }, // custom match rules (limits per mode)
   // crosshair
   xhColor: '#ffffff',
   xhLen: 9, // line length, px (0 = dot only)
@@ -54,6 +55,12 @@ export function loadSettings() {
   if (!MAPS.some((m) => m.id === s.map)) s.map = DEFAULT_MAP;
   if (!MODES.some((m) => m.id === s.mode)) s.mode = DEFAULT_MODE;
   s.binds = cleanBinds(s.binds);
+  {
+    const r = s.rules && typeof s.rules === 'object' ? s.rules : {};
+    const limits = {};
+    if (r.limits && typeof r.limits === 'object') for (const [k, v] of Object.entries(r.limits)) if (typeof v === 'number') limits[k] = v;
+    s.rules = { limits, time: typeof r.time === 'number' ? r.time : 0, ff: !!r.ff, pickups: r.pickups !== false, hardcore: !!r.hardcore };
+  }
   if (!XH_COLORS.some(([v]) => v === s.xhColor)) s.xhColor = DEFAULTS.xhColor;
   s.xhLen = Math.min(20, Math.max(0, Math.round(s.xhLen)));
   s.xhThick = Math.min(5, Math.max(1, Math.round(s.xhThick)));

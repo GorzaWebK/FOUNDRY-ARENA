@@ -2,7 +2,7 @@
 
 import './style.css';
 import { MAPS, getMap } from './maps/index.js';
-import { MODES, getMode } from './modes.js';
+import { MODES, getMode, makeRules, customSummary, TIME_OPTIONS, HARDCORE_HEALTH } from './modes.js';
 import RANGE_MAP from './maps/range.js';
 import { TRAINING } from './training.js';
 import { WEAPON_BY_ID, PRIMARIES, TACTICALS, TACTICAL_BY_ID, WEAPONS as WEAPON_LIST } from './weapons.js';
@@ -98,12 +98,24 @@ function fillSelect(sel, list) {
 }
 mapSels.forEach((s) => fillSelect(s, MAPS));
 modeSels.forEach((s) => fillSelect(s, MODES));
+/** The custom rules picked for a mode (limits are remembered per mode). */
+function customFor(id) {
+  const r = settings.rules;
+  return { limit: r.limits[id] || 0, time: r.time, ff: r.ff, pickups: r.pickups, hardcore: r.hardcore };
+}
+/** The rules the next match will use. */
+function nextRules() { return makeRules(settings.mode, customFor(settings.mode)); }
+
 function syncMatchPickers() {
   for (const s of mapSels) s.value = settings.map;
   for (const s of modeSels) s.value = settings.mode;
-  const blurb = getMode(settings.mode).blurb;
-  $('mode-blurb').textContent = blurb;
-  $('pause-mode-blurb').textContent = blurb;
+  const r = nextRules();
+  const sum = customSummary(r);
+  for (const id of ['mode-blurb', 'pause-mode-blurb']) {
+    const el = $(id);
+    el.textContent = r.blurb;
+    if (sum) { const c = document.createElement('span'); c.className = 'custom'; c.textContent = sum; el.append(c); }
+  }
 }
 syncMatchPickers();
 for (const s of mapSels) {
@@ -320,7 +332,7 @@ async function startMatch() {
   audio.setVolume(settings.volume);
   game.newMatch({
     botCount: settings.botCount, bots: settings.bots, difficulty: settings.difficulty,
-    map: getMap(settings.map), rules: getMode(settings.mode),
+    map: getMap(settings.map), rules: nextRules(),
   });
   setState('playing');
   const ok = await lock();
@@ -544,6 +556,55 @@ function openAccount() {
 }
 function closeAccount() { $('account').classList.add('hidden'); }
 
+// ---------------------------------------------------------------- match rules
+function renderRules() {
+  const mode = getMode(settings.mode), r = settings.rules;
+  $('rules-mode').textContent = `For ${mode.name}${mode.limit ? '' : ''}`;
+  const box = $('rules-rows');
+  box.textContent = '';
+  const row = (label, input, note) => {
+    const l = document.createElement('label'); l.className = 'row';
+    const s = document.createElement('span'); s.textContent = label;
+    if (note) { const sm = document.createElement('small'); sm.className = 'hint'; sm.textContent = note; s.append(sm); }
+    const o = document.createElement('output');
+    l.append(s, input, o); box.append(l);
+  };
+  const select = (opts, value, onChange) => {
+    const sel = document.createElement('select');
+    for (const [v, text] of opts) { const o = document.createElement('option'); o.value = v; o.textContent = text; sel.append(o); }
+    sel.value = String(value);
+    sel.addEventListener('change', () => { onChange(Number(sel.value)); rulesChanged(); });
+    return sel;
+  };
+  const check = (value, onChange) => {
+    const c = document.createElement('input'); c.type = 'checkbox'; c.checked = value;
+    c.addEventListener('change', () => { onChange(c.checked); rulesChanged(); });
+    return c;
+  };
+  if (mode.limit) {
+    const std = mode[mode.limit.key];
+    row(mode.limit.label, select([[0, `Standard (${std})`], ...mode.limit.options.filter((v) => v !== std).map((v) => [v, String(v)])],
+      r.limits[mode.id] || 0, (v) => { if (v) r.limits[mode.id] = v; else delete r.limits[mode.id]; }));
+  }
+  row('Time limit', select([[0, 'Standard (10 min)'], ...TIME_OPTIONS.filter((v) => v !== 10).map((v) => [v, `${v} min`])], r.time, (v) => { r.time = v; }));
+  if (mode.teams) row('Friendly fire', check(r.ff, (v) => { r.ff = v; }), 'team modes');
+  row('Pickups', check(r.pickups, (v) => { r.pickups = v; }), 'health, armour, ammo');
+  row('Hardcore', check(r.hardcore, (v) => { r.hardcore = v; }), `${HARDCORE_HEALTH} HP, no HUD`);
+}
+function rulesChanged() {
+  saveSettings(settings);
+  syncMatchPickers();
+}
+function openRules() { renderRules(); $('rules').classList.remove('hidden'); }
+$('btn-rules').addEventListener('click', openRules);
+$('btn-rules-pause').addEventListener('click', openRules);
+$('btn-rules-done').addEventListener('click', () => $('rules').classList.add('hidden'));
+$('btn-rules-reset').addEventListener('click', () => {
+  settings.rules = { limits: {}, time: 0, ff: false, pickups: true, hardcore: false };
+  rulesChanged();
+  renderRules();
+});
+
 // ---------------------------------------------------------------- career
 const SKIN_KILLS = 50; // kills with a gun to unlock its skins
 const fmtTime = (s) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m`; };
@@ -689,6 +750,10 @@ window.addEventListener('keydown', (e) => {
   }
   if (!$('account').classList.contains('hidden')) {
     if (e.code === 'Escape') closeAccount();
+    return;
+  }
+  if (!$('rules').classList.contains('hidden')) {
+    if (e.code === 'Escape') $('rules').classList.add('hidden');
     return;
   }
   if (!$('career').classList.contains('hidden')) {
