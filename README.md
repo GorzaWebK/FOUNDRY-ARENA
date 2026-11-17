@@ -150,7 +150,7 @@ still spread apart to show your current accuracy.
 | LMG           | 60 / 120      | 17      | huge belt, heavy: slower movement, long reload       |
 | Pistol        | 12 / ∞        | 25      | everyone's sidearm                                   |
 | Grenade       | 2 (max 3)     | up to 130 | 2.3 s fuse, bounces, 7.5 m blast; walls block it; hurts you too |
-| Flashbang     | 2             | —       | 1.6 s fuse; whites out the screen and muffles sound for up to 3.6 s for anyone who can see it (much less if they're facing away). Bots lose track of you while blinded |
+| Flashbang     | 2             | —       | 1.6 s fuse; whites out the game view (your HUD stays visible on top) and muffles sound for up to 3.6 s for anyone who can see it (much less if they're facing away). Bots lose track of you while blinded |
 | Smoke         | 2             | —       | 1.2 s fuse; a 4.6 m cloud for 15 s that nobody (bots included) can see through. Bullets still go through it |
 
 **Cooking:** pressing `F` or `G` pulls the pin and lowers your gun; the fuse burns

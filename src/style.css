@@ -253,6 +253,8 @@ h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 /* ------------------------------------------------------------------ grenade slot, scope, chat */
 .slot.nade { color: var(--ink); }
 #flashbang { position: absolute; inset: 0; background: #fff; opacity: 0; }
+/* flashbanged: the HUD stays readable against the white-out */
+#hud.flashed { text-shadow: 0 0 3px rgba(0, 0, 0, 0.95), 0 1px 4px rgba(0, 0, 0, 0.9); }
 #smokehaze { position: absolute; inset: 0; background: rgb(158, 166, 172); opacity: 0; }
 #cook { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: 26px 0 0 -23px; text-align: center; }
 #cook svg { position: absolute; inset: 0; transform: rotate(-90deg); }

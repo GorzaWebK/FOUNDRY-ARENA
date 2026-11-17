@@ -118,6 +118,7 @@ export class Hud {
       e.flash.style.opacity = (f * this.flashPeak).toFixed(3);
       if (this.flashT <= 0) e.flash.style.opacity = 0;
     }
+    this._set('flashed', this.flashT > 0, (v) => this.root.classList.toggle('flashed', v));
     // standing in smoke
     const cam = game.camera.position;
     const haze = game.smokes.density(cam.x, cam.y, cam.z);
