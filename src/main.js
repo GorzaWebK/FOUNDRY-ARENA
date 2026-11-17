@@ -22,6 +22,7 @@ import { Hud } from './hud.js';
 import { Input } from './input.js';
 import { Game } from './game.js';
 import { Net, cleanName } from './net.js';
+import { Party, PARTY_MAX, cleanPartyCode } from './party.js';
 import { cleanRoomCode } from './transport.js';
 import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
 import { BUILD, BUILD_TIME } from './version.js';
@@ -65,7 +66,7 @@ const net = new Net(game, {
     input.exitLock();
     startAttract();
     if (retryCode) rejoin(retryCode, reason);
-    else setMpStatus(reason, true);
+    else { setMpStatus(reason, true); party.leftRoom(); }
   },
   onVotes: () => renderVote(),
   onMatchStart: () => {
@@ -235,7 +236,7 @@ syncLoadout();
 // ---------------------------------------------------------------- multiplayer lobby UI
 const nameInput = $('mp-name'), codeInput = $('mp-code');
 nameInput.value = settings.name;
-nameInput.addEventListener('input', () => { settings.name = cleanName(nameInput.value); saveSettings(settings); });
+nameInput.addEventListener('input', () => { settings.name = cleanName(nameInput.value); saveSettings(settings); if (party.active) party.setName(settings.name || 'Player'); });
 codeInput.addEventListener('input', () => { codeInput.value = cleanRoomCode(codeInput.value); });
 codeInput.addEventListener('keydown', (e) => { if (e.code === 'Enter') joinGame(); });
 if (params.get('join')) codeInput.value = cleanRoomCode(params.get('join'));
@@ -248,6 +249,8 @@ function setMpStatus(text, isError = false) {
 
 function setMpBusy(busy) {
   for (const id of ['btn-host', 'btn-join', 'btn-play']) $(id).disabled = busy;
+  // a party member goes where their leader goes
+  if (!busy && party.active && !party.leader) $('btn-host').disabled = $('btn-join').disabled = true;
 }
 
 function inviteLink() {
@@ -373,6 +376,7 @@ async function hostGame() {
   } finally {
     setMpBusy(false);
   }
+  party.enteredRoom(net.code, net.password);
   setMpStatus('');
   hud.chatClear();
   await startMatch();
@@ -380,21 +384,26 @@ async function hostGame() {
 }
 
 async function joinGame() {
-  cancelRejoin();
   const code = cleanRoomCode(codeInput.value);
   if (!code) { setMpStatus('Enter the room code from your host.', true); return; }
+  await joinRoom(code, $('mp-pass').value.trim());
+}
+
+async function joinRoom(code, pw, viaParty = false) {
+  cancelRejoin();
   audio.resume();
   setMpBusy(true);
-  setMpStatus(`Connecting to room ${code}…`);
+  setMpStatus(viaParty ? `Following your party into room ${code}…` : `Connecting to room ${code}…`);
   hud.chatClear();
   try {
-    await net.join(code, settings.name, $('mp-pass').value.trim());
+    await net.join(code, settings.name, pw);
   } catch (e) {
     setMpStatus(e.message, true);
     return;
   } finally {
     setMpBusy(false);
   }
+  party.enteredRoom(code, pw);
   await enterRoom();
 }
 
@@ -425,6 +434,7 @@ async function rejoin(code, reason) {
       await net.join(code, settings.name);
       if (token !== rejoinToken) { net.leave(); return; } // they went and did something else
       hud.chatAdd('', 0, 'Reconnected.');
+      party.enteredRoom(code, net.lastPw);
       await enterRoom();
       return;
     } catch (e) {
@@ -434,6 +444,7 @@ async function rejoin(code, reason) {
   }
   if (token === rejoinToken && !net.active) {
     setMpStatus(`Couldn't get back into room ${code}. The host may have left. Press Join to retry. Your score holds for 3 minutes.`, true);
+    party.leftRoom();
   }
 }
 
@@ -441,10 +452,139 @@ function startAttract() {
   game.newMatch({ botCount: 6, bots: true, difficulty: 'normal', attract: true, map: getMap(settings.map) });
   hud.chatClear();
   setState('menu');
+  // the party went into a room while we were in a solo match: catch up with them
+  if (followWhenFree) { followWhenFree = false; setTimeout(goToPartyRoom, 300); }
 }
+
+// ---------------------------------------------------------------- party
+// Friends grouped together: members follow the leader into rooms (see party.js).
+
+let partyRoom = null; // member: the room our leader is in, { code, pw }
+let followWhenFree = false; // member: they went in while we were busy in a solo match
+const party = new Party({
+  onChange: () => renderParty(),
+  onNote: (text) => { setPartyStatus(text); if (state === 'playing' || state === 'paused') hud.chatAdd('', 0, text); },
+  onGo: (code, pw) => {
+    partyRoom = { code, pw };
+    renderParty();
+    if (net.active && net.code === code) return;
+    if (!net.active && (state === 'playing' || state === 'paused')) {
+      followWhenFree = true;
+      hud.centerMessage('YOUR PARTY IS IN A ROOM', 'Leave this match to join them', 5, '#4fc3f7');
+      return;
+    }
+    goToPartyRoom();
+  },
+  onOut: () => {
+    const was = partyRoom;
+    partyRoom = null;
+    followWhenFree = false;
+    renderParty();
+    if (was && net.active && net.code === was.code) {
+      input.exitLock();
+      net.leave();
+      startAttract();
+      setMpStatus('Your party leader left the room, so your party did too.');
+    }
+  },
+});
+
+async function goToPartyRoom() {
+  if (!partyRoom || party.leader || !party.active) return;
+  const { code, pw } = partyRoom;
+  if (net.active) {
+    if (net.code === code) return;
+    input.exitLock();
+    net.leave();
+    startAttract();
+  }
+  await joinRoom(code, pw, true);
+}
+
+function setPartyStatus(text, isError = false) {
+  const el = $('party-status');
+  el.textContent = text || '';
+  el.classList.toggle('err', !!isError);
+}
+
+function partyLink() {
+  const q = new URLSearchParams();
+  for (const k of ['net', 'nolock', 'peerhost', 'peerport', 'peerpath', 'peersecure']) if (params.has(k)) q.set(k, params.get(k));
+  q.set('party', party.code);
+  return `${location.origin}${location.pathname}?${q}`;
+}
+
+function renderParty() {
+  game.player.party = party.active ? party.code : null;
+  const on = party.active, lead = party.leader;
+  const btn = $('btn-party');
+  btn.textContent = on ? `Party · ${party.members.length || 1}` : 'Party…';
+  btn.classList.toggle('on', on);
+  $('party-off').classList.toggle('hidden', on);
+  $('party-on').classList.toggle('hidden', !on);
+  $('party-code-show').textContent = party.code || '—';
+  $('party-state').textContent = party.status === 'connecting' ? 'connecting…' : party.status === 'waiting' ? 'lost the leader, reconnecting…' : '';
+  const list = $('party-list');
+  list.textContent = '';
+  for (const m of party.members) {
+    const li = document.createElement('li');
+    li.className = m.lead ? 'lead' : '';
+    li.textContent = m.name;
+    const tag = document.createElement('small');
+    tag.textContent = m.lead ? 'Leader' : '';
+    li.append(tag);
+    list.append(li);
+  }
+  for (let i = party.members.length; on && lead && i < PARTY_MAX; i++) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = 'Open slot. Send a friend the invite link.';
+    list.append(li);
+    break;
+  }
+  $('btn-party-leave').textContent = lead ? 'Close party' : 'Leave party';
+  $('btn-party-room').classList.toggle('hidden', !(on && !lead && partyRoom && !(net.active && net.code === partyRoom.code)));
+  $('party-help').textContent = !on ? '' : lead
+    ? 'Host or join a room and your party follows you in, on your team.'
+    : 'Your leader picks the room. When they host or join one, you go in with them, on their team.';
+  setMpBusy(false);
+  if (on && !lead && !$('mp-status').classList.contains('err') && !net.active) setMpStatus("You're in a party: you follow your leader into rooms.");
+  else if (!on && /^You're in a party/.test($('mp-status').textContent)) setMpStatus('');
+}
+
+function openParty() { setPartyStatus(''); renderParty(); $('party-ov').classList.remove('hidden'); }
+function closeParty() { $('party-ov').classList.add('hidden'); }
+$('btn-party').addEventListener('click', openParty);
+$('btn-party-done').addEventListener('click', closeParty);
+$('party-code').addEventListener('input', () => { $('party-code').value = cleanPartyCode($('party-code').value); });
+$('party-code').addEventListener('keydown', (e) => { if (e.code === 'Enter') $('btn-party-join').click(); });
+$('btn-party-start').addEventListener('click', async () => {
+  setPartyStatus('Starting a party…');
+  try { await party.start(settings.name || 'Player'); setPartyStatus('Party started. Copy the invite link and send it to your friends.'); if (net.active) party.enteredRoom(net.code, net.role === 'host' ? net.password : net.lastPw); }
+  catch (e) { setPartyStatus(e.message, true); }
+});
+async function joinParty(code) {
+  setPartyStatus(`Joining party ${cleanPartyCode(code)}…`);
+  try { await party.join(code, settings.name || 'Player'); setPartyStatus("You're in. Your leader picks the room from here."); }
+  catch (e) { setPartyStatus(e.message, true); }
+}
+$('btn-party-join').addEventListener('click', () => joinParty($('party-code').value));
+$('btn-party-leave').addEventListener('click', () => {
+  const lead = party.leader;
+  party.leave();
+  partyRoom = null;
+  followWhenFree = false;
+  setPartyStatus(lead ? 'Party closed.' : 'You left the party.');
+});
+$('btn-party-copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(partyLink()); setPartyStatus('Invite link copied.'); }
+  catch (e) { setPartyStatus(`Copy this link: ${partyLink()}`); }
+});
+$('btn-party-room').addEventListener('click', () => { closeParty(); goToPartyRoom(); });
 
 function leaveToMenu() {
   input.exitLock();
+  if (net.active) party.leftRoom();
   net.leave();
   startAttract();
 }
@@ -994,6 +1134,10 @@ window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') closeAccount();
     return;
   }
+  if (!$('party-ov').classList.contains('hidden')) {
+    if (e.code === 'Escape') closeParty();
+    return;
+  }
   for (const id of ['settings-ov', 'keys-ov']) {
     if (!$(id).classList.contains('hidden')) {
       if (e.code === 'Escape') $(id).classList.add('hidden');
@@ -1035,7 +1179,7 @@ window.addEventListener('resize', () => game.resize());
 window.addEventListener('beforeunload', (e) => {
   if (state === 'playing' || state === 'paused') { e.preventDefault(); e.returnValue = ''; }
 });
-window.addEventListener('pagehide', () => { net.leave(false); game.career.flush(); game.progress.flush(); });
+window.addEventListener('pagehide', () => { party.suspend(); net.leave(false); game.career.flush(); game.progress.flush(); });
 
 game.onMatchEnd = () => {
   const res = game.rules.result(game);
@@ -1208,9 +1352,16 @@ if (document.fonts && document.fonts.load) {
   }).catch(() => {});
 }
 if (params.get('join')) setMpStatus(`Invited to room ${codeInput.value}. Pick a name and press Join.`);
+// back into this tab's party after a reload, or into a friend's from an invite link
+const invited = cleanPartyCode(params.get('party') || '');
+const savedParty = party.saved();
+if (invited.length === 5 && (!savedParty || savedParty.code !== invited)) { $('party-code').value = invited; openParty(); joinParty(invited); }
+else party.restore(settings.name || 'Player');
+renderParty();
 requestAnimationFrame(frame);
 
 // handy for debugging / automated tests
 window.__game = game;
 window.__net = net;
+window.__party = party;
 window.__app = { get state() { return state; }, startMatch, hostGame, joinGame, pause, resume, setState, openChat, closeChat, input, settings };

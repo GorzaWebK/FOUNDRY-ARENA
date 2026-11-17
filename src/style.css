@@ -700,3 +700,10 @@ input[type='password'] { background: var(--steel-1); color: var(--ink); border: 
 .d-tab.on { color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
 .d-tab + .d-tab { margin-left: 8px; }
 .d-note { margin: 3px 0 0; font-size: 11.5px; }
+
+.party-list { list-style: none; margin: 8px 0 12px; padding: 0; display: grid; gap: 4px; }
+.party-list li { display: flex; align-items: center; gap: 10px; padding: 7px 10px; background: rgba(255,255,255,0.04); border-left: 3px solid var(--line, #3a4350); font-weight: 600; }
+.party-list li.lead { border-left-color: var(--accent); }
+.party-list li small { margin-left: auto; color: var(--dim); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; font-size: 11px; }
+.party-list li.empty { color: var(--dim); font-weight: 500; font-style: italic; }
+#btn-party.on { color: var(--accent); }

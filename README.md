@@ -302,18 +302,27 @@ connect to them directly.
 3. **Private rooms:** fill in **Password** before hosting and only players who
    type the same password can join (it's never put in the invite link, so send it
    separately).
-3. Press `Enter` to chat.
-4. The host can switch bots on or off mid-match from the pause menu, pick the
+4. **Party:** press **Party…** (top of the Play with friends card) and **Start a
+   party**, then send friends the invite link or the 5-letter party code (up to 4
+   players). Whoever started the party leads: when they host or join a room, the
+   whole party is brought in with them (password and all), they stay together
+   from match to match, and the host always puts a party on the same team, even
+   when one of them switches sides. When the leader leaves a room, the party
+   leaves too. Members' Host and Join buttons are off while they're in a party;
+   if they're busy in a solo match, they follow as soon as they leave it. A
+   reload keeps you in your party (that tab remembers it).
+5. Press `Enter` to chat.
+6. The host can switch bots on or off mid-match from the pause menu, pick the
    next match's mode and map there, and restart or start the next match from the
    end screen. Closing the room (or the
    host's tab) ends the session for everyone.
-5. **Dropped?** If your connection drops (or you reload the tab by accident), the
+7. **Dropped?** If your connection drops (or you reload the tab by accident), the
    game tries to get you back into the room by itself. The host keeps your kills,
    deaths, team, lives and award stats for 3 minutes, matched by your player ID,
    and gives them back when you rejoin. Leaving with **Leave game** gives your
    place up, and when the host closes the room everyone is told rather than
    left retrying.
-6. Everyone has to be on the same version of the game. It's shown in the
+8. Everyone has to be on the same version of the game. It's shown in the
    main menu's bottom right corner. If someone has an old tab open, joining tells them who
    needs to refresh (`Ctrl+Shift+R`) instead of letting them in.
 
@@ -396,6 +405,7 @@ src/announcer.js      killstreak call-outs (banner + speech synthesis)
 src/net.js            multiplayer session: host/client protocol
 src/netChar.js        characters driven over the network (interpolated)
 src/transport.js      PeerJS (WebRTC) and local-tab transports
+src/party.js          parties: friends who follow their leader between rooms
 src/config.js         gameplay tuning, difficulty presets, bot roster
 src/maps/index.js     map registry
 src/maps/*.js         the maps (data only); range.js is the training range

@@ -424,7 +424,20 @@ export class Game {
     const n = [0, 0];
     const put = (c, t) => { c.team = t; n[t]++; };
     for (const c of this.chars) c.team = -1;
-    for (const c of this.chars) if (c.isHuman && (c.teamPref === 0 || c.teamPref === 1)) put(c, c.teamPref);
+    // parties stay together: the whole group goes where one of them asked to, else to the smaller side
+    const parties = new Map();
+    for (const c of this.chars) if (c.isHuman && c.party) parties.set(c.party, [...(parties.get(c.party) || []), c]);
+    const prefOf = (c) => (c.teamPref === 0 || c.teamPref === 1 ? c.teamPref : -1);
+    for (const group of parties.values()) {
+      const asked = group.map(prefOf).find((t) => t >= 0);
+      if (asked !== undefined) for (const c of group) put(c, asked);
+    }
+    for (const c of this.chars) if (c.isHuman && c.team < 0 && !c.party && prefOf(c) >= 0) put(c, c.teamPref);
+    for (const group of parties.values()) {
+      if (group[0].team >= 0) continue;
+      const t = n[0] <= n[1] ? 0 : 1;
+      for (const c of group) put(c, t);
+    }
     for (const c of this.chars) if (c.isHuman && c.team < 0) put(c, n[0] <= n[1] ? 0 : 1);
     for (const c of this.chars) if (!c.isHuman) put(c, n[0] <= n[1] ? 0 : 1);
     for (const c of this.chars) this.paint(c);
@@ -461,6 +474,8 @@ export class Game {
     if (this.over || this.attract || !this.rules.teams) return false;
     c.teamPref = t;
     if (!this.setTeam(c, t)) return false;
+    // the rest of their party comes along
+    for (const m of this.partyMates(c)) { m.teamPref = t; this.setTeam(m, t); }
     this.balanceBots();
     if (this.mode === 'host') { this.net.onRosterChanged(); this.net.system(`${c.name} switched to ${TEAM_NAMES[t]}`); }
     else this.hud.feedNote(`${c.name} switched to ${TEAM_NAMES[t]}`, TEAM_COLORS[t]);
@@ -470,6 +485,8 @@ export class Game {
   /** A late arrival joins the team they picked, or else the smaller one. */
   joinTeam(c) {
     if (!this.rules.teams) { c.team = -1; this.paint(c); return; }
+    const mate = this.partyMates(c).find((m) => m.team >= 0);
+    if (mate) { c.team = mate.team; this.paint(c); this.balanceBots(); return; }
     if (c.isHuman && (c.teamPref === 0 || c.teamPref === 1)) { c.team = c.teamPref; this.paint(c); this.balanceBots(); return; }
     const n = [0, 0], humans = [0, 0];
     for (const o of this.chars) {
@@ -482,6 +499,12 @@ export class Game {
     else if (c.isHuman && humans[0] !== humans[1]) c.team = humans[0] < humans[1] ? 0 : 1;
     else c.team = 0;
     this.paint(c);
+  }
+
+  /** Other players in `c`'s party who are in this game. */
+  partyMates(c) {
+    if (!c.party) return [];
+    return this.chars.filter((o) => o !== c && o.isHuman && o.party === c.party);
   }
 
   sameTeam(a, b) { return this.rules.teams && a !== b && a.team >= 0 && a.team === b.team; }

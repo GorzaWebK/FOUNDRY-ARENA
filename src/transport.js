@@ -70,7 +70,8 @@ function wrapPeerConn(dc) {
 }
 
 const peerTransport = {
-  host(code) {
+  /** `remake`: where a new code comes from if this one is taken. */
+  host(code, remake = makeRoomCode) {
     return new Promise((resolve, reject) => {
       let attempts = 0;
       const tryCode = (c) => {
@@ -97,7 +98,7 @@ const peerTransport = {
         peer.on('error', (err) => {
           if (opened) return;
           peer.destroy();
-          if (err.type === 'unavailable-id' && attempts++ < 4) tryCode(makeRoomCode());
+          if (err.type === 'unavailable-id' && attempts++ < 4) tryCode(remake());
           else reject(new Error(err.type === 'unavailable-id' ? 'Could not reserve a room code.' : 'Could not reach the matchmaking server.'));
         });
       };

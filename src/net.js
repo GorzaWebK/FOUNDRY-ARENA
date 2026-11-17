@@ -18,6 +18,7 @@
 //   end               match over
 // Client -> host messages
 //   hello, u (my state), f (I fired), g (I threw a grenade), k (I knifed), c (chat)
+//   (hello carries pty, the player's party code: the host keeps a party on one team)
 
 import { CFG, HUMAN_COLORS, MAX_HUMANS } from './config.js';
 import * as THREE from 'three';
@@ -155,7 +156,7 @@ export class Net {
         this._begin(m);
         resolve();
       };
-      conn.send({ t: 'hello', name: cleanName(name), v: this.version, vt: this.versionTime, pid: this.pid, cos: this._myCos(), tp: this.game.player.teamPref, pw: this.lastPw || undefined });
+      conn.send({ t: 'hello', name: cleanName(name), v: this.version, vt: this.versionTime, pid: this.pid, cos: this._myCos(), tp: this.game.player.teamPref, pw: this.lastPw || undefined, pty: this.game.player.party || undefined });
     });
   }
 
@@ -320,6 +321,7 @@ export class Net {
     c.conn = conn;
     c.pid = pid;
     c.teamPref = m.tp === 0 || m.tp === 1 ? m.tp : -1;
+    c.party = typeof m.pty === 'string' && m.pty ? m.pty.slice(0, 8) : null; // a party always plays together
     c.setCosmetics(unpackCosmetics(m.cos));
     c.lastSeen = now;
     c.alive = false;
