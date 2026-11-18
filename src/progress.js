@@ -4,6 +4,7 @@
 
 import { DEFAULT_EQUIPPED, ITEMS, SLOTS, itemOf, itemUnlocked } from './cosmetics.js';
 import { dailyFor, today, weeklyFor, weekKey } from './challenges.js';
+import { MEDAL_BY_ID, ACHIEVEMENTS } from './medals.js';
 
 export const PROGRESS_KEY = 'foundry-arena-progress';
 export const MAX_LEVEL = 50;
@@ -23,7 +24,7 @@ export const XP = {
 };
 
 function blank() {
-  return { v: 1, xp: 0, prestige: 0, equipped: { ...DEFAULT_EQUIPPED }, daily: { day: '', prog: {}, done: {} }, weekly: { week: '', prog: {}, done: {}, full: false }, weeksDone: 0, rankPeak: -1 };
+  return { v: 1, xp: 0, prestige: 0, equipped: { ...DEFAULT_EQUIPPED }, daily: { day: '', prog: {}, done: {} }, weekly: { week: '', prog: {}, done: {}, full: false }, weeksDone: 0, rankPeak: -1, medals: {}, achs: {} };
 }
 
 /** Level (1..50) and progress into it, from total XP this prestige. */
@@ -50,11 +51,18 @@ export class Progress {
       }
       if (typeof raw.weeksDone === 'number') this.p.weeksDone = Math.max(0, raw.weeksDone | 0);
       if (typeof raw.rankPeak === 'number') this.p.rankPeak = Math.max(-1, Math.min(15, raw.rankPeak | 0));
+      if (raw.medals && typeof raw.medals === 'object') {
+        for (const [k, v] of Object.entries(raw.medals)) if (MEDAL_BY_ID[k] && typeof v === 'number' && v > 0) this.p.medals[k] = Math.floor(v);
+      }
+      if (raw.achs && typeof raw.achs === 'object') {
+        for (const a of ACHIEVEMENTS) if (raw.achs[a.id]) this.p.achs[a.id] = typeof raw.achs[a.id] === 'string' ? raw.achs[a.id].slice(0, 10) : '1';
+      }
       if (raw.equipped && typeof raw.equipped === 'object') {
         for (const s of SLOTS) if (ITEMS[s.id].some((i) => i.id === raw.equipped[s.id])) this.p.equipped[s.id] = raw.equipped[s.id];
       }
     } catch (e) { /* fresh start */ }
     this.match = []; // [label, xp] earned this match
+    this.matchMedals = {}; // medal id -> count this match
     this.onLevelUp = null; // (newLevel) => void
     this.onXp = null; // (amount, label) => void
   }
@@ -78,10 +86,51 @@ export class Progress {
   }
 
   matchTotal() { return this.match.reduce((a, r) => a + r[1], 0); }
-  newMatch() { this.match = []; this.startXp = this.p.xp; }
+  newMatch() { this.match = []; this.matchMedals = {}; this.startXp = this.p.xp; }
+
+  // ---------------------------------------------------------------- medals + achievements
+
+  get medals() { return this.p.medals; }
+  get achs() { return this.p.achs; }
+
+  /** A medal was earned: count it (lifetime and this match). */
+  medal(id) {
+    if (this.frozen || !MEDAL_BY_ID[id]) return false;
+    this.p.medals[id] = (this.p.medals[id] || 0) + 1;
+    this.matchMedals[id] = (this.matchMedals[id] || 0) + 1;
+    this.dirty = true;
+    return true;
+  }
+
+  /**
+   * Look for newly finished achievements. `career` = career stats, `modes` = every
+   * mode id. Pays their XP, saves, and returns the new ones.
+   */
+  checkAchievements(career, modes) {
+    if (this.frozen) return [];
+    const out = [];
+    for (let pass = 0; pass < 2; pass++) { // an achievement's XP can level you into another
+      const s = this.achState(career, modes);
+      for (const a of ACHIEVEMENTS) {
+        if (this.p.achs[a.id] || a.val(s) < a.goal) continue;
+        this.p.achs[a.id] = new Date().toISOString().slice(0, 10);
+        out.push(a);
+        if (a.xp) this.add(a.xp, 'Achievements');
+      }
+    }
+    if (out.length) this.save();
+    return out;
+  }
+
+  achState(career, modes) {
+    return { career, medals: this.p.medals, level: this.level, prestige: this.prestige, rankPeak: this.p.rankPeak, weeks: this.p.weeksDone, modes };
+  }
 
   /** Is `slot`'s `item` usable now? */
-  has(slot, id) { return itemUnlocked(itemOf(slot, id), this.level, this.prestige, this.p.weeksDone, this.p.rankPeak); }
+  has(slot, id) { return this.unlocked(itemOf(slot, id)); }
+
+  /** Is this cosmetic item unlocked? */
+  unlocked(item) { return itemUnlocked(item, this.level, this.prestige, this.p.weeksDone, this.p.rankPeak, this.p.achs); }
 
   /** Equipped items, falling back to the default for anything not (or no longer) unlocked. */
   equipped() {

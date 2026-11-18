@@ -67,6 +67,16 @@ export const ITEMS = {
     { id: 'r-gold', name: 'Ranked Gold', rank: 6, css: 'radial-gradient(circle at 82% 50%,#f2c14e 0 14%,transparent 15%),repeating-linear-gradient(115deg,rgba(242,193,78,.18) 0 10px,transparent 10px 20px),linear-gradient(90deg,#2a2112,#4a3a18)' },
     { id: 'r-diamond', name: 'Ranked Diamond', rank: 12, css: 'conic-gradient(from 45deg at 82% 50%,#cfe4ff,#7fb2ff,#2d5aa8,#7fb2ff,#cfe4ff),linear-gradient(90deg,#0d1a2e,#1d3560)' },
     { id: 'r-master', name: 'Foundry Master', rank: 15, css: 'radial-gradient(ellipse at 82% 120%,#ffd27a 0,#ff6b1a 25%,transparent 55%),repeating-linear-gradient(90deg,rgba(255,107,26,.25) 0 2px,transparent 2px 18px),linear-gradient(90deg,#1a0d06,#3a1606)' },
+    // achievements (see medals.js)
+    { id: 'ach-lifer', name: 'Lifer', ach: 'm100', css: 'repeating-linear-gradient(90deg,rgba(233,228,218,.12) 0 3px,transparent 3px 26px),linear-gradient(180deg,#3a3026,#16110c)' },
+    { id: 'ach-champion', name: 'Champion', ach: 'w100', css: 'radial-gradient(circle at 82% 50%,#ffd24d 0 10%,#ff8a2a 11% 14%,transparent 15%),linear-gradient(90deg,#1e1608,#4a3410 70%,#ffd24d 140%)' },
+    { id: 'ach-thousand', name: 'Thousand', ach: 'k1000', css: 'repeating-linear-gradient(-60deg,rgba(201,52,60,.35) 0 6px,transparent 6px 16px),linear-gradient(90deg,#1a0c0d,#3a1418)' },
+    { id: 'ach-legend', name: 'Foundry Legend', ach: 'k5000', css: 'radial-gradient(ellipse at 50% 140%,#fff3c4 0,#ffd24d 18%,#ff6b1a 38%,transparent 62%),linear-gradient(180deg,#05070a,#1a0f08)' },
+    { id: 'ach-sharp', name: 'Sharpshooter', ach: 'hs250', css: 'radial-gradient(circle at 80% 50%,transparent 0 9px,#ffd24d 9px 11px,transparent 11px 19px,#ffd24d 19px 21px,transparent 21px),linear-gradient(90deg,#10161c,#24303a)' },
+    { id: 'ach-steel', name: 'Cold Steel', ach: 'kn50', css: 'linear-gradient(160deg,transparent 40%,#e8eef4 47%,#9aa6b2 52%,transparent 58%),linear-gradient(90deg,#14181c,#2c343c)' },
+    { id: 'ach-legendary', name: 'Legendary', ach: 'st20', css: 'conic-gradient(from 200deg at 85% 60%,#ff3020,#ff8a2a,#ffd24d,#ff8a2a,#ff3020),linear-gradient(90deg,#150806,#2a0d08)' },
+    { id: 'ach-squad', name: 'Bomb Squad', ach: 'defuse10', css: 'repeating-linear-gradient(45deg,rgba(127,220,154,.22) 0 10px,transparent 10px 20px),linear-gradient(90deg,#0c1810,#1a3020)' },
+    { id: 'ach-decorated', name: 'Decorated', ach: 'medals', css: 'radial-gradient(circle at 70% 50%,#ffd24d 0 5px,transparent 6px),radial-gradient(circle at 80% 50%,#c9343c 0 5px,transparent 6px),radial-gradient(circle at 90% 50%,#3f7fd0 0 5px,transparent 6px),linear-gradient(90deg,#141414,#2a2620)' },
     { id: 'gilded', name: 'Gilded', prestige: 1, css: 'linear-gradient(135deg,#7a5a10,#ffe08a 45%,#b8860b 70%,#ffe08a)' },
   ],
   helmet: [
@@ -143,7 +153,8 @@ export function itemOf(slot, id) {
 }
 
 /** Can someone at `level` / `prestige` use this item? */
-export function itemUnlocked(item, level, prestige, weeks = 0, rankPeak = -1) {
+export function itemUnlocked(item, level, prestige, weeks = 0, rankPeak = -1, achs = {}) {
+  if (item.ach) return !!achs[item.ach];
   if (item.rank !== undefined) return rankPeak >= item.rank;
   if (item.weekly) return weeks >= item.weekly;
   if (item.prestige) return prestige >= item.prestige;

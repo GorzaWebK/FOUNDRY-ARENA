@@ -249,6 +249,35 @@ kills, 8 wins, 8 flag captures and so on), picked fresh every Monday. Each pays
 first full week unlocks the **Overtime** calling card, and five full weeks
 unlock **Night Shift**. Neither can be earned any other way.
 
+### Medals
+
+Medals pop up under the crosshair as you earn them (three at a time, the rest
+queue), most with a little XP: **Headshot**, **Longshot** (40 m+), **Point
+Blank** (under 3 m), **Backstab**, **Cutthroat**, **Demolition**, **Lights Out**
+(a blinded victim), **Afterlife** (a kill after you died), **First Blood**,
+**Payback** (your last killer), **Avenger** (an enemy who just killed a
+teammate), **Buzzkill** (ending a 3+ streak), **Comeback** (after 3+ deaths in a
+row), Double / Triple / Quad / Mega Kill, streak medals from Killing Spree (3) to
+Legendary (20), and objective medals: Flag Runner, Defender, King (taking the
+hill), Secured (a Domination zone), Bomb Planted, Defused, **Clutch** (winning an
+S&D round as the last one alive), Infector, **Survivor** (lasting an Infected
+match), Victory and **MVP** (most kills in the match). The end screen lists the
+match's medals; **Career → Medals** has your lifetime count of each.
+
+### Achievements
+
+**Career → Achievements** lists 33 lifetime goals with progress bars: matches
+played and won, playing every mode, kill milestones (100 / 1,000 / 5,000),
+headshots, knife and grenade kills, a 60 m kill, 10- and 20-kill streaks, medal
+goals (Mega Kill, 25 Paybacks, 25 Backstabs, 10 defuses, 5 Clutches, 5 Infected
+survivals, 10 MVPs, 20 different medals), levels and prestige, four full weekly
+weeks and reaching Gold in ranked. Each pays XP once, and nine unlock a calling
+card you can't get any other way (Lifer, Champion, Thousand, Foundry Legend,
+Sharpshooter, Cold Steel, Legendary, Bomb Squad, Decorated). An achievement
+finished mid-match is called out on screen; one finished at the end shows on the
+end screen. Medals and achievements are saved with the rest of your progress, so
+they're in your account code too.
+
 ### Ranked
 
 Press **Ranked** (Play online card) to play for your **skill rating (SR)**. It
@@ -591,6 +620,7 @@ src/modes.js          game modes: rules, scoring, ranking, HUD text, results
 src/killcam.js        rolling recording + kill cam replay
 src/ctf.js            Capture the Flag: flags, rules, flag models
 src/objectives.js     Domination, Search & Destroy and Infected: rules, zones, bomb, HUD
+src/medals.js         medal and achievement definitions
 src/career.js         career stats (local, part of the account)
 src/skins.js          weapon camos: patterns, unlocks, colours
 src/progress.js       XP, levels, prestige, equipped cosmetics

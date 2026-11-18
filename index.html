@@ -24,6 +24,7 @@
       </div>
       <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
       <div id="xp-pop"></div>
+      <div id="medals"></div>
       <div id="net-warn" class="hidden"></div>
       <div id="cook" class="hidden"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" /><circle id="cook-arc" cx="20" cy="20" r="16" /></svg><span id="cook-t">2.3</span></div>
       <div id="dmg"></div>
@@ -278,9 +279,14 @@
       <div class="panel">
         <h2>CAREER</h2>
         <p class="acct-line">Player ID <b id="career-id" class="acct-id">—</b></p>
-        <div id="career-grid" class="career-grid"></div>
-        <h4>Kills and skins by weapon</h4>
-        <table class="career-weapons"><thead><tr><th class="l">Weapon</th><th>Kills</th><th class="l prog-h">Skins <small>camos at 50 kills, Gold at level 20 and 150, Diamond with Gold on all six</small></th></tr></thead><tbody id="career-weapons"></tbody></table>
+        <div class="tabs c-tabs"><button class="c-tab on" data-tab="stats">Stats</button><button class="c-tab" data-tab="medals">Medals</button><button class="c-tab" data-tab="achs">Achievements <small id="ach-count"></small></button></div>
+        <div id="career-stats" class="c-page">
+          <div id="career-grid" class="career-grid"></div>
+          <h4>Kills and skins by weapon</h4>
+          <table class="career-weapons"><thead><tr><th class="l">Weapon</th><th>Kills</th><th class="l prog-h">Skins <small>camos at 50 kills, Gold at level 20 and 150, Diamond with Gold on all six</small></th></tr></thead><tbody id="career-weapons"></tbody></table>
+        </div>
+        <div id="career-medals" class="c-page hidden"><div id="medal-grid" class="medal-grid"></div></div>
+        <div id="career-achs" class="c-page hidden"><div id="ach-list" class="ach-list"></div></div>
         <p class="note">Every match counts, solo or in a room. The range doesn't.</p>
         <div class="btn-row">
           <button id="btn-career-reset">Reset career…</button>

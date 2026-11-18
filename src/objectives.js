@@ -195,8 +195,7 @@ export class Domination extends Objective {
       const ours = d.team === me.team;
       g.hud.feedNote(`${TEAM_NAMES[d.team]} captured ${z.letter}`, TEAM_COLORS[d.team]);
       g.audio.play('pickup', null, 0.7, ours ? 820 : 360);
-      if ((d.by || []).includes(me.id)) { g.announcer.announce(`${z.letter} captured`, '+150 XP'); g.xp(150, 'Captures'); }
-      if (g.onObjectiveEvent) g.onObjectiveEvent('domcap', d);
+      if ((d.by || []).includes(me.id)) { g.announcer.announce(`${z.letter} captured`, '+150 XP'); g.xp(150, 'Captures'); g.medal('zone'); g.checkAchievements(); }
     } else if (kind === 'neutral') {
       g.hud.feedNote(`${z.letter} is neutral`, NEUTRAL);
     }
@@ -433,13 +432,11 @@ export class SearchDestroy extends Objective {
       g.hud.feedNote(`${c ? c.name : '?'} planted the bomb at ${'AB'[d.site] || '?'}`, 0xff6b1a);
       g.announcer.announce('Bomb planted', attacking ? `Defend it for ${FUSE_T} seconds` : 'Defuse it: stand on it');
       g.audio.play('sting-minute');
-      if (c === me && g.forCareer) g.xp(300, 'Bomb plants');
-      if (g.onObjectiveEvent) g.onObjectiveEvent('plant', { mine: c === me });
+      if (c === me && g.forCareer) { g.xp(300, 'Bomb plants'); g.medal('plant'); g.checkAchievements(); }
     } else if (kind === 'defuse') {
       const c = g.charById(d.id);
       g.hud.feedNote(`${c ? c.name : '?'} defused the bomb`, 0x7fdc9a);
-      if (c === me && g.forCareer) g.xp(300, 'Bomb defuses');
-      if (g.onObjectiveEvent) g.onObjectiveEvent('defuse', { mine: c === me });
+      if (c === me && g.forCareer) { g.xp(300, 'Bomb defuses'); g.medal('defuse'); g.checkAchievements(); }
     } else if (kind === 'boom') {
       g.effects.explosion(d.x, d.y + 0.3, d.z, d.y);
       g.audio.play('explosion', { x: d.x, y: d.y, z: d.z }, 1.6);
@@ -449,7 +446,8 @@ export class SearchDestroy extends Objective {
       g.announcer.announce(won ? 'Round won' : 'Round lost', why);
       g.audio.play(won ? 'win' : 'lose', null, 0.6);
       if (won && g.forCareer) g.xp(100, 'Rounds won');
-      if (g.onObjectiveEvent) g.onObjectiveEvent('roundEnd', { won, why: d.why, clutch: won && me.alive && g.chars.filter((c) => c.team === me.team && c.alive).length === 1 });
+      // the last one standing on the winning side
+      if (won && me.alive && g.chars.filter((c) => c.team === me.team && c.alive).length === 1 && g.chars.filter((c) => c.team === me.team).length > 1) { g.medal('clutch'); g.checkAchievements(); }
     }
   }
 

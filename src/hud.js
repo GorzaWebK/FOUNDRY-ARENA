@@ -57,6 +57,8 @@ export class Hud {
 
   reset() {
     this.anT = 0;
+    if (this.medalItems) { for (const it of this.medalItems) it.el.remove(); this.medalItems.length = 0; }
+    this.medalWait = [];
     this.el.announce.style.opacity = 0;
     this.el.feed.innerHTML = '';
     this.feedItems.length = 0;
@@ -235,6 +237,13 @@ export class Hud {
     }
 
     if (this.anT > 0) { this.anT -= dt; if (this.anT <= 0) e.announce.style.opacity = 0; }
+    if (this.medalItems && this.medalItems.length) {
+      for (const it of this.medalItems) { it.life -= dt; if (it.life < 0.4) it.el.classList.add('out'); }
+      while (this.medalItems.length && this.medalItems[0].life <= 0) this.medalItems.shift().el.remove();
+      // a waiting medal takes the free place; a long queue moves faster
+      if (this.medalWait.length && this.medalItems.length < 3) this.medal(this.medalWait.shift());
+      if (this.medalWait.length > 3) for (const it of this.medalItems) it.life = Math.min(it.life, 1.2);
+    }
     if (this.xpT > 0) { this.xpT -= dt; if (this.xpT <= 0) $('xp-pop').style.opacity = 0; }
     // client: warn about a bad connection to the host
     const net = game.net;
@@ -433,6 +442,24 @@ export class Hud {
     e.announce.classList.add('pop');
     e.announce.style.opacity = 1;
     this.anT = 2.4;
+  }
+
+  /** A medal pops up under the crosshair: up to three side by side, the rest wait their turn. */
+  medal(m) {
+    this.medalItems = this.medalItems || [];
+    this.medalWait = this.medalWait || [];
+    if (this.medalItems.length >= 3) { this.medalWait.push(m); return; }
+    const box = $('medals');
+    const el = document.createElement('div');
+    el.className = 'medal';
+    const b = document.createElement('i');
+    b.textContent = m.g;
+    b.style.setProperty('--mc', m.col);
+    const t = document.createElement('span');
+    t.textContent = m.name;
+    el.append(b, t);
+    box.append(el);
+    this.medalItems.push({ el, life: 2.4 });
   }
 
   /** A line of text in the kill feed (streaks, first blood…). */

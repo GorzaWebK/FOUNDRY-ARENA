@@ -37,7 +37,8 @@ import { BUILD, BUILD_TIME } from './version.js';
 import { START_SR, RANKED_MODES, RANKED_MAPS, TIERS, tierIndex, tierName, tierColor, seasonId, seasonName, msToSeasonEnd, srChange } from './ranked.js';
 import { getAccount, exportCode, parseCode, importAccount, friendCode, cleanFriendCode, showFriendCode } from './account.js';
 import { SKINS, SKIN_KILLS, skinSwatchCss, skinUnlocked, skinLockText } from './skins.js';
-import { SLOTS, ITEMS, itemOf, itemUnlocked, unlocksAt, packCosmetics, unpackCosmetics } from './cosmetics.js';
+import { SLOTS, ITEMS, itemOf, unlocksAt, packCosmetics, unpackCosmetics } from './cosmetics.js';
+import { MEDALS, MEDAL_BY_ID, ACHIEVEMENTS, ACH_BY_ID } from './medals.js';
 import { XP, levelFromXp, MAX_LEVEL } from './progress.js';
 import { msToReset, msToWeekReset } from './challenges.js';
 
@@ -1506,6 +1507,22 @@ game.progress.onChallenge = (c, weekly) => {
   if (state === 'playing') game.announcer.announce(weekly ? 'Weekly complete' : 'Challenge complete', `${c.text}  +${fmt(c.xp)} XP`);
   renderDaily();
 };
+// achievements: a call-out mid-match (one at a time), a line on the end screen after one
+const endAchs = [];
+let achQueue = [], achBusy = false;
+game.onAchievement = (a) => {
+  if (state !== 'playing' || game.over) { endAchs.push(a); return; }
+  achQueue.push(a);
+  if (!achBusy) nextAch();
+};
+function nextAch() {
+  const a = achQueue.shift();
+  if (!a) { achBusy = false; return; }
+  achBusy = true;
+  const card = a.card ? ITEMS.card.find((i) => i.id === a.card) : null;
+  game.announcer.announce('Achievement', `${a.name}${a.xp ? `  +${fmt(a.xp)} XP` : ''}${card ? `  ·  ${card.name} card unlocked` : ''}`);
+  setTimeout(nextAch, 2600);
+}
 game.progress.onWeekDone = (n) => {
   const card = n >= 5 ? 'Night Shift' : 'Overtime';
   setTimeout(() => game.announcer.announce('Full week!', n === 1 || n === 5 ? `Unlocked the ${card} calling card` : `${n} full weeks`), 2600);
@@ -1587,7 +1604,19 @@ function renderEndXp() {
   const up = pr.level > before ? `<span class="xp-up">Level ${before} → ${pr.level}!</span>` : `<span>Level ${pr.level}</span>`;
   el.innerHTML = `<div class="xp-line"><b>+${fmt(total)} XP</b>${up}<span class="bar"><i style="width:${pct}%"></i></span>`
     + `<small>${info.need ? `${fmt(info.into)} / ${fmt(info.need)}` : 'MAX'}</small></div>`
-    + `<div class="xp-parts">${pr.match.map(([k, v]) => `<span>${k} <b>+${fmt(v)}</b></span>`).join('')}</div>`;
+    + `<div class="xp-parts">${pr.match.map(([k, v]) => `<span>${k} <b>+${fmt(v)}</b></span>`).join('')}</div>`
+    + endMedalsHtml();
+}
+
+/** This match's medals (and any achievements finished at the end) for the end screen. */
+function endMedalsHtml() {
+  const mm = Object.entries(game.progress.matchMedals || {}).filter(([id]) => MEDAL_BY_ID[id]);
+  let html = '';
+  if (mm.length) {
+    html += `<div class="end-medals">${mm.map(([id, n]) => { const m = MEDAL_BY_ID[id]; return `<span class="em" title="${m.desc}"><i style="--mc:${m.col}">${m.g}</i>${m.name}${n > 1 ? ` <b>×${n}</b>` : ''}</span>`; }).join('')}</div>`;
+  }
+  if (endAchs.length) html += `<div class="end-achs">${endAchs.map((a) => `<span>Achievement: <b>${a.name}</b>${a.card ? ' (calling card unlocked)' : ''}</span>`).join('')}</div>`;
+  return html;
 }
 
 let customSlot = 'title';
@@ -1632,7 +1661,7 @@ function renderCustom() {
     b.type = 'button';
     b.className = s.id === customSlot ? 'on' : '';
     b.textContent = s.name;
-    const n = ITEMS[s.id].filter((i) => itemUnlocked(i, pr.level, pr.prestige, pr.weeksDone, pr.rankPeak)).length;
+    const n = ITEMS[s.id].filter((i) => pr.unlocked(i)).length;
     const sm = document.createElement('small'); sm.textContent = `${n}/${ITEMS[s.id].length}`;
     b.append(sm);
     b.addEventListener('click', () => { customSlot = s.id; renderCustom(); });
@@ -1641,7 +1670,7 @@ function renderCustom() {
   const grid = $('custom-items');
   grid.textContent = '';
   for (const item of ITEMS[customSlot]) {
-    const open = itemUnlocked(item, pr.level, pr.prestige, pr.weeksDone, pr.rankPeak);
+    const open = pr.unlocked(item);
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'citem' + (eq[customSlot] === item.id ? ' on' : '') + (open ? '' : ' locked');
@@ -1650,7 +1679,7 @@ function renderCustom() {
     nm.textContent = customSlot === 'title' ? '' : item.name; // a title's swatch already says it
     const req = document.createElement('small');
     req.textContent = open ? (eq[customSlot] === item.id ? 'equipped' : '')
-      : item.rank !== undefined ? `Reach ${TIERS[item.rank][0]}` : item.weekly ? (item.weekly === 1 ? 'Finish a week' : `${item.weekly} full weeks`) : item.prestige ? `Prestige ${item.prestige}` : `Level ${item.level}`;
+      : item.ach ? `Achievement: ${ACH_BY_ID[item.ach] ? ACH_BY_ID[item.ach].name : '?'}` : item.rank !== undefined ? `Reach ${TIERS[item.rank][0]}` : item.weekly ? (item.weekly === 1 ? 'Finish a week' : `${item.weekly} full weeks`) : item.prestige ? `Prestige ${item.prestige}` : `Level ${item.level}`;
     nm.append(req);
     b.append(nm);
     b.addEventListener('click', () => {
@@ -1791,6 +1820,63 @@ function renderCareer() {
     body.append(tr);
   }
   $('career-id').textContent = account.id;
+  renderMedalsAchs();
+}
+
+let careerTab = 'stats';
+for (const t of document.querySelectorAll('.c-tab')) t.addEventListener('click', () => { careerTab = t.dataset.tab; showCareerTab(); audio.play('ui'); });
+function showCareerTab() {
+  for (const t of document.querySelectorAll('.c-tab')) t.classList.toggle('on', t.dataset.tab === careerTab);
+  $('career-stats').classList.toggle('hidden', careerTab !== 'stats');
+  $('career-medals').classList.toggle('hidden', careerTab !== 'medals');
+  $('career-achs').classList.toggle('hidden', careerTab !== 'achs');
+}
+
+/** Career → Medals (lifetime counts) and Achievements (progress, rewards). */
+function renderMedalsAchs() {
+  const pr = game.progress, md = pr.medals;
+  const mg = $('medal-grid');
+  mg.textContent = '';
+  for (const m of MEDALS) {
+    const n = md[m.id] || 0;
+    const d = document.createElement('div');
+    d.className = 'mcell' + (n ? '' : ' none');
+    d.title = m.desc + (m.xp ? ` (+${m.xp} XP)` : '');
+    const i = document.createElement('i'); i.textContent = m.g; i.style.setProperty('--mc', m.col);
+    const nm = document.createElement('span'); nm.textContent = m.name;
+    const c = document.createElement('b'); c.textContent = n ? `×${fmt(n)}` : '—';
+    d.append(i, nm, c);
+    mg.append(d);
+  }
+  const s = pr.achState(game.career.stats, MODES.map((m) => m.id));
+  const list = $('ach-list');
+  list.textContent = '';
+  let done = 0;
+  for (const a of ACHIEVEMENTS) {
+    const got = pr.achs[a.id];
+    if (got) done++;
+    const v = Math.min(a.goal, a.val(s));
+    const row = document.createElement('div');
+    row.className = 'ach' + (got ? ' done' : '');
+    const top = document.createElement('div'); top.className = 'a-top';
+    const nm = document.createElement('b'); nm.textContent = a.name;
+    const rw = document.createElement('small');
+    const card = a.card ? ITEMS.card.find((i) => i.id === a.card) : null;
+    rw.textContent = [a.xp ? `+${fmt(a.xp)} XP` : '', card ? `${card.name} card` : ''].filter(Boolean).join(' · ');
+    top.append(nm, rw);
+    const ds = document.createElement('span'); ds.textContent = a.desc;
+    const line = document.createElement('div'); line.className = 'd-line';
+    const bar = document.createElement('div'); bar.className = 'd-bar';
+    const fill = document.createElement('i'); fill.style.width = `${got ? 100 : Math.round((v / a.goal) * 100)}%`;
+    bar.append(fill);
+    const cnt = document.createElement('small');
+    cnt.textContent = got ? `done ${typeof got === 'string' && got.length === 10 ? got : ''}`.trim() : a.prog ? a.prog(s) : `${fmt(Math.floor(v))}${a.unit ? ' ' + a.unit : ''}/${fmt(a.goal)}${a.unit ? ' ' + a.unit : ''}`;
+    line.append(bar, cnt);
+    row.append(top, ds, line);
+    list.append(row);
+  }
+  $('ach-count').textContent = `${done}/${ACHIEVEMENTS.length}`;
+  showCareerTab();
 }
 function openCareer() { renderCareer(); $('career').classList.remove('hidden'); }
 $('btn-career').addEventListener('click', openCareer);
@@ -2016,9 +2102,17 @@ game.onMatchEnd = () => {
     if (won) pr.add(XP.matchWon, 'Victory');
     const mine = (game.awards || []).filter((a) => a[1] === game.player.name).length;
     if (mine) pr.add(XP.award * mine, 'Awards');
+    // end-of-match medals
+    const endMedal = (id) => { if (pr.medal(id) && MEDAL_BY_ID[id].xp) pr.add(MEDAL_BY_ID[id].xp, 'Medals'); };
+    if (won && !res.draw) endMedal('win');
+    const p = game.player, others = game.chars.filter((c) => c !== p);
+    if (others.length && p.kills > 0 && others.every((c) => p.kills > c.kills)) endMedal('mvp');
+    if (game.rules.objective === 'infected' && won && p.team === 0) endMedal('survive');
     pr.challenge('match', 1, { mode: game.rules.id });
     if (won) pr.challenge('win', 1, { mode: game.rules.id });
   }
+  endAchs.length = 0;
+  game.checkAchievements();
   game.progress.save();
   updateBoardEntry();
   reportRanked(res);

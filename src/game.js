@@ -26,6 +26,7 @@ import { SKIN_GUNS, SKIN_BY_ID, skinUnlocked } from './skins.js';
 import { getMode, makeRules, MODES, TEAM_COLORS, TEAM_NAMES, GUN_LADDER, gunLevel, setTeamPalette } from './modes.js';
 import { MAPS, getMap } from './maps/index.js';
 import { Announcer } from './announcer.js';
+import { MEDAL_BY_ID, STREAK_MEDALS, MULTI_MEDALS } from './medals.js';
 import { KillCam } from './killcam.js';
 import { Range } from './training.js';
 
@@ -369,6 +370,7 @@ export class Game {
     c.hillTime = 0;
     c.caps = 0;
     c.speedMul = 1;
+    c.lastKiller = null; c.lastVictim = null; c.deathRun = 0; // (medals)
     // for the end-of-match awards (kept by whoever runs the match)
     c.st = { shots: 0, hits: 0, heads: 0, knives: 0, nades: 0, bestStreak: 0, longest: 0, returns: 0 };
   }
@@ -839,6 +841,7 @@ export class Game {
 
     // Streaks and multi-kills, tracked on every machine from the kills it sees.
     const ended = victim.streak;
+    const avenged = victim.lastVictim && this.time - victim.lastKillT < 5 ? victim.lastVictim : null; // (for the Avenger medal)
     victim.streak = 0;
     victim.multi = 0;
     let first = false;
@@ -848,8 +851,10 @@ export class Game {
       attacker.streak++;
       if (attacker.st) attacker.st.bestStreak = Math.max(attacker.st.bestStreak, attacker.streak);
       if (!this.firstBlood) { this.firstBlood = true; first = true; }
+      attacker.lastVictim = victim;
     }
     if (this.attract) return;
+    this.killMedals(victim, attacker, head, weapon, first, ended, avenged);
 
     if (this.forCareer) {
       const me = this.player;
@@ -883,6 +888,52 @@ export class Game {
       this.hud.centerMessage(`ELIMINATED ${victim.name.toUpperCase()}`, sub, 1.6, '#' + victim.color.toString(16).padStart(6, '0'));
     }
     this.announceKill(victim, attacker, first, ended);
+  }
+
+  /** Medals for a kill you made (and the bookkeeping some of them need when you die). */
+  killMedals(victim, attacker, head, weapon, first, ended, avenged) {
+    const me = this.player;
+    if (!this.forCareer || this.over) return;
+    if (victim === me && attacker !== me) { me.lastKiller = attacker; me.deathRun = (me.deathRun || 0) + 1; }
+    if (attacker !== me || victim === me || this.sameTeam(victim, me)) return;
+    const wid = weaponIdOf(weapon);
+    const dist = me.pos.distanceTo(victim.pos);
+    const m = (id) => this.medal(id);
+    if (wid === 'knife') m(this.obj && this.obj.noGuns && this.obj.noGuns(me) ? 'infect' : head ? 'back' : 'blade');
+    else if (wid === 'grenade') m('boom');
+    else {
+      if (head) m('head');
+      if (dist >= 40) m('long');
+      else if (dist < 3) m('blank');
+    }
+    if (victim.isBlind()) m('blind');
+    if (!me.alive) m('after');
+    if (first) m('first');
+    if (victim === me.lastKiller) { m('revenge'); me.lastKiller = null; }
+    if (avenged && avenged !== me && this.sameTeam(avenged, me)) m('avenge');
+    if (ended >= 3) m('shut');
+    if ((me.deathRun || 0) >= 3) m('comeback');
+    me.deathRun = 0;
+    if (me.multi >= 2) m(me.multi >= 5 ? 'mega' : MULTI_MEDALS[me.multi]);
+    if (STREAK_MEDALS[me.streak]) m(STREAK_MEDALS[me.streak]);
+    this.checkAchievements();
+  }
+
+  /** You earned a medal: count it, pay its XP, show it. */
+  medal(id) {
+    if (!this.forCareer || this.over) return;
+    const m = MEDAL_BY_ID[id];
+    if (!m || !this.progress.medal(id)) return;
+    if (m.xp) this.xp(m.xp, 'Medals');
+    this.hud.medal(m);
+  }
+
+  /** Any achievements just finished? (main.js shows them) */
+  checkAchievements() {
+    if (this.attract || this.range) return [];
+    const done = this.progress.checkAchievements(this.career.stats, MODES.map((m) => m.id));
+    if (done.length && this.onAchievement) for (const a of done) this.onAchievement(a);
+    return done;
   }
 
   /** Killstreak announcer: big call-outs for you, kill-feed notes for everyone else. */
@@ -1237,6 +1288,8 @@ export class Game {
   hillTaken(team) {
     this.hud.feedNote(`${TEAM_NAMES[team]} team took the hill`, TEAM_COLORS[team]);
     if (team === this.player.team) this.audio.play('pickup', null, 0.7, 700);
+    const h = this.hillZone();
+    if (team === this.player.team && h && this.inHill(this.player, h)) this.medal('hill');
   }
 
   /** The glowing ring + light pillar marking the hill. */

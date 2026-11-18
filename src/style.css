@@ -341,6 +341,14 @@ h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 /* XP */
 #xp-pop { position: absolute; left: 50%; top: 50%; margin: 34px 0 0 30px; font: 800 15px var(--mono); color: #ffd24d; opacity: 0; white-space: nowrap; }
 #xp-pop.pop { animation: xpPop 0.3s ease-out; }
+/* medals: badges popping in under the crosshair */
+#medals { position: absolute; left: 50%; top: 60%; transform: translateX(-50%); display: flex; gap: 14px; pointer-events: none; }
+.medal { display: flex; flex-direction: column; align-items: center; gap: 4px; animation: medalIn 0.35s cubic-bezier(0.2, 1.6, 0.4, 1); transition: opacity 0.35s, transform 0.35s; }
+.medal.out { opacity: 0; transform: translateY(-8px); }
+.medal i { --mc: #ffd24d; width: 44px; height: 44px; display: grid; place-items: center; font: 800 14px var(--cond, sans-serif); font-style: normal; letter-spacing: 0.02em; color: #14110d;
+  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.55), transparent 45%), var(--mc); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); box-shadow: 0 0 0 2px rgba(0,0,0,.4); }
+.medal span { font: 700 12px var(--cond, sans-serif); letter-spacing: 0.12em; text-transform: uppercase; color: #f4f1ea; text-shadow: 0 1px 3px rgba(0,0,0,.8); white-space: nowrap; }
+@keyframes medalIn { from { transform: scale(1.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes xpPop { from { transform: translateY(6px) scale(1.25); } to { transform: none; } }
 .end-xp { margin: 10px 0 0; }
 .end-xp .xp-line { display: flex; align-items: center; gap: 12px; font-size: 14px; }
@@ -859,3 +867,35 @@ body.soft-flash #flashbang { background: #8b9096; transition: opacity 0.35s ease
 .sb-rank { display: inline-block; min-width: 20px; margin-right: 5px; padding: 0 3px; font: 800 10px var(--cond); letter-spacing: 0.04em; text-align: center; border: 1px solid currentColor; border-radius: 3px; vertical-align: 1px; }
 .host-row .wide-btn { height: 44px; padding: 4px 6px; white-space: nowrap; font-size: 12.5px; letter-spacing: 0.06em; overflow: hidden; }
 .ranked-btn small { font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+/* Career: tabs, medals, achievements */
+.c-tabs { display: flex; gap: 4px; margin: 8px 0 2px; }
+.c-tab { flex: 1; padding: 6px 8px; font: 700 13px var(--cond); letter-spacing: 0.1em; text-transform: uppercase; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--dim); cursor: pointer; }
+.c-tab.on { color: var(--ink); border-color: var(--accent); background: rgba(255, 107, 26, 0.12); }
+.c-tab small { font-size: 11px; color: var(--dim); margin-left: 4px; }
+.c-page { max-height: 470px; overflow-y: auto; }
+.medal-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 10px; }
+.mcell { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px; background: rgba(255, 255, 255, 0.03); text-align: center; }
+.mcell i, .end-medals i { --mc: #ffd24d; width: 34px; height: 34px; display: grid; place-items: center; font: 800 12px var(--cond); font-style: normal; color: #14110d;
+  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.55), transparent 45%), var(--mc); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.mcell span { font: 600 12px var(--cond); letter-spacing: 0.04em; line-height: 1.1; }
+.mcell b { font: 700 12px var(--mono); color: var(--accent-hot); }
+.mcell.none { opacity: 0.38; }
+.mcell.none i { filter: grayscale(1); }
+.ach-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-top: 10px; }
+.ach { padding: 6px 8px; background: rgba(255, 255, 255, 0.03); border-left: 3px solid rgba(255, 255, 255, 0.1); }
+.ach.done { border-left-color: #8fb04a; }
+.ach .a-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.ach .a-top b { font: 700 14px var(--cond); letter-spacing: 0.04em; }
+.ach .a-top small { font: 600 11px var(--cond); color: var(--accent-hot); white-space: nowrap; }
+.ach > span { display: block; font-size: 12px; color: var(--dim); margin: 1px 0 4px; }
+.ach .d-line { display: flex; align-items: center; gap: 8px; }
+.ach .d-bar { flex: 1; height: 4px; background: rgba(255, 255, 255, 0.08); }
+.ach .d-bar i { display: block; height: 100%; background: var(--accent); }
+.ach.done .d-bar i { background: #8fb04a; }
+.ach .d-line small { font: 600 11px var(--cond); color: var(--dim); white-space: nowrap; }
+.end-medals { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: center; margin-top: 8px; }
+.end-medals .em { display: inline-flex; align-items: center; gap: 6px; font: 600 13px var(--cond); letter-spacing: 0.04em; }
+.end-medals .em i { width: 24px; height: 24px; font-size: 9px; }
+.end-medals .em b { color: var(--accent-hot); }
+.end-achs { display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: center; margin-top: 6px; font: 600 13px var(--cond); color: #8fb04a; }
