@@ -265,7 +265,8 @@ export class NavGrid {
     let bestNode = start, bestH = heur(start);
     let found = false;
     let iter = 0;
-    while (heap.size > 0 && iter++ < 20000) {
+    const maxIter = Math.max(20000, this.nodeCount | 0); // (big maps need longer searches)
+    while (heap.size > 0 && iter++ < maxIter) {
       const cur = heap.pop();
       if (closed[cur] === stamp) continue;
       closed[cur] = stamp;

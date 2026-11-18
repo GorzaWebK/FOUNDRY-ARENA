@@ -7,10 +7,11 @@ import cloister from './cloister.js';
 import depot from './depot.js';
 import skyline from './skyline.js';
 import dockyard from './dockyard.js';
+import steelworks from './steelworks.js';
 
 import { setBuiltinMaps, customMap } from '../mapspec.js';
 
-export const MAPS = [foundry, span, cloister, depot, skyline, dockyard];
+export const MAPS = [foundry, span, cloister, depot, skyline, dockyard, steelworks];
 export const DEFAULT_MAP = foundry.id;
 setBuiltinMaps(MAPS); // custom maps borrow their look from these
 

@@ -332,6 +332,7 @@ jumping and holding the trigger widen the cone; crouching and aiming tighten it.
 | **Depot**    | 72 × 48   | roofed three-storey warehouse (skylights): shelving aisles, a mezzanine ring at 4 m, a catwalk at 8 m |
 | **Skyline**  | 80 × 60   | rooftops over a street: bridges, long stairs and short gaps you can jump |
 | **Dockyard** | 88 × 56   | container yard: sheds with sniper roofs, stacks to climb, a crane walkway |
+| **Steelworks** | 220 × 160 | the mega map: a blast furnace with a chimney landmark, conveyor bridges 5 m up, a container rail yard, a rolling-mill hall with a mezzanine, slag mounds, cooling towers, bases at each end |
 
 Each map is plain data in `src/maps/`: boxes, ramps and stairs, plus spawn
 points, pickups, patrol points, King of the Hill zones, flag bases, materials,
