@@ -122,9 +122,8 @@ switched off with **Kill cam** in settings.
 Your multi-kills (Double, Triple, Quad, Mega Kill within 4 seconds of each other)
 and streaks (Killing Spree at 3, Rampage 5, Dominating 7, Unstoppable 10, Godlike 15,
 Legendary 20), plus First Blood and Shutdown (ending someone's streak), get a big
-banner and a sting. Other players' big streaks show up in the kill feed. Turn on
-**Spoken call-outs** in settings to also hear them read out (the browser's
-text-to-speech, so how it sounds depends on your browser and OS).
+banner and a sting. Other players' big streaks show up in the kill feed. Call-outs
+are on-screen text only (there's no spoken voice).
 
 ## Sound
 
@@ -576,7 +575,7 @@ src/smoke.js          smoke grenade clouds (visuals + line-of-sight blocking)
 src/account.js        player ID + account code export / import
 src/training.js       training range: targets, stands, challenge, stats
 src/bindings.js       rebindable controls
-src/announcer.js      killstreak call-outs (banner + speech synthesis)
+src/announcer.js      call-outs (on-screen banner + sting)
 src/net.js            multiplayer session: host/client protocol
 src/netChar.js        characters driven over the network (interpolated)
 src/transport.js      PeerJS (WebRTC) and local-tab transports
