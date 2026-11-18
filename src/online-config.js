@@ -8,11 +8,12 @@
 // These values are not secret: every Firebase web app ships them to the browser.
 // What protects the data is the database rules.
 
-export const FIREBASE_CONFIG = null;
-// export const FIREBASE_CONFIG = {
-//   apiKey: '...',
-//   authDomain: 'your-project.firebaseapp.com',
-//   databaseURL: 'https://your-project-default-rtdb.firebaseio.com',
-//   projectId: 'your-project',
-//   appId: '...',
-// };
+export const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyAZbpZCxU6cykOywHHvSqpnRiAxfkaEuEU',
+  authDomain: 'foundry-arena.firebaseapp.com',
+  databaseURL: 'https://foundry-arena-default-rtdb.europe-west1.firebasedatabase.app',
+  projectId: 'foundry-arena',
+  storageBucket: 'foundry-arena.firebasestorage.app',
+  messagingSenderId: '690371517667',
+  appId: '1:690371517667:web:bb6fcab88afa90b13c39d6',
+};
