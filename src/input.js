@@ -54,13 +54,15 @@ export class Input {
       if (this.active) { this.wheel += Math.sign(e.deltaY); e.preventDefault(); }
     }, { passive: false });
     document.addEventListener('pointerlockchange', () => {
+      const was = this.locked;
       this.locked = document.pointerLockElement === canvas;
       if (!this.locked) { this.keys.clear(); this.left = this.right = false; }
-      if (this.onLockChange) this.onLockChange(this.locked);
+      // only real changes: locked -> unlocked (Esc) or unlocked -> locked
+      if (this.locked !== was && this.onLockChange) this.onLockChange(this.locked);
     });
-    document.addEventListener('pointerlockerror', () => {
-      if (this.onLockChange) this.onLockChange(false, true);
-    });
+    // A failed request is not the player letting go of the mouse: requestLock()
+    // handles it (it retries without raw input, which some browsers refuse with
+    // an error event before the retry succeeds), so it must not pause the game.
   }
 
   // keys only count while gameplay has focus (not while a menu is open)
@@ -90,12 +92,20 @@ export class Input {
     return false;
   }
 
-  /** Ask for pointer lock. Resolves true once the pointer is captured. */
+  /**
+   * Ask for pointer lock. Resolves true once the pointer is captured.
+   *
+   * The first try asks for raw (unaccelerated) mouse input. Browsers that can't
+   * do that reject it, and may also fire a pointerlockerror event for it, which
+   * can arrive late, even after the plain retry has already succeeded. So where
+   * requestPointerLock returns a promise, only the promises decide; the events
+   * are used only by older browsers that return nothing.
+   */
   requestLock() {
     return new Promise((resolve) => {
       if (this.locked) { resolve(true); return; }
       const canvas = this.canvas;
-      let done = false;
+      let done = false, promised = false;
       const finish = (v) => {
         if (done) return;
         done = true;
@@ -103,21 +113,23 @@ export class Input {
         document.removeEventListener('pointerlockerror', onErr);
         resolve(v);
       };
-      const onChange = () => finish(document.pointerLockElement === canvas);
-      const onErr = () => finish(false);
+      const onChange = () => { if (document.pointerLockElement === canvas) finish(true); };
+      const onErr = () => { if (!promised) finish(false); };
       document.addEventListener('pointerlockchange', onChange);
       document.addEventListener('pointerlockerror', onErr);
       setTimeout(() => finish(document.pointerLockElement === canvas), 1500);
       const plain = () => {
         try {
           const p = canvas.requestPointerLock();
-          if (p && p.catch) p.catch(() => finish(false));
+          if (p && p.then) { promised = true; p.then(() => finish(true), () => finish(document.pointerLockElement === canvas)); }
         } catch (e) { finish(false); }
       };
       try {
-        // raw (unaccelerated) mouse input where the browser supports it
         const p = canvas.requestPointerLock({ unadjustedMovement: true });
-        if (p && p.catch) p.catch((err) => { if (err && err.name === 'NotSupportedError') plain(); else finish(false); });
+        if (p && p.then) {
+          promised = true;
+          p.then(() => finish(true), (err) => { if (err && err.name === 'NotSupportedError') plain(); else finish(false); });
+        }
       } catch (e) { plain(); }
     });
   }
