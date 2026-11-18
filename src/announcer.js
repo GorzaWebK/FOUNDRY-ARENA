@@ -14,7 +14,11 @@ export class Announcer {
     if (this.synth) {
       const pick = () => {
         const en = this.synth.getVoices().filter((v) => /^en/i.test(v.lang));
-        this.voice = en.find((v) => PREFERRED.test(v.name)) || en[0] || null;
+        // Voices installed on the computer first. Online voices (Chrome's "Google …"
+        // ones) stream through the browser's own audio output, and on some systems
+        // that cuts out the game's sound for as long as they speak.
+        const local = en.filter((v) => v.localService);
+        this.voice = local.find((v) => PREFERRED.test(v.name)) || local[0] || en.find((v) => PREFERRED.test(v.name)) || en[0] || null;
       };
       pick();
       if (this.synth.addEventListener) this.synth.addEventListener('voiceschanged', pick);
@@ -36,7 +40,10 @@ export class Announcer {
       u.rate = 0.92;
       u.pitch = 0.45; // deep "arena announcer" voice
       u.volume = Math.min(1, this.settings.volume * 1.5);
+      // if the system paused the game's audio for the speech, bring it straight back
+      u.onstart = u.onend = u.onerror = () => this.audio.kick();
       this.synth.speak(u);
+      setTimeout(() => this.audio.kick(), 50);
     } catch (e) { /* speech is a nice-to-have */ }
   }
 }

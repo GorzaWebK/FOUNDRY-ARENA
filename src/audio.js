@@ -27,6 +27,21 @@ export class AudioSys {
       this._buildVerb();
     }
     if (this.ctx.state === 'suspended') this.ctx.resume();
+    this.wanted = true;
+    if (!this.watching) {
+      this.watching = true;
+      // Something else (speech call-outs, another tab's audio, the OS) can suspend
+      // or "interrupt" the context. Ask for it back whenever that happens.
+      this.ctx.addEventListener('statechange', () => { if (this.ctx.state !== 'running') setTimeout(() => this.kick(), 60); });
+    }
+  }
+
+  /** Make sure the audio context is running (after something paused it). */
+  kick() {
+    const c = this.ctx;
+    if (!c || !this.wanted || c.state === 'running' || c.state === 'closed') return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+    c.resume().catch(() => {});
   }
 
   /**
@@ -246,7 +261,8 @@ export class AudioSys {
   // --- sounds --------------------------------------------------------------
 
   play(name, pos = null, vol = 1, arg = 0) {
-    if (!this.ctx || this.muted || (this.ctx.state !== 'running' && !this.offline)) return;
+    if (!this.ctx || this.muted) return;
+    if (this.ctx.state !== 'running' && !this.offline) { this.kick(); return; }
     const t = this.ctx.currentTime;
     switch (name) {
       case 'pistol': {
