@@ -228,10 +228,10 @@ export class Character {
   gear() {
     const obj = this.game.obj;
     if (obj && obj.noGuns && obj.noGuns(this)) return [null, null, null, 'none', 'none']; // infected: bare hands
-    const ws = this.weapons, held = this.weapon.def.id;
-    if (ws.length < 2) return [held, null, null, this.skinOf(held), 'none'];
-    const stowed = this.weaponIdx === 0 ? ws[1].def.id : ws[0].def.id;
-    return [held, stowed, this.weaponIdx === 0 ? 'hip' : 'back', this.skinOf(held), this.skinOf(stowed)];
+    const ws = this.weapons, held = this.weapon.def.id, ha = this.weapon.def.att || 0;
+    if (ws.length < 2) return [held, null, null, this.skinOf(held), 'none', ha, 0];
+    const sw = this.weaponIdx === 0 ? ws[1] : ws[0], stowed = sw.def.id;
+    return [held, stowed, this.weaponIdx === 0 ? 'hip' : 'back', this.skinOf(held), this.skinOf(stowed), ha, sw.def.att || 0];
   }
 
   /** Gun game: hand out the gun this kill count has earned. */

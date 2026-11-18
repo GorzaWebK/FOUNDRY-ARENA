@@ -8,6 +8,8 @@
 //   projectile        fires a bolt that flies and drops (speed m/s, gravity m/s²)
 //                     instead of a hitscan bullet; see bolts.js
 
+import { withAttachments } from './attachments.js';
+
 const DEFS = [
   {
     id: 'pistol', name: 'Pistol', blurb: 'Twelve in the mag. Never runs dry.',
@@ -199,11 +201,12 @@ function makeState(def) {
   };
 }
 
-/** [primary, sidearm] */
-export function makeLoadout(primaryId, secondaryId = DEFAULT_SECONDARY) {
+/** [primary, sidearm]; `att` = { gunId: attachment code } (see attachments.js) */
+export function makeLoadout(primaryId, secondaryId = DEFAULT_SECONDARY, att = null) {
   const prim = WEAPON_BY_ID[isPrimary(primaryId) ? primaryId : DEFAULT_PRIMARY];
   const side = WEAPON_BY_ID[isSecondary(secondaryId) ? secondaryId : DEFAULT_SECONDARY];
-  return [makeState(prim), makeState(side)];
+  const a = att || {};
+  return [makeState(withAttachments(prim, a[prim.id])), makeState(withAttachments(side, a[side.id]))];
 }
 
 /** Gun game: just the one gun, with bottomless reserve ammo. */

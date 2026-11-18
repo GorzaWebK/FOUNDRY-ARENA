@@ -85,7 +85,7 @@ export class Player extends Character {
     // ---- look
     // aiming always wins over sprinting (the sprint picks up again when you let go)
     const wantAds = input.act('aim') && w.reloadT <= 0 && this.switchT <= 0;
-    this.ads += ((wantAds ? 1 : 0) - this.ads) * Math.min(1, dt * 14);
+    this.ads += ((wantAds ? 1 : 0) - this.ads) * Math.min(1, dt * (w.def.adsRate || 14));
     if (this.ads < 0.002) this.ads = 0;
     this.scoped = !!w.def.scope && this.ads > 0.8;
     const zoom = 1 - this.ads * (1 - w.def.adsFov);

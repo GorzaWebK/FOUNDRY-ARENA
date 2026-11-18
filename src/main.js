@@ -39,6 +39,7 @@ import { getAccount, exportCode, parseCode, importAccount, friendCode, cleanFrie
 import { SKINS, SKIN_KILLS, skinSwatchCss, skinUnlocked, skinLockText } from './skins.js';
 import { SLOTS, ITEMS, itemOf, unlocksAt, packCosmetics, unpackCosmetics } from './cosmetics.js';
 import { MEDALS, MEDAL_BY_ID, ACHIEVEMENTS, ACH_BY_ID } from './medals.js';
+import { ATT_SLOTS, ATTACHMENTS, fits, attUnlocked, attList, withAttachments } from './attachments.js';
 import { XP, levelFromXp, MAX_LEVEL } from './progress.js';
 import { msToReset, msToWeekReset } from './challenges.js';
 
@@ -1833,6 +1834,107 @@ function renderCareer() {
   $('career-id').textContent = account.id;
   renderMedalsAchs();
 }
+
+// ---------------------------------------------------------------- gunsmith (attachments)
+let gsGun = null;
+const GS_GUNS = [...PRIMARIES, ...SECONDARIES];
+function openGunsmith() {
+  gsGun = gsGun || settings.primary;
+  renderGunsmith();
+  $('gunsmith').classList.remove('hidden');
+}
+function gsKills(id) { return (game.career.stats.weapons || {})[id] || 0; }
+function renderGunsmith(hover = null) {
+  const id = gsGun, base = WEAPON_BY_ID[id];
+  const tabs = $('gs-guns');
+  tabs.textContent = '';
+  for (const g of GS_GUNS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'gs-gun' + (g === id ? ' on' : '');
+    const d = WEAPON_BY_ID[g];
+    b.textContent = d.short || d.name;
+    const n = attList(settings.attach[g] | 0, g).length;
+    if (n) { const sm = document.createElement('small'); sm.textContent = '+' + n; b.append(sm); }
+    b.addEventListener('click', () => { gsGun = g; audio.play('ui'); renderGunsmith(); });
+    tabs.append(b);
+  }
+  const kills = gsKills(id);
+  const code = settings.attach[id] | 0;
+  const box = $('gs-slots');
+  box.textContent = '';
+  ATT_SLOTS.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'gs-row';
+    const h = document.createElement('span'); h.className = 'gs-slot'; h.textContent = s.name;
+    row.append(h);
+    const cur = (code >> (i * 2)) & 3;
+    ATTACHMENTS[s.id].forEach((a, k) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      const fit = fits(a, id), open = attUnlocked(a, kills);
+      b.className = 'gs-opt' + (k === cur ? ' on' : '') + (!fit ? ' nofit' : !open ? ' locked' : '');
+      b.textContent = a.name;
+      const sm = document.createElement('small');
+      sm.textContent = !fit ? "doesn't fit" : !open ? `${a.kills} kills` : k === cur && k ? 'fitted' : '';
+      b.append(sm);
+      b.addEventListener('mouseenter', () => renderGsSide(a, i, k));
+      b.addEventListener('mouseleave', () => renderGsSide(null));
+      b.addEventListener('click', () => {
+        if (!fit || !open) { audio.play('ui', null, 0.4); return; }
+        const next = (code & ~(3 << (i * 2))) | (k << (i * 2));
+        if (next) settings.attach[id] = next; else delete settings.attach[id];
+        saveSettings(settings);
+        game.applyOwnSkins();
+        audio.play('ui');
+        renderGunsmith();
+        if (state === 'paused') $('pause-hint').textContent = 'Attachments change on your next spawn.';
+      });
+      row.append(b);
+    });
+    box.append(row);
+  });
+  renderGsSide(hover);
+}
+/** The description and stats panel: the fitted set, or what a hovered option would make it. */
+function renderGsSide(a, slotI = -1, k = 0) {
+  const id = gsGun, base = WEAPON_BY_ID[id];
+  const code = settings.attach[id] | 0;
+  const preview = a && slotI >= 0 ? (code & ~(3 << (slotI * 2))) | (k << (slotI * 2)) : code;
+  const cur = withAttachments(base, code), next = withAttachments(base, preview);
+  $('gs-desc').innerHTML = a ? `<b>${a.name}</b> ${a.desc || 'Nothing in this slot.'}${a.id !== 'none' && !attUnlocked(a, gsKills(id)) ? ` <i>Unlocks at ${a.kills} kills with the ${base.name} (you have ${gsKills(id)}).</i>` : ''}`
+    : `<b>${base.name}</b> ${base.blurb} <i>${gsKills(id)} kills.</i>`;
+  const rows = [
+    ['Damage', (d) => d.damage * d.pellets, (v) => (base.pellets > 1 ? `${base.damage}×${base.pellets}` : Math.round(v)), 1],
+    ['Fire rate', (d) => (d.burst ? (d.burst * 60) / (d.interval + d.burstGap * (d.burst - 1)) : 60 / d.interval), (v) => `${Math.round(v)} rpm`, 1],
+    ['Range', (d) => d.falloffEnd, (v) => `${Math.round(v)} m`, 1],
+    ['Hip spread', (d) => d.spreadMin * 1000, (v) => v.toFixed(1), -1],
+    ['Aimed spread', (d) => d.spreadMin * d.adsSpread * 1000, (v) => v.toFixed(2), -1],
+    ['Recoil', (d) => d.recoil * 1000, (v) => v.toFixed(1), -1],
+    ['Bloom', (d) => d.heatPerShot * 100, (v) => v.toFixed(1), -1],
+    ['Aim speed', (d) => d.adsRate || 14, (v) => `${Math.round(v / 14 * 100)}%`, 1],
+    ['Move speed', (d) => d.speedMult * 100, (v) => `${Math.round(v)}%`, 1],
+    ['Magazine', (d) => d.magSize, (v) => Math.round(v), 1],
+    ['Reload', (d) => d.reload, (v) => `${v.toFixed(2)} s`, -1],
+    ['Noise', (d) => d.noise, (v) => `${Math.round(v)} m`, -1],
+  ];
+  const body = $('gs-stats');
+  body.textContent = '';
+  for (const [label, f, show, good] of rows) {
+    const b0 = f(base), v1 = f(cur), v2 = f(next);
+    const tr = document.createElement('tr');
+    const changed = Math.abs(v2 - b0) > 1e-6, previewing = Math.abs(v2 - v1) > 1e-6;
+    const better = (v2 - b0) * good > 0;
+    tr.className = changed ? (better ? 'up' : 'down') : '';
+    if (previewing) tr.classList.add('pv');
+    tr.innerHTML = `<td class="l">${label}</td><td>${show(b0)}</td><td>${changed ? `${better ? '▲' : '▼'} ${show(v2)}` : ''}</td>`;
+    body.append(tr);
+  }
+}
+$('btn-gunsmith').addEventListener('click', openGunsmith);
+$('btn-gunsmith-pause').addEventListener('click', openGunsmith);
+$('btn-gs-done').addEventListener('click', () => $('gunsmith').classList.add('hidden'));
+$('btn-gs-clear').addEventListener('click', () => { delete settings.attach[gsGun]; saveSettings(settings); game.applyOwnSkins(); audio.play('ui'); renderGunsmith(); });
 
 let careerTab = 'stats';
 for (const t of document.querySelectorAll('.c-tab')) t.addEventListener('click', () => { careerTab = t.dataset.tab; showCareerTab(); audio.play('ui'); });

@@ -19,6 +19,7 @@ import { GRENADE, FLASH, SMOKE, TACTICALS } from './weapons.js';
 import { FLAG_STATE } from './ctf.js';
 import { COMMON_SKINS } from './skins.js';
 import { randomCosmetics } from './cosmetics.js';
+import { randomCode } from './attachments.js';
 
 export const STATE = {
   PATROL: 'patrol',
@@ -120,6 +121,7 @@ export class Bot extends Character {
   spawnAt(x, y, z, yaw) {
     this.primary = Math.random() < 0.7 ? this.pers.favorite : rollPrimary();
     this.secondary = this.pers.revolver ? 'revolver' : 'pistol';
+    this.attach = { [this.primary]: randomCode(this.primary), [this.secondary]: randomCode(this.secondary) };
     this.tacId = TACTICALS[(Math.random() * TACTICALS.length) | 0];
     // some bots run a camo or two
     this.skins = {};

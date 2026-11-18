@@ -16,6 +16,7 @@ import { Bot } from './bot.js';
 import { damageAtDistance, GRENADE, FLASH, KNIFE, makeLoadout, makeSingle } from './weapons.js';
 import { SmokeClouds } from './smoke.js';
 import { Bolts } from './bolts.js';
+import { ATT_SLOTS, ATTACHMENTS, fits, attUnlocked } from './attachments.js';
 import { applyCrosshair } from './settings.js';
 import { Career } from './career.js';
 import { Ctf } from './ctf.js';
@@ -456,7 +457,7 @@ export class Game {
   loadoutFor(c) {
     const r = this.rules;
     if (r.gunGame) return makeSingle(GUN_LADDER[gunLevel(c.kills)]);
-    return r.forcePrimary ? makeLoadout(r.forcePrimary, 'pistol') : makeLoadout(c.primary, c.secondary);
+    return r.forcePrimary ? makeLoadout(r.forcePrimary, 'pistol', c.attach) : makeLoadout(c.primary, c.secondary, c.attach);
   }
 
   /** Out of lives (Last One Standing)? */
@@ -618,8 +619,24 @@ export class Game {
     return out;
   }
 
-  /** Put your skins on your guns (first person and your character). */
+  /** Your attachments: { gunId: code }, only what you've unlocked (see attachments.js). */
+  ownAttach() {
+    const out = {}, picked = this.settings.attach || {};
+    for (const id of SKIN_GUNS) {
+      const code = picked[id] | 0;
+      if (!code) continue;
+      const kills = (this.career.stats.weapons || {})[id] || 0;
+      let ok = 0;
+      ATT_SLOTS.forEach((s, i) => { const k = (code >> (i * 2)) & 3; const a = ATTACHMENTS[s.id][k]; if (k && a && fits(a, id) && attUnlocked(a, kills)) ok |= k << (i * 2); });
+      if (ok) out[id] = ok;
+    }
+    return out;
+  }
+
+  /** Put your skins (and attachments) on your guns (first person and your character). */
   applyOwnSkins() {
+    this.player.attach = this.ownAttach();
+    for (const id of SKIN_GUNS) this.viewmodel.setAttachments(id, this.player.attach[id] || 0);
     this.player.skins = this.ownSkins();
     for (const id of SKIN_GUNS) this.viewmodel.setSkin(id, this.player.skins[id] || 'none');
   }

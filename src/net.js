@@ -514,10 +514,21 @@ export class Net {
     const prim = WEAPONS[d[10] | 0], side = num(d[14]) ? WEAPONS[d[14] | 0] : null;
     const g = this.game;
     const newSide = side && isSecondary(side.id) && side.id !== c.secondary;
-    if ((prim && isPrimary(prim.id) && prim.id !== c.primary) || newSide) {
-      if (prim && isPrimary(prim.id)) c.primary = prim.id;
-      if (newSide) c.secondary = side.id;
-      if (!g.rules.gunGame) c.weapons = g.loadoutFor(c);
+    // their attachments (2 bits a slot; see attachments.js), for the primary and the sidearm
+    const aP = num(d[15]) ? clamp(d[15] | 0, 0, 255) : 0, aS = num(d[16]) ? clamp(d[16] | 0, 0, 255) : 0;
+    const pid = prim && isPrimary(prim.id) ? prim.id : c.primary, sid = newSide ? side.id : c.secondary;
+    const att = c.attach || {};
+    const newAtt = (att[pid] | 0) !== aP || (att[sid] | 0) !== aS;
+    if ((prim && isPrimary(prim.id) && prim.id !== c.primary) || newSide || newAtt) {
+      c.primary = pid;
+      c.secondary = sid;
+      c.attach = { [pid]: aP, [sid]: aS };
+      if (!g.rules.gunGame) {
+        // keep what's in their magazines
+        const old = c.weapons.map((w) => [w.def.id, w.mag, w.reserve]);
+        c.weapons = g.loadoutFor(c);
+        for (const w of c.weapons) { const o = old.find((x) => x[0] === w.def.id); if (o) { w.mag = Math.min(o[1], w.def.magSize); w.reserve = o[2]; } }
+      }
     }
     c.weaponIdx = Math.min(c.weapons.length - 1, (d[6] | 0) === c.weapons[0].def.index ? 0 : 1);
     if (!g.rules.gunGame) c.weapons[0].reserve = clamp(d[7] | 0, 0, c.weapons[0].def.reserveMax);
@@ -570,7 +581,9 @@ export class Net {
   _hostFire(c, m) {
     const g = this.game;
     if (!c.alive || g.over) return;
-    const def = WEAPONS[m.w];
+    // their own gun (with their attachments) if it's one they carry
+    const own = c.weapons.find((w) => w.def.index === m.w);
+    const def = own ? own.def : WEAPONS[m.w];
     if (!def || !Array.isArray(m.m) || !m.m.every(num)) return;
     const now = performance.now() / 1000;
     if (now - c.lastFireT < (def.burst ? def.burstGap : def.interval) * 0.6) return; // faster than the gun can shoot
@@ -625,6 +638,7 @@ export class Net {
       ch.weapons[0].def.index, ch.weapons.length > 1 ? 1 + ch.weapons[1].def.index : 0, Math.round(ch.hillTime || 0), ch.caps || 0,
       skinIndex(ch.skinOf(ch.weapons[0].def.id)), skinIndex(ch.skinOf(ch.weapons.length > 1 ? ch.weapons[1].def.id : 'pistol')),
       ch === g.player ? 0 : ch.isHuman ? (ch.ping ?? -2) : -1, // -2: not measured yet
+      ch.weapons[0].def.att || 0, ch.weapons.length > 1 ? ch.weapons[1].def.att || 0 : 0,
     ]);
     let p = '';
     for (const pk of g.pickups) p += pk.active ? '1' : '0';
@@ -935,7 +949,7 @@ export class Net {
     if (Array.isArray(m.c)) {
       for (const e of m.c) {
         if (!Array.isArray(e) || e.length < 12) continue;
-        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, held, lean, lives, prim, side, hillT, caps, skinP, skinS, ping] = e;
+        const [id, x, y, z, yaw, pitch, fl, hp, ar, k, d, held, lean, lives, prim, side, hillT, caps, skinP, skinS, ping, attP, attS] = e;
         if (id === p.id) {
           p.kills = k; p.deaths = d;
           if (num(caps)) p.caps = caps;
@@ -967,6 +981,8 @@ export class Net {
         if (num(held)) c.netHeld = held | 0;
         if (num(prim)) c.netPrim = prim | 0;
         if (num(side)) c.netSide = side | 0; // 0: no sidearm, else 1 + its weapon index
+        if (num(attP)) c.netAttP = attP & 255;
+        if (num(attS)) c.netAttS = attS & 255;
       }
     }
     if (typeof m.p === 'string') {
@@ -990,7 +1006,8 @@ export class Net {
         p.weapon.def.index, p.weapons[0].reserve === Infinity ? 0 : p.weapons[0].reserve, this.mySeq,
         r2(p.lean), WEAPON_BY_ID[p.primary].index, Math.max(0, TACTICALS.indexOf(p.tacId)),
         skinIndex(p.skinOf(p.weapons[0].def.id)), skinIndex(p.skinOf(p.weapons[p.weapons.length - 1].def.id)),
-        WEAPON_BY_ID[p.secondary] ? WEAPON_BY_ID[p.secondary].index : 0],
+        WEAPON_BY_ID[p.secondary] ? WEAPON_BY_ID[p.secondary].index : 0,
+        p.weapons[0].def.att || 0, p.weapons.length > 1 ? p.weapons[1].def.att || 0 : 0],
     });
   }
 

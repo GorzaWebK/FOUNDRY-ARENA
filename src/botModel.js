@@ -5,6 +5,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { nameTexture, flashTexture } from './textures.js';
 import { worldGun } from './gunModels.js';
 import { itemOf } from './cosmetics.js';
+import { attList } from './attachments.js';
 
 const GUN_SCALE = 0.95;
 const HAND = new THREE.Vector3(0.14, 0.4, -0.38); // right hand, in upper-body space
@@ -217,15 +218,15 @@ export class BotModel {
   melee() { this.meleeT = 0.32; }
 
   /** Show `held` in the hands and `stowed` on the hip or back (`slot`). */
-  setGear(held, stowed, slot, heldSkin = 'none', stowedSkin = 'none') {
-    const key = `${held}|${stowed}|${slot}|${heldSkin}|${stowedSkin}`;
+  setGear(held, stowed, slot, heldSkin = 'none', stowedSkin = 'none', heldAtt = 0, stowedAtt = 0) {
+    const key = `${held}|${stowed}|${slot}|${heldSkin}|${stowedSkin}|${heldAtt}|${stowedAtt}`;
     if (key === this.gearKey) return;
     this.gearKey = key;
     this.heldMount.clear();
     this.hipMount.clear();
     this.backInner.clear();
     if (held) {
-      const g = worldGun(held, heldSkin);
+      const g = worldGun(held, heldSkin, attList(heldAtt | 0, held));
       const pt = g.userData.points;
       g.position.copy(pt.grip).negate(); // grip in the hand
       this.heldMount.add(g);
@@ -237,7 +238,7 @@ export class BotModel {
     }
     this.holster.visible = !!stowed && slot === 'hip';
     if (stowed) {
-      const g = worldGun(stowed, stowedSkin);
+      const g = worldGun(stowed, stowedSkin, attList(stowedAtt | 0, stowed));
       const pt = g.userData.points;
       if (slot === 'hip') {
         g.position.set(0, 0.02, 0);
@@ -279,7 +280,7 @@ export class BotModel {
     }
     g.position.set(s.x, s.y, s.z);
     g.rotation.y = s.yaw;
-    if (s.gear) this.setGear(s.gear[0], s.gear[1], s.gear[2], s.gear[3], s.gear[4]);
+    if (s.gear) this.setGear(s.gear[0], s.gear[1], s.gear[2], s.gear[3], s.gear[4], s.gear[5], s.gear[6]);
 
     this.crouchT += ((s.crouch ? 1 : 0) - this.crouchT) * Math.min(1, dt * 10);
     const cr = this.crouchT;

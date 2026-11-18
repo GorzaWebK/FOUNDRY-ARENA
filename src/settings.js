@@ -20,6 +20,7 @@ export const DEFAULTS = {
   name: '', // multiplayer display name
   primary: DEFAULT_PRIMARY, // loadout
   secondary: DEFAULT_SECONDARY, // 'pistol' | 'revolver'
+  attach: {}, // gun id -> attachment code (attachments.js)
   tactical: DEFAULT_TACTICAL, // 'flash' | 'smoke'
   map: DEFAULT_MAP,
   mode: DEFAULT_MODE,
@@ -66,6 +67,11 @@ export function loadSettings() {
     const out = {};
     if (s.skins && typeof s.skins === 'object') for (const [k, v] of Object.entries(s.skins)) if (typeof v === 'string' && v.length < 20 && k.length < 20) out[k] = v;
     s.skins = out;
+  }
+  {
+    const out = {};
+    if (s.attach && typeof s.attach === 'object') for (const [k, v] of Object.entries(s.attach)) if (typeof v === 'number' && v > 0 && v < 256 && k.length < 20) out[k] = v | 0;
+    s.attach = out;
   }
   {
     const r = s.rules && typeof s.rules === 'object' ? s.rules : {};

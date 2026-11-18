@@ -50,8 +50,9 @@ export class NetChar extends Character {
     const skinP = (SKINS[this.netSkinP] || SKINS[0]).id, skinS = (SKINS[this.netSkinS] || SKINS[0]).id;
     const side = this.netSide ? (WEAPONS[this.netSide - 1] || WEAPONS[0]).id : null;
     const sk = (id) => (id === side && prim !== side ? skinS : skinP);
-    if (!side) return [held, null, null, sk(held), 'none'];
-    return held === side && prim !== side ? [held, prim, 'back', skinS, skinP] : [held, side, 'hip', sk(held), skinS];
+    const aP = this.netAttP | 0, aS = this.netAttS | 0, at = (id) => (id === side && prim !== side ? aS : aP);
+    if (!side) return [held, null, null, sk(held), 'none', at(held), 0];
+    return held === side && prim !== side ? [held, prim, 'back', skinS, skinP, aS, aP] : [held, side, 'hip', sk(held), skinS, at(held), aS];
   }
 
   /** Host: (re)spawn this remote player. */

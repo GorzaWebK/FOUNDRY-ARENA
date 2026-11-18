@@ -7,7 +7,8 @@
 import * as THREE from 'three';
 import { flashTexture, glowTexture } from './textures.js';
 import { SWITCH_TIME } from './weapons.js';
-import { buildGun, makeMaterials, PALETTE } from './gunModels.js';
+import { buildGun, makeMaterials, PALETTE, attachmentModel, setMagSize } from './gunModels.js';
+import { ATT_SLOTS, ATTACHMENTS, fits } from './attachments.js';
 import { SKINNED, SKIN_BY_ID, camoTexture } from './skins.js';
 
 const GLOVE = 0x3a3f47, SLEEVE = 0x34475c;
@@ -144,6 +145,17 @@ export class ViewModel {
         spec.handShell.visible = false;
         spec.armL.add(spec.handShell);
       }
+      // every attachment that fits, built once and shown as picked (see setAttachments)
+      spec.attMeshes = {};
+      for (const s of ATT_SLOTS) for (const a of ATTACHMENTS[s.id]) {
+        if (a.id === 'none' || !fits(a, id)) continue;
+        const am = attachmentModel(spec, id, mats, a.id);
+        if (!am) continue;
+        am.visible = false;
+        if (am.userData.inMag && spec.parts.mag) spec.parts.mag.add(am); else spec.group.add(am);
+        spec.attMeshes[a.id] = am;
+      }
+      spec.attCode = 0;
       spec.group.visible = false;
       this.root.add(spec.group);
       this.models[id] = spec;
@@ -225,7 +237,7 @@ export class ViewModel {
     this.flashMax = v ? v.flashT : 0.05;
     this.flashT = this.flashMax;
     this.flash.rotation.z = Math.random() * Math.PI * 2;
-    this.flash.scale.setScalar((v ? v.flash : 1) * (0.8 + Math.random() * 0.45));
+    this.flash.scale.setScalar((v ? v.flash : 1) * (def.suppressed ? 0.28 : 1) * (0.8 + Math.random() * 0.45));
     this.cycleT = 0;
     this.sinceShot = 0;
     this.inspectT = 0;
@@ -263,6 +275,19 @@ export class ViewModel {
   }
 
   /** Paint a gun in a skin ('none' = factory finish). */
+  /** Show a gun's attachments (code: see attachments.js). */
+  setAttachments(id, code) {
+    const m = this.models[id];
+    if (!m || m.attCode === code) return;
+    m.attCode = code;
+    const on = new Set();
+    ATT_SLOTS.forEach((s, i) => { const a = ATTACHMENTS[s.id][(code >> (i * 2)) & 3]; if (a && a.id !== 'none' && fits(a, id)) on.add(a.id); });
+    for (const [aid, mesh] of Object.entries(m.attMeshes)) mesh.visible = on.has(aid);
+    setMagSize(m, on.has('ext'));
+    // the flash comes out of the end of a suppressor
+    m.muzzleOff = on.has('supp') ? (['pistol', 'revolver'].includes(id) ? 0.12 : 0.17) : 0;
+  }
+
   setSkin(id, skin) {
     const m = this.models[id];
     if (!m || m.skin === skin) return;
@@ -526,7 +551,7 @@ export class ViewModel {
       this.flashT -= dt;
       this.flash.visible = true;
       this.flash.position.copy(pts.muzzle);
-      this.flash.position.z -= 0.06;
+      this.flash.position.z -= 0.06 + (m.muzzleOff || 0);
       m.group.localToWorld(_w.copy(pts.muzzle));
       this.flashLight.position.copy(_w);
       this.flashLight.intensity = 5 * Math.max(0, this.flashT / this.flashMax);

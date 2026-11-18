@@ -451,22 +451,97 @@ export function buildGun(id, mats) {
   return BUILDERS[id](mats);
 }
 
+// ------------------------------------------------------------------ attachments (see attachments.js)
+
+const SIDEARM_IDS = ['pistol', 'revolver'];
+const _bb = new THREE.Box3();
+
+/**
+ * The model of attachment `attId` for a built gun `spec` (a group placed in the
+ * gun's own space), or null if it has no model. 'ext' (extended mag) has no mesh
+ * of its own: it lengthens the magazine (see setMagSize).
+ */
+export function attachmentModel(spec, id, mats, attId) {
+  const k = kit(mats), g = new THREE.Group();
+  const P = spec.points, side = SIDEARM_IDS.includes(id);
+  if (attId === 'supp') {
+    const r = side ? 0.015 : 0.021, len = side ? 0.12 : 0.17;
+    k.cyl(g, r, len, 'polymer', 0, P.muzzle.y, P.muzzle.z - len / 2 + 0.005, 12);
+    k.cyl(g, r + 0.002, 0.012, 'metal', 0, P.muzzle.y, P.muzzle.z - 0.006, 12);
+    k.cyl(g, r + 0.002, 0.01, 'metal', 0, P.muzzle.y, P.muzzle.z - len + 0.01, 12);
+  } else if (attId === 'comp') {
+    const w = side ? 0.024 : 0.032;
+    k.box(g, w, w, 0.055, 'metal', 0, P.muzzle.y, P.muzzle.z - 0.025);
+    for (let i = 0; i < 3; i++) k.box(g, w + 0.004, 0.006, 0.008, 'polymer', 0, P.muzzle.y + w / 2 - 0.002, P.muzzle.z - 0.01 - i * 0.015);
+  } else if (attId === 'grip') {
+    k.box(g, 0.028, 0.075, 0.032, 'polymer', P.fore.x, P.fore.y - 0.035, P.fore.z, 0.12);
+    k.box(g, 0.03, 0.012, 0.036, 'polymerLight', P.fore.x, P.fore.y - 0.074, P.fore.z + 0.005, 0.12);
+  } else if (attId === 'laser') {
+    // a small box under the barrel with a red lens
+    const x = side ? 0 : 0.034, y = side ? P.muzzle.y - 0.036 : P.fore.y + 0.03, z = side ? P.muzzle.z + 0.05 : P.fore.z - 0.06;
+    k.box(g, 0.02, 0.022, 0.05, 'polymer', x, y, z);
+    k.box(g, 0.01, 0.01, 0.004, 'red', x, y, z - 0.027);
+  } else if (attId === 'fast') {
+    // a pull tab under the magazine
+    const m = spec.parts.mag;
+    if (!m) return null;
+    spec.group.updateMatrixWorld(true);
+    _bb.setFromObject(m);
+    const inv = m.matrixWorld.clone().invert();
+    const bottom = new THREE.Vector3(( _bb.min.x + _bb.max.x) / 2, _bb.min.y, (_bb.min.z + _bb.max.z) / 2).applyMatrix4(inv);
+    k.box(g, 0.012, 0.02, 0.03, 'orange', bottom.x, bottom.y - 0.008, bottom.z);
+    g.userData.inMag = true;
+  } else if (attId === 'light' || attId === 'heavy') {
+    spec.group.updateMatrixWorld(true);
+    _bb.setFromObject(spec.group);
+    const back = _bb.max.z;
+    if (attId === 'heavy') {
+      k.box(g, 0.05, 0.1, 0.03, 'polymer', 0, P.grip.y + 0.07, back + 0.012); // thick recoil pad
+      k.box(g, 0.046, 0.03, 0.08, 'polymerLight', 0, P.grip.y + 0.13, back - 0.05); // cheek rest
+    } else {
+      k.box(g, 0.05, 0.012, 0.09, 'cyan', 0, P.grip.y + 0.15, back - 0.06); // lightened stock: a cut-out strip
+    }
+  } else return null;
+  return g;
+}
+
+/** Put the attachment models in `code` on a built gun (the world copies use this). */
+export function fitAttachments(spec, id, mats, list) {
+  for (const a of list) {
+    if (a.id === 'ext') { setMagSize(spec, true); continue; }
+    const m = attachmentModel(spec, id, mats, a.id);
+    if (!m) continue;
+    if (m.userData.inMag && spec.parts.mag) spec.parts.mag.add(m); else spec.group.add(m);
+  }
+}
+
+/** Extended mag: a longer magazine. */
+export function setMagSize(spec, ext) {
+  const m = spec.parts && spec.parts.mag;
+  if (!m || spec.id === 'crossbow' || spec.id === 'revolver') return;
+  m.scale.y = ext ? 1.4 : 1;
+}
+
 // ------------------------------------------------------------------ world (third-person) guns
 
 const WORLD_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.25 });
 const worldCache = new Map();
 const _c = new THREE.Color();
 
-/** Merge a gun into one vertex-coloured geometry (built once per gun and skin). */
-function worldSpec(id, skin = 'none') {
-  const cacheKey = `${id}|${skin}`;
+/** Merge a gun into one vertex-coloured geometry (built once per gun, skin and attachment set). */
+function worldSpec(id, skin = 'none', att = []) {
+  const cacheKey = `${id}|${skin}|${att.map((a) => a.id).join(',')}`;
   if (worldCache.has(cacheKey)) return worldCache.get(cacheKey);
   // record each part's colour through a throwaway material set (skins repaint the body parts)
   const mats = {};
   for (const [key, [color]] of Object.entries(PALETTE)) mats[key] = { color: new THREE.Color(skinColor(skin, key) || color) };
   LOW = true;
   let spec;
-  try { spec = BUILDERS[id](mats); } finally { LOW = false; }
+  try {
+    spec = BUILDERS[id](mats);
+    spec.id = id;
+    if (att.length) fitAttachments(spec, id, mats, att);
+  } finally { LOW = false; }
   spec.group.updateMatrixWorld(true);
   const geos = [];
   spec.group.traverse((o) => {
@@ -487,9 +562,9 @@ function worldSpec(id, skin = 'none') {
   return out;
 }
 
-/** A single-mesh copy of a gun (in a skin) for a character to hold or carry. */
-export function worldGun(id, skin = 'none') {
-  const spec = worldSpec(id, skin);
+/** A single-mesh copy of a gun (in a skin, with attachments) for a character to hold or carry. */
+export function worldGun(id, skin = 'none', att = []) {
+  const spec = worldSpec(id, skin, att);
   const mesh = new THREE.Mesh(spec.geometry, WORLD_MAT);
   mesh.castShadow = true;
   mesh.userData.points = spec.points;

@@ -116,7 +116,7 @@
             </label>
           </section>
           <section class="card">
-            <h4 class="h-with-btn">Loadout <button id="btn-skins" class="link-btn">Weapon skins…</button></h4>
+            <h4 class="h-with-btn">Loadout <button id="btn-gunsmith" class="link-btn">Gunsmith…</button><button id="btn-skins" class="link-btn">Skins…</button></h4>
             <div id="menu-loadout" class="loadout compact"></div>
             <p id="loadout-blurb" class="note loadout-blurb"></p>
             <div id="menu-kit" class="loadout compact kit"></div>
@@ -200,7 +200,7 @@
           <label class="row"><span>Map</span><select id="pause-map"></select><output></output></label>
           <p class="note">Takes effect on <b>Restart match</b>.</p>
         </div>
-        <h4 class="h-with-btn">Loadout <small>next spawn</small> <button id="btn-skins-pause" class="link-btn">Weapon skins…</button></h4>
+        <h4 class="h-with-btn">Loadout <small>next spawn</small> <button id="btn-gunsmith-pause" class="link-btn">Gunsmith…</button><button id="btn-skins-pause" class="link-btn">Skins…</button></h4>
         <div id="pause-loadout" class="loadout compact"></div>
         <div id="pause-tac" class="loadout compact kit"></div>
         <p id="loadout-note" class="note"></p>
@@ -273,6 +273,23 @@
           <button id="btn-rules-reset">Standard rules</button>
           <button id="btn-rules-done" class="primary">DONE</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ============================== GUNSMITH ============================== -->
+    <div id="gunsmith" class="overlay hidden">
+      <div class="panel">
+        <h2>GUNSMITH</h2>
+        <div id="gs-guns" class="gs-guns"></div>
+        <div class="gs-body">
+          <div id="gs-slots" class="gs-slots"></div>
+          <div class="gs-side">
+            <p id="gs-desc" class="note gs-desc"></p>
+            <table class="gs-stats"><tbody id="gs-stats"></tbody></table>
+          </div>
+        </div>
+        <p class="note">Attachments unlock with kills using that gun (Career shows your kills per gun) and apply on your next spawn. Others see them on your gun.</p>
+        <div class="btn-row"><button id="btn-gs-clear">Strip this gun</button><button id="btn-gs-done" class="primary">DONE</button></div>
       </div>
     </div>
 

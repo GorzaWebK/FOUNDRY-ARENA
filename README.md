@@ -387,6 +387,28 @@ the hip, or the sidearm out with the primary slung across their back.
 tactical (flashbang or smoke) on the main menu, or from the pause menu for your
 next spawn. Snipers Only always gives the pistol.
 
+### Gunsmith (attachments)
+
+**Gunsmith…** (Loadout card, or the pause menu) fits attachments to any gun:
+four slots, each empty or holding one of two pieces, unlocked by kills with that
+gun:
+
+| Slot        | Option        | Kills | Effect |
+| ----------- | ------------- | ----- | ------ |
+| Muzzle      | Suppressor    | 10    | others hear your shots from about a third as far, small flash; damage falls off sooner |
+|             | Compensator   | 30    | 30% less recoil and kick |
+| Underbarrel | Foregrip      | 20    | less bloom from sustained fire and moving (not on sidearms) |
+|             | Laser         | 45    | tighter hip-fire cone |
+| Magazine    | Extended mag  | 25    | 50% more rounds, 12% slower reload |
+|             | Fast mag      | 60    | 25% faster reload |
+| Stock       | Light stock   | 35    | 40% faster aiming, a little faster on your feet (not on sidearms) |
+|             | Heavy stock   | 80    | less recoil and a tighter aimed cone, a little slower (not on sidearms) |
+
+The panel compares the gun's numbers with and without your set as you hover
+over options. Attachments show on the gun in first person and on your character
+(others see them in multiplayer), apply from your next spawn, and bots run random
+sets. A suppressor doesn't fit the shotgun or crossbow.
+
 Every gun but the crossbow is hitscan, and reloads by themselves when the magazine runs dry. Headshots deal 2×. Damage falls off with distance. Moving,
 jumping and holding the trigger widen the cone; crouching and aiming tighten it.
 
@@ -630,6 +652,8 @@ src/killcam.js        rolling recording + kill cam replay
 src/ctf.js            Capture the Flag: flags, rules, flag models
 src/objectives.js     Domination, Search & Destroy and Infected: rules, zones, bomb, HUD
 src/medals.js         medal and achievement definitions
+src/attachments.js    Gunsmith attachments: slots, unlocks, stat changes
+src/bolts.js          crossbow bolts (projectiles)
 src/career.js         career stats (local, part of the account)
 src/skins.js          weapon camos: patterns, unlocks, colours
 src/progress.js       XP, levels, prestige, equipped cosmetics
