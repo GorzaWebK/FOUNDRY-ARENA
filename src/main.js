@@ -251,9 +251,9 @@ function setMpStatus(text, isError = false) {
 }
 
 function setMpBusy(busy) {
-  for (const id of ['btn-host', 'btn-join', 'btn-play']) $(id).disabled = busy;
+  for (const id of ['btn-host', 'btn-join', 'btn-play', 'btn-quick']) $(id).disabled = busy;
   // a party member goes where their leader goes
-  if (!busy && party.active && !party.leader) $('btn-host').disabled = $('btn-join').disabled = true;
+  if (!busy && party.active && !party.leader) $('btn-host').disabled = $('btn-join').disabled = $('btn-quick').disabled = true;
 }
 
 function inviteLink() {
@@ -367,14 +367,15 @@ async function startMatch() {
   if (!ok && state === 'playing') hud.setLockHint(true);
 }
 
-async function hostGame() {
+/** Host a room. `opts.quick`: Quick Play's open public room (no password). */
+async function hostGame(opts = {}) {
   cancelRejoin();
   audio.resume();
   setMpBusy(true);
   setMpStatus('Creating a room…');
   try {
-    hostPublic = $('mp-public').checked;
-    await net.host(settings.name, $('mp-pass').value.trim());
+    hostPublic = opts.quick ? true : $('mp-public').checked;
+    await net.host(settings.name, opts.quick ? '' : $('mp-pass').value.trim());
   } catch (e) {
     setMpStatus(e.message, true);
     return;
@@ -645,6 +646,44 @@ function renderRooms() {
   }
   $('rooms-msg').textContent = follower ? "You're in a party: your leader picks the room." : '';
   $('btn-rooms-host').disabled = follower || net.active;
+}
+
+/**
+ * Quick Play: into the fullest open public room (same version, not full, no
+ * password), or, if there isn't one, host an open public room for others to find.
+ */
+async function quickPlay() {
+  if (net.active || (party.active && !party.leader)) return;
+  cancelRejoin();
+  audio.resume();
+  setMpBusy(true);
+  setMpStatus('Finding a match…');
+  lobby.connect();
+  lobby.refresh();
+  // give the lobby a moment if we've only just opened the page
+  for (let i = 0; i < 25 && !lobby.online; i++) await new Promise((r) => setTimeout(r, 200));
+  if (lobby.online) await new Promise((r) => setTimeout(r, 600)); // a fresh room list
+  const open = lobby.joinable().filter((r) => !r.locked && r.n < r.max).sort((a, b) => b.n - a.n);
+  setMpBusy(false);
+  for (const r of open.slice(0, 3)) {
+    setMpStatus(`Joining ${r.host}'s room (${r.mode}, ${r.map})…`);
+    codeInput.value = r.code;
+    hud.chatClear();
+    try {
+      setMpBusy(true);
+      await net.join(r.code, settings.name, '');
+    } catch (e) {
+      continue; // full or gone since the list was made: try the next one
+    } finally {
+      setMpBusy(false);
+    }
+    party.enteredRoom(r.code, '');
+    await enterRoom();
+    return;
+  }
+  setMpStatus(lobby.online ? 'No open rooms right now. Hosting a public one for others to find…' : "Couldn't reach the lobby. Hosting a public room…");
+  await hostGame({ quick: true });
+  if (net.role === 'host') hud.centerMessage('PUBLIC ROOM', 'Others can find it with Quick play or Browse rooms', 5, '#4fc3f7');
 }
 
 function openRooms() { lobby.refresh(); renderRooms(); $('rooms-ov').classList.remove('hidden'); }
@@ -1270,7 +1309,8 @@ renderKeysList();
 hud.setBindHints(label);
 
 $('btn-play').addEventListener('click', startMatch);
-$('btn-host').addEventListener('click', hostGame);
+$('btn-host').addEventListener('click', () => hostGame());
+$('btn-quick').addEventListener('click', quickPlay);
 $('btn-join').addEventListener('click', joinGame);
 $('btn-again').addEventListener('click', startNext);
 $('btn-resume').addEventListener('click', resume);
