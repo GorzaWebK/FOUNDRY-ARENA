@@ -670,6 +670,8 @@ export class Game {
   endMatch() {
     if (this.over) return;
     this.over = true;
+    // ranked host: an id for this match's record (see lobby-cloud.js recordRankedMatch)
+    this.rankedMid = this.rules.ranked && this.mode === 'host' ? Array.from({ length: 12 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'[(Math.random() * 57) | 0]).join('') : null;
     const rank = this.ranking();
     this.winner = rank[0];
     this.awards = this.computeAwards();

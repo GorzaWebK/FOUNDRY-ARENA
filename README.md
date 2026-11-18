@@ -327,6 +327,11 @@ you were there for most of it.
   online service and its rules check every change (at most one result every 3
   minutes, at most 45 SR at a time, no skipping matches, no deleting your
   rating to dodge a bad season).
+- **Match verification:** at the end of a ranked match the host writes a record
+  of it (who was on which team, who won) to the online service, once. Every
+  player's rating change has to point at that record, be from someone in it,
+  agree with it about whether they won (a win can't lose SR, a loss can't gain
+  it), count each match only once, and come within 15 minutes of it.
 
 ### Leaderboard
 
@@ -548,17 +553,28 @@ connect to them directly.
    leaves too. Members' Host and Join buttons are off while they're in a party;
    if they're busy in a solo match, they follow as soon as they leave it. A
    reload keeps you in your party (that tab remembers it).
-6. Press `Enter` to chat.
+6. Press `Enter` to chat. **Settings → Filter bad language in chat** (on by
+   default) masks the worst words on your screen, spelling tricks included. The
+   pause menu lists the other players in the room: **Mute** hides someone's chat
+   (remembered by name), **Report** sends their name, a reason and their last few
+   chat lines to the online service for a person to look at, and the host can
+   **Kick** a player, who then can't rejoin that room. The host also holds chat to
+   five lines in eight seconds per player, and disconnects anyone flooding it
+   with messages.
 7. The host can switch bots on or off mid-match from the pause menu, pick the
    next match's mode and map there, and restart or start the next match from the
-   end screen. Closing the room (or the
-   host's tab) ends the session for everyone.
+   end screen.
+   **Host migration:** if the host leaves, or their connection or tab drops, the
+   match carries on. The host keeps everyone told who's next in line; the next
+   player re-hosts the same match (map, mode, rules, clock, team score and
+   everyone's kills and deaths) under a new room code everyone works out for
+   themselves, and the rest reconnect to it within a few seconds. Bots and
+   objectives (flags, zones, the bomb) restart where they spawn.
 8. **Dropped?** If your connection drops (or you reload the tab by accident), the
    game tries to get you back into the room by itself. The host keeps your kills,
    deaths, team, lives and award stats for 3 minutes, matched by your player ID,
    and gives them back when you rejoin. Leaving with **Leave game** gives your
-   place up, and when the host closes the room everyone is told rather than
-   left retrying.
+   place up.
 9. Everyone has to be on the same version of the game. It's shown in the
    main menu's bottom right corner. If someone has an old tab open, joining tells them who
    needs to refresh (`Ctrl+Shift+R`) instead of letting them in.
@@ -605,6 +621,10 @@ Firebase project and both move to Firebase instead:
   server watching the matches, a cheat could still invent plausible matches
   inside those limits; it can't post absurd numbers or touch anyone else's row.)
 - **Public rooms** vanish the instant the host's tab closes.
+- **Ranked match records** (`rankedMatches`) are written once by the host at the
+  end of a ranked match and checked against every rating change (see Ranked).
+- **Reports** (`reports`) from the pause menu's player list are write-only: read
+  them in the Firebase console under **Realtime Database → Data → reports**.
 - Players sign in anonymously in the background: no accounts, nothing to type.
 - If Firebase can't be reached, the game falls back to the peer-to-peer lobby.
 

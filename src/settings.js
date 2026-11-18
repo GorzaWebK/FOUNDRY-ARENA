@@ -34,6 +34,8 @@ export const DEFAULTS = {
   softFlash: false, // flashbangs fade in to grey instead of a sudden white flash, with a quieter ring
   tutorialDone: false, // finished (or declined) the first-time tutorial
   killcam: true,
+  chatFilter: true, // mask bad language in chat (chatfilter.js)
+  muted: [], // names whose chat you don't see
   leanToggle: true, // tap Q / E to lean instead of holding
   rules: { limits: {}, time: 0, ff: false, pickups: true, hardcore: false }, // custom match rules (limits per mode)
   skins: {}, // weapon id -> skin id (only used once unlocked)
@@ -66,6 +68,8 @@ export function loadSettings() {
   s.renderScale = typeof s.renderScale === 'number' && s.renderScale >= 0.5 && s.renderScale <= 1 ? s.renderScale : 1;
   if (![0, 30, 60, 120, 144].includes(s.fpsCap)) s.fpsCap = 0;
   s.dynRes = !!s.dynRes; s.reduceMotion = !!s.reduceMotion;
+  s.chatFilter = s.chatFilter !== false;
+  s.muted = Array.isArray(s.muted) ? s.muted.filter((n) => typeof n === 'string' && n.length <= 16).slice(0, 100) : [];
   if (!isPrimary(s.primary)) s.primary = DEFAULT_PRIMARY;
   if (!isSecondary(s.secondary)) s.secondary = DEFAULT_SECONDARY;
   if (!isTactical(s.tactical)) s.tactical = DEFAULT_TACTICAL;
@@ -139,6 +143,7 @@ export function buildSettingsUI(container, settings, onChange) {
     { key: 'fpsCap', label: 'Frame rate cap', options: [[0, 'None'], [144, '144'], [120, '120'], [60, '60'], [30, '30']] },
     { key: 'reduceMotion', label: 'Reduce camera motion', check: true },
     { key: 'killcam', label: 'Kill cam', check: true },
+    { key: 'chatFilter', label: 'Filter bad language in chat', check: true },
     { key: 'teamPalette', label: 'Team colours', options: [['standard', 'Standard: blue / red'], ['deutan', 'Red-green colour-blind: blue / orange'], ['tritan', 'Blue-yellow colour-blind: cyan / pink'], ['contrast', 'High contrast: blue / yellow']] },
     { key: 'softFlash', label: 'Gentler flashbangs', check: true },
     { key: 'leanToggle', label: 'Toggle lean', check: true },

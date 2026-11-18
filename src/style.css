@@ -958,3 +958,12 @@ body.soft-flash #flashbang { background: #8b9096; transition: opacity 0.35s ease
 .sp-cell .sw { display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; text-shadow: 0 1px 2px #000; overflow: hidden; }
 .sp-cell .sw.pic { height: 48px; background: radial-gradient(ellipse at 50% 60%, #2a3038, #15181c 75%); }
 .sp-cell .sw.pic img { max-height: 100%; max-width: 100%; }
+
+/* pause menu: players in the room (mute / report / kick) */
+.room-players h4 { margin: 10px 0 4px; }
+.rp-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); }
+.rp-row b { flex: 1; font-family: var(--cond); font-size: 15px; }
+.rp-row small { font: 600 11px var(--mono); color: var(--dim); min-width: 46px; }
+.rp-row .small-btn { padding: 4px 9px; font-size: 12px; }
+.rp-row select { font-size: 13px; padding: 3px 6px; }
+.small-btn.danger { color: #ff7a6a; border-color: rgba(255, 90, 80, 0.4); }

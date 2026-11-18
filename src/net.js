@@ -29,6 +29,7 @@ import { getMode, makeRules, TEAM_COLORS } from './modes.js';
 import { tracerColor } from './game.js';
 import { NetChar } from './netChar.js';
 import { getTransport, makeRoomCode, cleanRoomCode } from './transport.js';
+import { gunLevel } from './modes.js';
 import { BUILD, BUILD_TIME, OLD_CLIENT_MSG, OLD_HOST_MSG } from './version.js';
 import { getAccount, isPlayerId } from './account.js';
 import { SKINS, skinIndex } from './skins.js';
@@ -89,9 +90,10 @@ export class Net {
   // ======================================================================
 
   /** Open a room. `password`: optional; joiners must give the same one. */
-  async host(name, password = '') {
+  async host(name, password = '', code = null) {
     this.password = String(password || '').slice(0, 32);
-    const room = await getTransport().host(makeRoomCode());
+    // (a migrated room has a fixed code everyone else is looking for)
+    const room = code ? await getTransport().host(code, () => code, 3) : await getTransport().host(makeRoomCode());
     const g = this.game;
     this.role = 'host';
     this.room = room;
@@ -119,6 +121,13 @@ export class Net {
           conn.onClose = null;
           conn.close();
           reject(new Error(this.lastPw ? 'Wrong password for that room.' : 'That room is private. Enter its password and join again.'));
+          return;
+        }
+        if (m.t === 'banned') {
+          clearTimeout(timer);
+          conn.onClose = null;
+          conn.close();
+          reject(new Error('The host removed you from that room.'));
           return;
         }
         if (m.t === 'full') {
@@ -157,7 +166,8 @@ export class Net {
         this._begin(m);
         resolve();
       };
-      conn.send({ t: 'hello', name: cleanName(name), v: this.version, vt: this.versionTime, pid: this.pid, cos: this._myCos(), tp: this.game.player.teamPref, pw: this.lastPw || undefined, pty: this.game.player.party || undefined, sr: num(this.game.player.sr) ? this.game.player.sr : undefined });
+      const uid = this.hooks.uid ? this.hooks.uid() : null;
+      conn.send({ t: 'hello', uid: uid || undefined, name: cleanName(name), v: this.version, vt: this.versionTime, pid: this.pid, cos: this._myCos(), tp: this.game.player.teamPref, pw: this.lastPw || undefined, pty: this.game.player.party || undefined, sr: num(this.game.player.sr) ? this.game.player.sr : undefined });
     });
   }
 
@@ -188,6 +198,7 @@ export class Net {
 
   _reset() {
     const g = this.game;
+    this.banned = null;
     this.role = null;
     this.room = null;
     this.conn = null;
@@ -202,10 +213,41 @@ export class Net {
   _lost(reason = 'Lost connection to the host.', retry = true) {
     if (!this.role) return;
     const code = this.code;
+    const succ = this.succ;
     if (this.conn) { this.conn.onClose = null; this.conn.close(); }
     this._reset();
     this.lastCode = code;
+    // Host migration: other players were in the room too, and we know the line of
+    // succession: carry on with one of us hosting (see main.js migrate()).
+    if (succ && succ.code === code && succ.o.includes(this.pid) && this.hooks.onMigrate) {
+      this.succ = null;
+      this.hooks.onMigrate({ ...succ, reason });
+      return;
+    }
     this.hooks.onLeft(reason, retry ? code : '');
+  }
+
+  /**
+   * Host: who takes over if we go, and what they need to carry the match on.
+   * Sent every few seconds and whenever the roster changes. `o` is the line of
+   * succession (players' ids, oldest connection first).
+   */
+  _sendSucc() {
+    const g = this.game;
+    if (g.attract) return;
+    const humans = g.remotes.filter((r) => r.conn && r.pid);
+    if (!humans.length) return;
+    const row = (c) => [c.kills | 0, c.deaths | 0, c.caps | 0, c.team, c.lives | 0, Math.round(c.hillTime || 0), c.name];
+    const p = { [this.pid]: row(g.player) };
+    for (const h of humans) p[h.pid] = row(h);
+    for (const [pid, s] of this.parked) if (!p[pid]) p[pid] = [s.kills, s.deaths, s.caps, s.team, s.lives, Math.round(s.hillTime || 0), s.name];
+    this.broadcast({
+      t: 'succ', o: humans.map((h) => h.pid),
+      st: {
+        map: g.map.id, mode: g.rules.id, cr: g.rules.custom, rk: g.rules.ranked ? 1 : 0, mt: r2(g.matchTime), ts: g.teamScore,
+        bots: g.botsOn ? 1 : 0, bc: g.botCount, df: g.difficulty, pub: this.hooks.isPublic && this.hooks.isPublic() ? 1 : 0, host: g.player.name, p,
+      },
+    });
   }
 
   /** Call once per frame after game.update(). */
@@ -217,6 +259,11 @@ export class Net {
     } else if (this.acc >= SEND_INTERVAL) {
       this.acc = 0;
       this._sendState();
+    }
+    // host: the line of succession, every few seconds
+    if (this.role === 'host') {
+      this.succT = (this.succT || 0) + dt;
+      if (this.succT >= 3) { this.succT = 0; this._sendSucc(); }
     }
     // host: time a round trip to every player every couple of seconds
     if (this.role === 'host') {
@@ -291,6 +338,12 @@ export class Net {
     // the same player connecting again replaces their old self: same connection, or the
     // same player ID on a connection that has gone quiet (a dropped player coming back)
     const pid = isPlayerId(m.pid) && m.pid !== this.pid ? m.pid : null;
+    // removed by the host earlier: not back in
+    if (pid && this.banned && this.banned.has(pid)) {
+      conn.send({ t: 'banned' });
+      setTimeout(() => conn.close(), 300);
+      return null;
+    }
     for (const r of [...g.remotes]) {
       if (!r.conn) continue;
       const stale = pid && r.pid === pid && now - r.lastSeen > 1500;
@@ -318,9 +371,10 @@ export class Net {
       if (!names.has(saved.name.toLowerCase())) name = saved.name;
     }
 
-    const c = new NetChar(g, this.nextId++, name, saved && !used.has(saved.color) ? saved.color : color, false);
+    const c = new NetChar(g, this.nextId++, name, saved && saved.color != null && !used.has(saved.color) ? saved.color : color, false);
     c.conn = conn;
     c.pid = pid;
+    c.uid = typeof m.uid === 'string' && /^[A-Za-z0-9]{1,128}$/.test(m.uid) ? m.uid : null; // online-service id (ranked records)
     c.teamPref = m.tp === 0 || m.tp === 1 ? m.tp : -1;
     c.party = typeof m.pty === 'string' && m.pty ? m.pty.slice(0, 8) : null; // a party always plays together
     c.sr = num(m.sr) ? clamp(Math.round(m.sr), 0, 4000) : -1; // ranked rating (for everyone's SR maths)
@@ -332,7 +386,7 @@ export class Net {
     g.resetScore(c);
     if (saved) {
       c.kills = saved.kills; c.deaths = saved.deaths; c.lives = saved.lives;
-      c.hillTime = saved.hillTime; c.st = saved.st; c.caps = saved.caps || 0;
+      c.hillTime = saved.hillTime; if (saved.st) c.st = saved.st; c.caps = saved.caps || 0;
       c.gunLevel = saved.gunLevel;
       if (g.rules.teams && (saved.team === 0 || saved.team === 1)) { c.team = saved.team; g.paint(c); } else g.joinTeam(c);
     } else {
@@ -350,6 +404,7 @@ export class Net {
     if (saved) this.system(`${name} rejoined with their score`);
     else this.system(spectate ? `${name} joined. They play from the next round.` : `${name} joined`);
     this.hooks.onRoster();
+    this.succT = 2.5; // tell everyone the new line of succession soon
     return c;
   }
 
@@ -402,6 +457,11 @@ export class Net {
   _hostMsg(c, m) {
     const g0 = this.game;
     c.lastSeen = performance.now();
+    // flood guard: a normal client sends ~40 messages a second; far more than that
+    // for several seconds running is someone hammering the host
+    const sec = Math.floor(c.lastSeen / 1000);
+    if (sec !== c.msgSec) { if ((c.msgN || 0) > 200) c.floods = (c.floods || 0) + 1; else c.floods = 0; c.msgSec = sec; c.msgN = 0; }
+    if (++c.msgN > 200) { if (c.floods >= 3) this.kick(c, true); return; }
     if (m.t === 'u') this._hostState(c, m.d);
     else if (m.t === 'f') this._hostFire(c, m);
     else if (m.t === 'bo') this._hostBolt(c, m);
@@ -428,15 +488,34 @@ export class Net {
       const now = performance.now();
       const text = cleanChat(m.m);
       if (!text || now - (c.lastChatT || 0) < 400) return; // no flooding
+      // and no more than 5 lines in 8 seconds
+      c.chatTimes = (c.chatTimes || []).filter((t) => now - t < 8000);
+      if (c.chatTimes.length >= 5) {
+        if (!c.slowT || now - c.slowT > 3000) { c.slowT = now; c.conn.send({ t: 'c', n: '', col: 0, m: 'Slow down: too many messages.', id: -1 }); }
+        return;
+      }
+      c.chatTimes.push(now);
       c.lastChatT = now;
-      this._chat(c.name, c.color, text);
+      this._chat(c.name, c.color, text, c.id);
     }
   }
 
   /** Host: show a chat line here and send it to everyone. */
-  _chat(name, color, text) {
-    this.broadcast({ t: 'c', n: name, col: color, m: text });
-    this.hooks.onChat(name, color, text);
+  _chat(name, color, text, id = -1) {
+    this.broadcast({ t: 'c', n: name, col: color, m: text, id });
+    this.hooks.onChat(name, color, text, id);
+  }
+
+  /** Host: remove a player from the room (they can't come back to it). `quiet`: no reason given. */
+  kick(c, quiet = false) {
+    if (this.role !== 'host' || !c || !c.conn) return;
+    (this.banned || (this.banned = new Set())).add(c.pid);
+    c.conn.send({ t: 'kicked' });
+    const conn = c.conn;
+    conn.onClose = null;
+    setTimeout(() => conn.close(), 200);
+    this._drop(c, false, true);
+    this.system(quiet ? `${c.name} was disconnected (too much traffic)` : `${c.name} was removed by the host`);
   }
 
   /** Host: a grey "so-and-so joined" style line for everyone. */
@@ -446,7 +525,7 @@ export class Net {
   sendChat(text) {
     text = cleanChat(text);
     if (!text || !this.role) return;
-    if (this.role === 'host') this._chat(this.game.player.name, this.game.player.color, text);
+    if (this.role === 'host') this._chat(this.game.player.name, this.game.player.color, text, this.game.player.id);
     else if (this.conn) this.conn.send({ t: 'c', m: text });
   }
 
@@ -701,12 +780,13 @@ export class Net {
   onRosterChanged() {
     this.broadcast({ t: 'roster', r: this._roster() });
     this.hooks.onRoster();
+    this.succT = 2.5; // the succession list goes out soon
   }
 
   onEnd() {
     const g = this.game;
     this._sendSnapshot(); // final scores
-    this.broadcast({ t: 'end', aw: g.awards, vo: g.voteOptions, vl: Math.round((g.voteDeadline - performance.now()) / 1000) });
+    this.broadcast({ t: 'end', aw: g.awards, vo: g.voteOptions, vl: Math.round((g.voteDeadline - performance.now()) / 1000), rm: g.rankedMid || undefined });
   }
 
   /** Host: someone voted for the next map / mode. */
@@ -889,7 +969,11 @@ export class Net {
         break;
       }
       case 'c':
-        this.hooks.onChat(cleanName(m.n), num(m.col) ? m.col : 0, cleanChat(m.m));
+        this.hooks.onChat(cleanName(m.n), num(m.col) ? m.col : 0, cleanChat(m.m), num(m.id) ? m.id : -1);
+        break;
+      case 'kicked':
+        this.succ = null; // (not a host leaving: no taking over)
+        this._lost('The host removed you from the room.', false);
         break;
       case 'fl':
         if (g.ctf && ['take', 'drop', 'return', 'home', 'cap'].includes(m.k) && (m.tm === 0 || m.tm === 1)) {
@@ -908,8 +992,28 @@ export class Net {
         }
         break;
       case 'bye':
-        this._lost('The host closed the room.', false);
+        this._lost('The host left the room.', false);
         break;
+      case 'succ': {
+        // the line of succession (host migration): checked before we keep it
+        if (!Array.isArray(m.o) || m.o.length > 16 || !m.o.every((x) => isPlayerId(x)) || !m.st || typeof m.st !== 'object') break;
+        const st = m.st, p = {};
+        if (st.p && typeof st.p === 'object') {
+          for (const [pid, r] of Object.entries(st.p).slice(0, 20)) {
+            if (isPlayerId(pid) && Array.isArray(r) && r.length >= 7 && r.slice(0, 6).every(num)) p[pid] = [...r.slice(0, 6).map((v) => v | 0), cleanName(r[6])];
+          }
+        }
+        this.succ = {
+          code: this.code, o: m.o.slice(),
+          st: {
+            map: typeof st.map === 'string' ? st.map.slice(0, 40) : 'foundry', mode: getMode(st.mode).id, cr: st.cr, rk: !!st.rk,
+            mt: num(st.mt) ? clamp(st.mt, 0, 7200) : CFG.timeLimit, ts: Array.isArray(st.ts) ? [st.ts[0] | 0, st.ts[1] | 0] : [0, 0],
+            bots: !!st.bots, bc: num(st.bc) ? clamp(st.bc | 0, 1, 10) : 5, df: ['easy', 'normal', 'hard', 'veteran'].includes(st.df) ? st.df : 'normal',
+            pub: !!st.pub, host: cleanName(st.host), p,
+          },
+        };
+        break;
+      }
       case 'votes':
         if (Array.isArray(m.n) && m.n.every(num)) {
           g.voteCounts = m.n.slice(0, 3);
@@ -918,6 +1022,7 @@ export class Net {
         break;
       case 'end':
         if (g.over) break;
+        g.rankedMid = typeof m.rm === 'string' && /^[A-Za-z0-9]{12}$/.test(m.rm) ? m.rm : null; // (ranked: the host's match record)
         this._readEnd(m);
         g.over = true;
         g.winner = g.ranking()[0];

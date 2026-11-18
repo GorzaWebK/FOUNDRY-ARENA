@@ -340,6 +340,19 @@ export class CloudLobby {
     await this.D.remove(this.D.ref(this.db, `invites/${myCode}/${fromCode}`)).catch(() => {});
   }
 
+  // ---------------------------------------------------------------- reports
+  // reports/<push id> = { by, name, reason, lines, room, at }: write-only, read in the Firebase console
+
+  /** Report a player: { name, reason, lines[], room }. */
+  async report(r) {
+    if (!this.online) throw new Error('Not connected to the online service.');
+    const clean = (v, n) => String(v || '').replace(/[\u0000-\u001f]/g, ' ').slice(0, n);
+    await this.D.set(this.D.push(this.D.ref(this.db, 'reports')), {
+      by: this.uid, name: clean(r.name, 18) || '?', reason: clean(r.reason, 40), lines: clean((r.lines || []).join(' | '), 700),
+      room: clean(r.room, 8), at: this.D.serverTimestamp(),
+    });
+  }
+
   // ---------------------------------------------------------------- ranked
   // ranked/<uid> = { name, bid, sr, peak, games, wins, season, at }  (checked by the rules)
 
@@ -358,15 +371,34 @@ export class CloudLobby {
     return { sr: r.sr, peak: r.peak, games: r.games, wins: r.wins, season };
   }
 
-  /** Apply a ranked result: { delta, won, name, bid }. Returns { before, after, row } or throws. */
+  /**
+   * Host of a ranked match, at the end: the record everyone's rating change is
+   * checked against. rankedMatches/<mid> = { h: host uid, at, w: winning team
+   * (-1 a draw), t: { uid: team } }. Written once; read by the rules.
+   */
+  async recordRankedMatch(mid, w, t) {
+    if (!this.uid) throw new Error('Not connected to the online service.');
+    await this.D.set(this.D.ref(this.db, `rankedMatches/${mid}`), { h: this.uid, at: this.D.serverTimestamp(), w, t });
+  }
+
+  /**
+   * Apply a ranked result: { delta, won, name, bid, m: the match id }. The rules
+   * only take it if the host's record of match `m` has us in it, says the same
+   * about who won, and hasn't been counted for us before. The host's record can
+   * land a moment after the match ends, so a refusal is retried a few times.
+   * Returns { before, after, row } or throws.
+   */
   async reportRanked(res) {
     const cur = await this.myRanked();
     if (!cur) throw new Error('Not connected to the online service.');
     const delta = Math.max(-MAX_SR_STEP, Math.min(MAX_SR_STEP, Math.round(res.delta)));
     const sr = Math.max(0, Math.min(4000, cur.sr + delta));
-    const row = { name: clean(res.name) || 'Player', sr, peak: Math.max(cur.peak, sr), games: cur.games + 1, wins: cur.wins + (res.won ? 1 : 0), season: cur.season, at: this.D.serverTimestamp() };
+    const row = { name: clean(res.name) || 'Player', sr, peak: Math.max(cur.peak, sr), games: cur.games + 1, wins: cur.wins + (res.won ? 1 : 0), season: cur.season, m: String(res.m || ''), won: !!res.won, at: this.D.serverTimestamp() };
     if (res.bid && /^[0-9a-f]{16}$/.test(res.bid)) row.bid = res.bid;
-    await this.D.set(this.D.ref(this.db, `ranked/${this.uid}`), row);
+    for (let i = 0; ; i++) {
+      try { await this.D.set(this.D.ref(this.db, `ranked/${this.uid}`), row); break; }
+      catch (e) { if (i >= 5) throw e; await new Promise((r) => setTimeout(r, 2000)); }
+    }
     this.rk = { ...row, at: Date.now() };
     return { before: cur.sr, after: sr, row: this.rk };
   }

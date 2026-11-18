@@ -23,6 +23,18 @@ export function makeRoomCode() {
   return s;
 }
 
+/**
+ * Host migration: the room code the k-th player in line re-hosts a room at, after
+ * the host of room `code` is gone. Everyone works out the same codes.
+ */
+export function migrateCode(code, k) {
+  let h = 2166136261;
+  for (const ch of `${code}:${k}:moved`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+  let s = '';
+  for (let i = 0; i < 5; i++) { s += ALPHABET[h % ALPHABET.length]; h = Math.imul(h ^ (h >>> 13), 2654435761) >>> 0; }
+  return s;
+}
+
 export function cleanRoomCode(s) {
   return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
 }

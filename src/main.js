@@ -12,7 +12,7 @@ import '@fontsource/barlow/latin-700.css';
 import '@fontsource/saira-stencil-one/latin-400.css';
 import './style.css';
 import { MAPS, getMap } from './maps/index.js';
-import { MODES, getMode, makeRules, customSummary, TIME_OPTIONS, HARDCORE_HEALTH, TEAM_NAMES } from './modes.js';
+import { MODES, getMode, makeRules, customSummary, TIME_OPTIONS, HARDCORE_HEALTH, TEAM_NAMES, gunLevel } from './modes.js';
 import RANGE_MAP from './maps/range.js';
 import { TRAINING } from './training.js';
 import { TUTORIAL } from './tutorial.js';
@@ -31,7 +31,7 @@ import { buildMap, cleanSpec, registerMap, customMaps, fitMode, specToCode, code
 import { CloudLobby } from './lobby-cloud.js';
 import { FIREBASE_CONFIG } from './online-config.js';
 import { MAX_HUMANS } from './config.js';
-import { cleanRoomCode } from './transport.js';
+import { cleanRoomCode, migrateCode } from './transport.js';
 import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
 import { BUILD, BUILD_TIME } from './version.js';
 import { START_SR, RANKED_MODES, RANKED_MAPS, TIERS, tierIndex, tierName, tierColor, seasonId, seasonName, msToSeasonEnd, srChange } from './ranked.js';
@@ -44,6 +44,7 @@ import { PASS_TIERS, PASS_TIER_XP, THEMES, themeOf, track as passTrack } from '.
 import { XP, levelFromXp, MAX_LEVEL } from './progress.js';
 import { msToReset, msToWeekReset } from './challenges.js';
 import { Music } from './music.js';
+import { filterChat } from './chatfilter.js';
 
 {
   // version stamp on the main menu, so players can compare before joining
@@ -85,12 +86,18 @@ const net = new Net(game, {
     else { setMpStatus(reason, true); party.leftRoom(); }
   },
   onVotes: () => renderVote(),
+  onMigrate: (info) => migrate(info),
+  isPublic: () => hostPublic,
+  uid: () => (typeof lobby !== 'undefined' && lobby && lobby.uid) || null,
   onMatchStart: () => {
     setState('playing');
     hud.setLockHint(!input.locked);
   },
-  onChat: (name, color, text) => {
-    hud.chatAdd(name, color, text);
+  onChat: (name, color, text, id = -1) => {
+    // muted players' lines don't show; the rest is filtered if you want it to be
+    if (name && settings.muted.includes(name)) return;
+    if (name && id >= 0) { const l = chatLog.get(id) || []; l.push(text); chatLog.set(id, l.slice(-6)); }
+    hud.chatAdd(name, color, settings.chatFilter ? filterChat(text) : text);
     if (name) audio.play('chat');
   },
 });
@@ -318,6 +325,55 @@ function inviteLink() {
   return `${location.origin}${location.pathname}?${q}`;
 }
 
+// ---------------------------------------------------------------- players in the room: mute, report, kick
+const chatLog = new Map(); // player id -> their last few chat lines (sent with a report)
+const REPORT_REASONS = ['Abusive chat', 'Cheating', 'Offensive name', 'Griefing / team killing', 'Other'];
+let reporting = null; // the id of the player we're filling in a report for
+function renderRoomPlayers() {
+  const box = $('room-players');
+  box.textContent = '';
+  if (!net.active) return;
+  const others = game.remotes.filter((r) => r.isHuman);
+  if (!others.length) return;
+  const h = document.createElement('h4'); h.textContent = 'Players';
+  box.append(h);
+  for (const c of others) {
+    const row = document.createElement('div');
+    row.className = 'rp-row';
+    const nm = document.createElement('b'); nm.textContent = c.name;
+    nm.style.color = '#' + (c.color >>> 0).toString(16).padStart(6, '0').slice(-6);
+    const pg = document.createElement('small'); pg.textContent = c.ping > 0 ? `${c.ping} ms` : '';
+    row.append(nm, pg);
+    const muted = settings.muted.includes(c.name);
+    const btn = (label, fn, cls = '') => { const b = document.createElement('button'); b.type = 'button'; b.className = 'small-btn ' + cls; b.textContent = label; b.addEventListener('click', fn); row.append(b); return b; };
+    if (reporting === c.id) {
+      const sel = document.createElement('select');
+      for (const r of REPORT_REASONS) { const o = document.createElement('option'); o.textContent = r; sel.append(o); }
+      row.append(sel);
+      btn('Send report', async () => {
+        reporting = null;
+        try {
+          if (!lobby.report) throw new Error('Reports need the online service.');
+          await lobby.report({ name: c.name, reason: sel.value, lines: chatLog.get(c.id) || [], room: net.code });
+          hud.chatAdd('', 0, `Report on ${c.name} sent. Thanks: it's looked at by a person.`);
+        } catch (e) { hud.chatAdd('', 0, `Couldn't send the report: ${e.message}`); }
+        renderRoomPlayers();
+      }, 'accent');
+      btn('Cancel', () => { reporting = null; renderRoomPlayers(); });
+    } else {
+      btn(muted ? 'Unmute' : 'Mute', () => {
+        settings.muted = muted ? settings.muted.filter((n) => n !== c.name) : [...settings.muted, c.name];
+        saveSettings(settings);
+        hud.chatAdd('', 0, muted ? `${c.name} unmuted.` : `${c.name} muted: you won't see their chat.`);
+        renderRoomPlayers();
+      });
+      btn('Report', () => { reporting = c.id; renderRoomPlayers(); });
+      if (net.role === 'host') btn('Kick', () => { if (window.confirm(`Remove ${c.name} from the room? They won't be able to rejoin it.`)) net.kick(c); }, 'danger');
+    }
+    box.append(row);
+  }
+}
+
 function updateRoomUi() {
   const on = net.active;
   const n = net.humanCount;
@@ -336,11 +392,12 @@ function updateRoomUi() {
   if (ranked) $('btn-restart').classList.add('hidden');
   $('btn-range-reset').classList.toggle('hidden', !training);
   $('btn-restart').textContent = training ? 'Restart range' : 'Restart match';
-  $('btn-quit').textContent = on ? (net.role === 'host' ? 'Close room' : 'Leave game') : 'Main menu';
+  $('btn-quit').textContent = on ? (net.role === 'host' ? 'Leave room' : 'Leave game') : 'Main menu';
+  renderRoomPlayers();
   if (typeof editorTesting !== 'undefined') $('btn-editor-back').classList.toggle('hidden', !(editorTesting && !on && game.map.custom));
   $('btn-again').classList.toggle('hidden', net.role === 'client');
   $('btn-again').textContent = net.role === 'host' ? 'START NEXT MATCH' : 'PLAY AGAIN';
-  $('btn-menu').textContent = on ? (net.role === 'host' ? 'Close room' : 'Leave game') : 'Main menu';
+  $('btn-menu').textContent = on ? (net.role === 'host' ? 'Leave room' : 'Leave game') : 'Main menu';
   $('end-wait').classList.toggle('hidden', net.role !== 'client');
   hud.chatHint(on && state === 'playing' && !chatting);
   syncBotsUi();
@@ -510,6 +567,79 @@ async function rejoin(code, reason) {
     setMpStatus(`Couldn't get back into room ${code}. The host may have left. Press Join to retry. Your score holds for 3 minutes.`, true);
     party.leftRoom();
   }
+}
+
+/**
+ * Host migration: the host is gone, but we know who's next in line. Players
+ * ahead of us in the line get a few seconds each to re-host (at a room code
+ * everyone can work out, see transport.js migrateCode); if none of them does, we
+ * host it ourselves and carry the match on: same map, mode, clock and scores.
+ */
+async function migrate(info) {
+  const token = ++rejoinToken;
+  const me = info.o.indexOf(net.pid);
+  const pw = net.lastPw || '';
+  hud.centerMessage('HOST LEFT', 'Moving the match to a new host…', 4, '#ffd24d');
+  hud.chatAdd('', 0, `${info.reason} Moving the match to a new host…`);
+  for (let k = 0; k < me; k++) {
+    const code = migrateCode(info.code, k), until = performance.now() + 9000;
+    while (performance.now() < until) {
+      if (token !== rejoinToken) return;
+      try {
+        await net.join(code, settings.name, pw);
+        if (token !== rejoinToken) { net.leave(); return; }
+        party.enteredRoom(code, pw);
+        hud.chatAdd('', 0, `The match carries on in room ${code}.`);
+        await enterRoom();
+        return;
+      } catch (e) {
+        if (/newer version|older version|full|password|private/i.test(e.message)) break;
+      }
+      await new Promise((r) => setTimeout(r, 1200));
+    }
+  }
+  if (token !== rejoinToken) return;
+  // our turn: host it
+  try {
+    await net.host(settings.name, pw, migrateCode(info.code, me));
+  } catch (e) {
+    setMpStatus(`The host left and the match couldn't be moved (${e.message}).`, true);
+    startAttract();
+    return;
+  }
+  hostPublic = !!info.st.pub;
+  party.enteredRoom(net.code, net.password);
+  restoreMatch(info.st);
+  hud.chatAdd('', 0, `You're the host now (room ${net.code}). The others are on their way.`);
+  hud.centerMessage("YOU'RE THE HOST", `Room ${net.code}`, 4, '#4fc3f7');
+}
+
+/** New host after a migration: start the same match where it was. */
+function restoreMatch(st) {
+  const map = getMap(st.map);
+  const rules = makeRules(fitMode(st.mode, map), st.rk ? null : st.cr);
+  if (st.rk) { rules.ranked = true; rankedRoom = { map: map.id, mode: rules.id }; }
+  game.clearRemotes(); // the old room's players: they reconnect to us as new connections
+  game.newMatch({ botCount: st.bc, bots: st.bots, difficulty: st.df, map, rules });
+  game.matchTime = st.mt;
+  game.teamScore = st.ts.slice();
+  const mine = st.p[net.pid];
+  const p = game.player;
+  if (mine) {
+    p.kills = mine[0]; p.deaths = mine[1]; p.caps = mine[2]; p.hillTime = mine[5];
+    if (rules.lives) p.lives = mine[4];
+    if (rules.teams && (mine[3] === 0 || mine[3] === 1)) { p.team = mine[3]; game.paint(p); }
+    p.applyGunLevel();
+  }
+  // everyone else gets their score back when they reconnect (the host's "parked" scores)
+  const until = performance.now() + 3 * 60 * 1000;
+  for (const [pid, r] of Object.entries(st.p)) {
+    if (pid === net.pid) continue;
+    net.parked.set(pid, { name: r[6], team: r[3], kills: r[0], deaths: r[1], lives: r[4], caps: r[2], hillTime: r[5], gunLevel: gunLevel(r[0]), st: undefined, until });
+  }
+  setState('playing');
+  syncPublicRoom();
+  lock().then((ok) => { if (!ok && state === 'playing') hud.setLockHint(true); });
 }
 
 function startAttract() {
@@ -1312,6 +1442,15 @@ async function reportRanked(res) {
   if (game.time < 60 || game.matchPlayT < game.time * 0.5) { show('Ranked: not counted (you joined too late).'); return; }
   if (!myRank) await refreshRank();
   if (!myRank) return;
+  // the host writes the match record everyone's result is checked against
+  if (net.role === 'host' && game.rankedMid && lobby.recordRankedMatch) {
+    const [b, r] = game.teamScore;
+    const t = {};
+    if (lobby.uid) t[lobby.uid] = game.player.team;
+    for (const c of game.remotes) if (c.isHuman && c.uid && (c.team === 0 || c.team === 1)) t[c.uid] = c.team;
+    try { await lobby.recordRankedMatch(game.rankedMid, b === r ? -1 : b > r ? 0 : 1, t); } catch (e) { show('Ranked: the match record could not be saved, so this match does not count.'); return; }
+  }
+  if (!game.rankedMid) { show('Ranked: not counted (no match record from the host).'); return; }
   const others = humans.filter((c) => c !== game.player && c.sr >= 0);
   const lobbySr = others.length ? others.reduce((a, c) => a + c.sr, 0) / others.length : START_SR;
   const result = res.draw ? 0.5 : res.won ? 1 : 0;
@@ -1322,7 +1461,7 @@ async function reportRanked(res) {
   const delta = srChange(myRank, lobbySr, result, perf);
   const before = myRank.sr, tierBefore = tierIndex(before);
   try {
-    const r = await lobby.reportRanked({ delta, won: result === 1, name: settings.name || 'Player', bid: boardId(getAccount().id) });
+    const r = await lobby.reportRanked({ delta, won: result === 1, name: settings.name || 'Player', bid: boardId(getAccount().id), m: game.rankedMid });
     myRank = { ...myRank, sr: r.after, peak: r.row.peak, games: r.row.games, wins: r.row.wins };
     game.player.sr = r.after;
     const t = tierIndex(r.after);
