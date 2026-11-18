@@ -149,6 +149,7 @@
             <button id="btn-open-settings" class="small-btn">Settings</button>
             <button id="btn-open-controls" class="small-btn">Controls</button>
             <button id="btn-custom" class="small-btn accent">Customize</button>
+            <button id="btn-season" class="small-btn accent">Season <span id="season-chip"></span></button>
             <button id="btn-career" class="small-btn">Career</button>
             <button id="btn-board" class="small-btn">Leaderboard</button>
             <button id="btn-maps" class="small-btn">Maps</button>
@@ -273,6 +274,18 @@
           <button id="btn-rules-reset">Standard rules</button>
           <button id="btn-rules-done" class="primary">DONE</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ============================== SEASON PASS ============================== -->
+    <div id="season" class="overlay hidden">
+      <div class="panel">
+        <h2>SEASON PASS <small id="sp-theme"></small></h2>
+        <p class="acct-line"><span id="sp-name"></span> · <span id="sp-left"></span> · free for everyone</p>
+        <div class="sp-prog"><b id="sp-tier"></b><span class="bar"><i id="sp-fill"></i></span><small id="sp-xp"></small></div>
+        <div id="sp-track" class="sp-track"></div>
+        <p class="note">Every bit of XP you earn in matches also fills the pass: 1,000 XP a tier. Ten tiers give you something from this season's theme to keep (equip it in Customize); the rest give 250 bonus XP. A new season starts each month with the next theme, and each theme comes back every four months.</p>
+        <div class="btn-row"><button id="btn-sp-done" class="primary">DONE</button></div>
       </div>
     </div>
 

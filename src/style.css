@@ -933,3 +933,28 @@ body.soft-flash #flashbang { background: #8b9096; transition: opacity 0.35s ease
 .gs-stats tr.up td:last-child { color: #8fd36a; }
 .gs-stats tr.down td:last-child { color: #ff7a6a; }
 .gs-stats tr.pv td { background: rgba(255, 255, 255, 0.04); }
+
+/* Season pass */
+#season .panel { width: min(900px, 100%); padding: 20px 26px; }
+#season h2 small { font-size: 0.55em; letter-spacing: 0.12em; margin-left: 8px; }
+#season-chip { font: 700 11px var(--mono); margin-left: 4px; color: var(--ink); }
+.sp-prog { display: flex; align-items: center; gap: 12px; margin: 10px 0 12px; }
+.sp-prog b { font: 800 22px var(--cond); letter-spacing: 0.04em; white-space: nowrap; }
+.sp-prog .bar { flex: 1; height: 8px; background: rgba(255, 255, 255, 0.08); }
+.sp-prog .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), #ffd24d); }
+.sp-prog small { font: 600 12px var(--cond); color: var(--dim); white-space: nowrap; }
+.sp-track { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; }
+.sp-cell { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 3px 6px; min-height: 92px;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); text-align: center; opacity: 0.6; }
+.sp-cell > b { font: 700 11px var(--mono); color: var(--dim); align-self: flex-start; }
+.sp-cell .sw { width: 100%; height: 40px; }
+.sp-cell small { font: 600 11px var(--cond); line-height: 1.1; letter-spacing: 0.02em; }
+.sp-cell small.xp { margin-top: 18px; color: var(--accent-hot); font-family: var(--mono); }
+.sp-cell.item { opacity: 0.85; }
+.sp-cell.got { opacity: 1; border-color: rgba(143, 176, 74, 0.6); background: rgba(143, 176, 74, 0.08); }
+.sp-cell.got > b { color: #8fb04a; }
+.sp-cell.next { opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.end-tiers { color: #ffd24d; }
+.sp-cell .sw { display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; text-shadow: 0 1px 2px #000; overflow: hidden; }
+.sp-cell .sw.pic { height: 48px; background: radial-gradient(ellipse at 50% 60%, #2a3038, #15181c 75%); }
+.sp-cell .sw.pic img { max-height: 100%; max-width: 100%; }

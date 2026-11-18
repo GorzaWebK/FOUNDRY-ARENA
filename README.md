@@ -249,6 +249,21 @@ kills, 8 wins, 8 flag captures and so on), picked fresh every Monday. Each pays
 first full week unlocks the **Overtime** calling card, and five full weeks
 unlock **Night Shift**. Neither can be earned any other way.
 
+### Season pass
+
+**Season** (bottom row, with your tier on it) opens the season pass. It's free
+for everyone. A season is a calendar month, the same as ranked. Every point of
+XP you earn in matches also goes into the pass: 1,000 XP a tier, 30 tiers. Ten
+tiers hand out something from the season's theme to keep for good (two titles,
+three calling cards, two tracers, a grenade finish, an armour colour and a
+knife); the other twenty pay 250 bonus XP. Tier-ups are called out in the match
+and listed on the end screen.
+
+The four themes (**Molten**, **Ironclad**, **Graveyard**, **Arc Light**) take
+turns month by month, so a theme's items come round again four months later for
+anyone who missed them. Pass items show in Customize with the tier that unlocks
+them. Your pass progress is saved with the rest of your progress.
+
 ### Medals
 
 Medals pop up under the crosshair as you earn them (three at a time, the rest
@@ -653,6 +668,7 @@ src/ctf.js            Capture the Flag: flags, rules, flag models
 src/objectives.js     Domination, Search & Destroy and Infected: rules, zones, bomb, HUD
 src/medals.js         medal and achievement definitions
 src/attachments.js    Gunsmith attachments: slots, unlocks, stat changes
+src/seasonpass.js     the free season pass: themes, tiers, rewards
 src/bolts.js          crossbow bolts (projectiles)
 src/career.js         career stats (local, part of the account)
 src/skins.js          weapon camos: patterns, unlocks, colours

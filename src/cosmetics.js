@@ -6,6 +6,8 @@
 // indices (see packCosmetics / unpackCosmetics), so others see your name tag,
 // title, calling card, gear, tracers and kill effects.
 
+import { passItems } from './seasonpass.js';
+
 export const SLOTS = [
   { id: 'title', name: 'Title', shared: true },
   { id: 'tag', name: 'Name tag', shared: true },
@@ -153,12 +155,19 @@ export function itemOf(slot, id) {
 }
 
 /** Can someone at `level` / `prestige` use this item? */
-export function itemUnlocked(item, level, prestige, weeks = 0, rankPeak = -1, achs = {}) {
+export function itemUnlocked(item, level, prestige, weeks = 0, rankPeak = -1, achs = {}, owned = {}) {
+  if (item.pass) return !!owned[item.id]; // season pass rewards (see seasonpass.js)
   if (item.ach) return !!achs[item.ach];
   if (item.rank !== undefined) return rankPeak >= item.rank;
   if (item.weekly) return weeks >= item.weekly;
   if (item.prestige) return prestige >= item.prestige;
   return level >= (item.level || 1);
+}
+
+// season pass items go on the end of their lists (indices travel over the network)
+{
+  const extra = passItems();
+  for (const [slot, list] of Object.entries(extra)) ITEMS[slot].push(...list);
 }
 
 /** Every item unlocked exactly at `level` (for the level-up call-out). */

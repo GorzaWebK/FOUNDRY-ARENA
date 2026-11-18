@@ -40,6 +40,7 @@ import { SKINS, SKIN_KILLS, skinSwatchCss, skinUnlocked, skinLockText } from './
 import { SLOTS, ITEMS, itemOf, unlocksAt, packCosmetics, unpackCosmetics } from './cosmetics.js';
 import { MEDALS, MEDAL_BY_ID, ACHIEVEMENTS, ACH_BY_ID } from './medals.js';
 import { ATT_SLOTS, ATTACHMENTS, fits, attUnlocked, attList, withAttachments } from './attachments.js';
+import { PASS_TIERS, PASS_TIER_XP, THEMES, themeOf, track as passTrack } from './seasonpass.js';
 import { XP, levelFromXp, MAX_LEVEL } from './progress.js';
 import { msToReset, msToWeekReset } from './challenges.js';
 
@@ -1531,10 +1532,65 @@ function nextAch() {
   const a = achQueue.shift();
   if (!a) { achBusy = false; return; }
   achBusy = true;
-  const card = a.card ? ITEMS.card.find((i) => i.id === a.card) : null;
-  game.announcer.announce('Achievement', `${a.name}${a.xp ? `  +${fmt(a.xp)} XP` : ''}${card ? `  ·  ${card.name} card unlocked` : ''}`);
+  if (a.pass) game.announcer.announce(`Season tier ${a.tier}`, a.sub);
+  else {
+    const card = a.card ? ITEMS.card.find((i) => i.id === a.card) : null;
+    game.announcer.announce('Achievement', `${a.name}${a.xp ? `  +${fmt(a.xp)} XP` : ''}${card ? `  ·  ${card.name} card unlocked` : ''}`);
+  }
   setTimeout(nextAch, 2600);
 }
+// season pass tiers: called out in a match (in the same queue), listed on the end screen
+const endTiers = [];
+game.progress.onPassTier = (tier, r) => {
+  const item = r.id ? ITEMS[r.slot].find((i) => i.id === r.id) : null;
+  const sub = item ? `Unlocked: ${item.name} (${SLOTS.find((s) => s.id === r.slot).name.toLowerCase()})` : `+${fmt(r.xp)} bonus XP`;
+  renderSeasonChip();
+  if (state !== 'playing' || game.over) { endTiers.push({ tier, sub }); return; }
+  achQueue.push({ pass: true, tier, sub });
+  if (!achBusy) nextAch();
+};
+
+function renderSeasonChip() {
+  const pass = game.progress.pass;
+  $('season-chip').textContent = `${pass.tier}/${PASS_TIERS}`;
+}
+renderSeasonChip();
+
+function openSeason() {
+  const pr = game.progress, pass = pr.pass, theme = themeOf(pass.season);
+  $('sp-theme').textContent = theme.name;
+  $('sp-theme').style.color = theme.color;
+  $('sp-name').textContent = seasonName(pass.season);
+  const ms = msToSeasonEnd(), d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000);
+  $('sp-left').textContent = `ends in ${d ? `${d} day${d === 1 ? '' : 's'} ` : ''}${h}h`;
+  const into = pass.tier >= PASS_TIERS ? PASS_TIER_XP : pass.xp - pass.tier * PASS_TIER_XP;
+  $('sp-tier').textContent = `Tier ${pass.tier}`;
+  $('sp-fill').style.width = `${Math.round((into / PASS_TIER_XP) * 100)}%`;
+  $('sp-xp').textContent = pass.tier >= PASS_TIERS ? 'Complete!' : `${fmt(into)} / ${fmt(PASS_TIER_XP)} XP to tier ${pass.tier + 1}`;
+  const box = $('sp-track');
+  box.textContent = '';
+  for (const r of passTrack(pass.season)) {
+    const cell = document.createElement('div');
+    const got = r.tier <= pass.tier;
+    cell.className = 'sp-cell' + (got ? ' got' : '') + (r.tier === pass.tier + 1 ? ' next' : '') + (r.id ? ' item' : '');
+    const n = document.createElement('b'); n.textContent = r.tier;
+    cell.append(n);
+    if (r.id) {
+      const item = ITEMS[r.slot].find((i) => i.id === r.id);
+      cell.append(swatchFor(r.slot, item));
+      const nm = document.createElement('small'); nm.textContent = item.name;
+      cell.title = `${SLOTS.find((s) => s.id === r.slot).name}: ${item.name}`;
+      cell.append(nm);
+    } else {
+      const x = document.createElement('small'); x.className = 'xp'; x.textContent = `+${r.xp} XP`;
+      cell.append(x);
+    }
+    box.append(cell);
+  }
+  $('season').classList.remove('hidden');
+}
+$('btn-season').addEventListener('click', openSeason);
+$('btn-sp-done').addEventListener('click', () => $('season').classList.add('hidden'));
 game.progress.onWeekDone = (n) => {
   const card = n >= 5 ? 'Night Shift' : 'Overtime';
   setTimeout(() => game.announcer.announce('Full week!', n === 1 || n === 5 ? `Unlocked the ${card} calling card` : `${n} full weeks`), 2600);
@@ -1628,6 +1684,7 @@ function endMedalsHtml() {
     html += `<div class="end-medals">${mm.map(([id, n]) => { const m = MEDAL_BY_ID[id]; return `<span class="em" title="${m.desc}"><i style="--mc:${m.col}">${m.g}</i>${m.name}${n > 1 ? ` <b>×${n}</b>` : ''}</span>`; }).join('')}</div>`;
   }
   if (endAchs.length) html += `<div class="end-achs">${endAchs.map((a) => `<span>Achievement: <b>${a.name}</b>${a.card ? ' (calling card unlocked)' : ''}</span>`).join('')}</div>`;
+  if (endTiers.length) html += `<div class="end-achs end-tiers">${endTiers.map((t) => `<span>Season tier <b>${t.tier}</b>: ${t.sub}</span>`).join('')}</div>`;
   return html;
 }
 
@@ -1691,7 +1748,7 @@ function renderCustom() {
     nm.textContent = customSlot === 'title' ? '' : item.name; // a title's swatch already says it
     const req = document.createElement('small');
     req.textContent = open ? (eq[customSlot] === item.id ? 'equipped' : '')
-      : item.ach ? `Achievement: ${ACH_BY_ID[item.ach] ? ACH_BY_ID[item.ach].name : '?'}` : item.rank !== undefined ? `Reach ${TIERS[item.rank][0]}` : item.weekly ? (item.weekly === 1 ? 'Finish a week' : `${item.weekly} full weeks`) : item.prestige ? `Prestige ${item.prestige}` : `Level ${item.level}`;
+      : item.pass ? `Season pass: ${(THEMES.find((t) => t.id === item.pass) || {}).name} tier ${item.tier}` : item.ach ? `Achievement: ${ACH_BY_ID[item.ach] ? ACH_BY_ID[item.ach].name : '?'}` : item.rank !== undefined ? `Reach ${TIERS[item.rank][0]}` : item.weekly ? (item.weekly === 1 ? 'Finish a week' : `${item.weekly} full weeks`) : item.prestige ? `Prestige ${item.prestige}` : `Level ${item.level}`;
     nm.append(req);
     b.append(nm);
     b.addEventListener('click', () => {
@@ -2203,6 +2260,7 @@ window.addEventListener('beforeunload', (e) => {
 window.addEventListener('pagehide', () => { lobby.close(); party.suspend(); net.leave(false); game.career.flush(); game.progress.flush(); });
 
 game.onMatchEnd = () => {
+  endTiers.length = 0;
   const res = game.rules.result(game);
   const won = res.won;
   // career: count the match if you actually played some of it
@@ -2226,6 +2284,7 @@ game.onMatchEnd = () => {
   }
   endAchs.length = 0;
   game.checkAchievements();
+  renderSeasonChip();
   game.progress.save();
   updateBoardEntry();
   reportRanked(res);

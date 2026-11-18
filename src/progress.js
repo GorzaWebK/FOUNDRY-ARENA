@@ -5,6 +5,7 @@
 import { DEFAULT_EQUIPPED, ITEMS, SLOTS, itemOf, itemUnlocked } from './cosmetics.js';
 import { dailyFor, today, weeklyFor, weekKey } from './challenges.js';
 import { MEDAL_BY_ID, ACHIEVEMENTS } from './medals.js';
+import { seasonId, track, tierOf, PASS_TIERS } from './seasonpass.js';
 
 export const PROGRESS_KEY = 'foundry-arena-progress';
 export const MAX_LEVEL = 50;
@@ -24,7 +25,7 @@ export const XP = {
 };
 
 function blank() {
-  return { v: 1, xp: 0, prestige: 0, equipped: { ...DEFAULT_EQUIPPED }, daily: { day: '', prog: {}, done: {} }, weekly: { week: '', prog: {}, done: {}, full: false }, weeksDone: 0, rankPeak: -1, medals: {}, achs: {} };
+  return { v: 1, xp: 0, prestige: 0, equipped: { ...DEFAULT_EQUIPPED }, daily: { day: '', prog: {}, done: {} }, weekly: { week: '', prog: {}, done: {}, full: false }, weeksDone: 0, rankPeak: -1, medals: {}, achs: {}, pass: { season: '', xp: 0 }, owned: {} };
 }
 
 /** Level (1..50) and progress into it, from total XP this prestige. */
@@ -57,6 +58,12 @@ export class Progress {
       if (raw.achs && typeof raw.achs === 'object') {
         for (const a of ACHIEVEMENTS) if (raw.achs[a.id]) this.p.achs[a.id] = typeof raw.achs[a.id] === 'string' ? raw.achs[a.id].slice(0, 10) : '1';
       }
+      if (raw.pass && typeof raw.pass === 'object' && typeof raw.pass.season === 'string' && typeof raw.pass.xp === 'number') {
+        this.p.pass = { season: raw.pass.season.slice(0, 10), xp: Math.max(0, Math.floor(raw.pass.xp)) };
+      }
+      if (raw.owned && typeof raw.owned === 'object') {
+        for (const k of Object.keys(raw.owned)) if (k.startsWith('sp-') && k.length < 40) this.p.owned[k] = 1;
+      }
       if (raw.equipped && typeof raw.equipped === 'object') {
         for (const s of SLOTS) if (ITEMS[s.id].some((i) => i.id === raw.equipped[s.id])) this.p.equipped[s.id] = raw.equipped[s.id];
       }
@@ -83,6 +90,33 @@ export class Progress {
     const after = this.level;
     if (after > before && this.onLevelUp) for (let l = before + 1; l <= after; l++) this.onLevelUp(l);
     this.dirty = true;
+    if (label !== 'Season pass') this.passXp(amount); // (the pass's own bonus XP doesn't feed it)
+  }
+
+  // ---------------------------------------------------------------- season pass
+
+  /** This season's pass: { season, xp, tier } (a new month starts it over). */
+  get pass() {
+    const s = seasonId();
+    if (this.p.pass.season !== s) this.p.pass = { season: s, xp: 0 };
+    return { ...this.p.pass, tier: tierOf(this.p.pass.xp) };
+  }
+
+  /** XP into the pass; hands out each tier's reward as it's reached. */
+  passXp(amount) {
+    if (this.frozen || amount <= 0) return;
+    const before = this.pass.tier;
+    this.p.pass.xp += amount;
+    const after = tierOf(this.p.pass.xp);
+    if (after <= before) return;
+    const tr = track(this.p.pass.season);
+    for (let t = before + 1; t <= after && t <= PASS_TIERS; t++) {
+      const r = tr[t - 1];
+      if (r.id) this.p.owned[r.id] = 1;
+      if (this.onPassTier) this.onPassTier(t, r);
+      if (r.xp) this.add(r.xp, 'Season pass');
+    }
+    this.save();
   }
 
   matchTotal() { return this.match.reduce((a, r) => a + r[1], 0); }
@@ -130,7 +164,8 @@ export class Progress {
   has(slot, id) { return this.unlocked(itemOf(slot, id)); }
 
   /** Is this cosmetic item unlocked? */
-  unlocked(item) { return itemUnlocked(item, this.level, this.prestige, this.p.weeksDone, this.p.rankPeak, this.p.achs); }
+  unlocked(item) { return itemUnlocked(item, this.level, this.prestige, this.p.weeksDone, this.p.rankPeak, this.p.achs, this.p.owned); }
+  get owned() { return this.p.owned; }
 
   /** Equipped items, falling back to the default for anything not (or no longer) unlocked. */
   equipped() {
