@@ -224,6 +224,9 @@ star next to your level (★1, ★2… up to 10). Level unlocks come back as you
 up again; prestige-only items (the Reborn and Immortal titles, the Prestige name
 tag, the Gilded calling card), weapon skins and career stats are kept.
 
+
+Every item in Customize has a preview: helmets, armour and shoulder pads are shown on a crew member, and charms, knives and grenades are rendered from the in-game models; tracers, kill effects and crosshair shapes get a drawn sample.
+
 ### Daily challenges
 
 The **Today** card on the main menu has three challenges, the same for everyone

@@ -26,6 +26,7 @@ import { Net, cleanName } from './net.js';
 import { Party, PARTY_MAX, cleanPartyCode } from './party.js';
 import { Lobby, boardId } from './lobby.js';
 import { MapEditor, loadMyMaps, saveMyMaps } from './editor.js';
+import { previewFor, PREVIEW_SLOTS } from './previews.js';
 import { buildMap, cleanSpec, registerMap, customMaps, fitMode, specToCode, codeToSpec, validateMap } from './mapspec.js';
 import { CloudLobby } from './lobby-cloud.js';
 import { FIREBASE_CONFIG } from './online-config.js';
@@ -1276,6 +1277,14 @@ let customSlot = 'title';
 function swatchFor(slot, item) {
   const sw = document.createElement('div');
   sw.className = 'sw';
+  // a rendered picture of the real model (gear, charms, knives, grenades) or a drawing (tracers, effects, crosshairs)
+  if (PREVIEW_SLOTS.has(slot)) {
+    sw.classList.add('pic');
+    const url = previewFor(slot, item.id, { color: game.player.baseColor, xhColor: settings.xhColor });
+    if (url) { const img = document.createElement('img'); img.src = url; img.alt = item.name; img.draggable = false; sw.append(img); return sw; }
+    sw.textContent = item.id === 'none' ? 'None' : item.name;
+    return sw;
+  }
   const hexc = (c) => '#' + c.toString(16).padStart(6, '0');
   if (item.css) sw.style.background = item.css;
   else if (item.color !== undefined) sw.style.background = hexc(item.color);

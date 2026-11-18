@@ -49,7 +49,7 @@ function makeArm(side) {
 }
 
 /** A small charm on a chain (pivot at the top of the chain). */
-function buildCharm(id) {
+export function buildCharm(id) {
   const g = new THREE.Group();
   const chain = std(0xb8bec6, 0.3, 0.9);
   bx(g, 0.003, 0.03, 0.003, chain, 0, -0.015, 0);
@@ -79,7 +79,7 @@ function buildCharm(id) {
   return g;
 }
 
-function buildKnife() {
+export function buildKnife() {
   const g = new THREE.Group();
   const blade = std(0xd9dee4, 0.25, 0.85), handle = std(0x23262b, 0.8, 0), guard = std(0x55606c, 0.5, 0.5);
   bx(g, 0.012, 0.035, 0.2, blade, 0, 0, -0.12);

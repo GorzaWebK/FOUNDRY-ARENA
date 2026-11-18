@@ -159,7 +159,7 @@ export class BotModel {
     for (const m of this.look.children) if (m.material && m.material !== this.mats[3]) m.material.dispose();
     this.look.clear();
     const lam = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.25, ...extra });
-    const gearC = 0x2e3238, gold = 0xc9a227;
+    const gearC = 0x2e3238, padC = 0x59616b, gold = 0xc9a227; // (pads lighter than the suit so they read)
     const add = (w, h, d, mat, x, y, z) => part(this.look, w, h, d, mat, x, y, z);
     // armour vest over the chest
     const arm = itemOf('armour', eq.armour);
@@ -172,7 +172,7 @@ export class BotModel {
     // shoulder pads
     if (eq.shoulders !== 'none') {
       const big = eq.shoulders === 'plates';
-      const m = lam(big ? 0x6f7883 : gearC);
+      const m = lam(big ? 0x8a949f : padC);
       add(big ? 0.2 : 0.15, big ? 0.1 : 0.07, big ? 0.27 : 0.22, m, 0.29, 0.62, 0);
       add(big ? 0.2 : 0.15, big ? 0.1 : 0.07, big ? 0.27 : 0.22, m, -0.29, 0.62, 0);
     }
