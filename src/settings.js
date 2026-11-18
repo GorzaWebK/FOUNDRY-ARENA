@@ -52,7 +52,7 @@ export function loadSettings() {
   s.fov = Math.min(120, Math.max(70, s.fov));
   s.volume = Math.min(1, Math.max(0, s.volume));
   s.botCount = Math.min(10, Math.max(1, Math.round(s.botCount)));
-  if (!['easy', 'normal', 'hard'].includes(s.difficulty)) s.difficulty = 'normal';
+  if (!['easy', 'normal', 'hard', 'veteran'].includes(s.difficulty)) s.difficulty = 'normal';
   if (!['high', 'low'].includes(s.quality)) s.quality = 'high';
   if (!isPrimary(s.primary)) s.primary = DEFAULT_PRIMARY;
   if (!isTactical(s.tactical)) s.tactical = DEFAULT_TACTICAL;

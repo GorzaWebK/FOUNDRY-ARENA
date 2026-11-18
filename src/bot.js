@@ -204,6 +204,7 @@ export class Bot extends Character {
       const m = this.memOf(c);
       if (!c.alive) { m.visible = false; m.lastSeenT = -99; continue; }
       if (this.canSee(c, m)) {
+        if (!m.visible && now - m.lastSeenT > 2) this.callout(c);
         m.visible = true;
         m.lastSeenT = now;
         m.lastPos.copy(c.pos);
@@ -232,6 +233,23 @@ export class Bot extends Character {
     }
     if (best) this.chooseWeapon(this.pos.distanceTo(best.pos));
     this.decide();
+  }
+
+  /** Just spotted `c`: tell teammates nearby where they are (team modes, Normal and up). */
+  callout(c) {
+    const g = this.game, r = g.skill.callout || 0;
+    if (!r || !g.rules.teams || this.team < 0) return;
+    for (const b of g.bots) {
+      if (b === this || !b.alive || b.team !== this.team || b.target) continue;
+      if (b.pos.distanceTo(this.pos) > r) continue;
+      if (b.state === STATE.RETREAT || (b.state === STATE.OBJECTIVE && g.ctf && g.ctf.carrying(b))) continue;
+      if (!b.alert) b.alert = { pos: new THREE.Vector3(), t: 0, src: null };
+      b.alert.pos.copy(c.pos);
+      b.alert.t = g.time;
+      b.alert.src = c;
+      b.alert.urgent = true;
+      b.calledOut = (b.calledOut || 0) + 1; // (stats, for tests)
+    }
   }
 
   /** Something made a noise nearby. kind = 'shot' | 'step'. */
@@ -304,6 +322,11 @@ export class Bot extends Character {
       if (carrying || (onJob && this.pos.distanceTo(t.pos) > 9)) {
         this.enemy = t;
         this.lastCombatT = now;
+        // running the flag home under fire: smoke between us and them
+        if (carrying && this.tacDef === SMOKE && this.tactical > 0 && this.pos.distanceTo(t.pos) > 6 && Math.random() < 0.35) {
+          const dx = t.pos.x - this.pos.x, dz = t.pos.z - this.pos.z, l = Math.hypot(dx, dz) || 1, k = Math.min(5, l * 0.4);
+          this.tryGrenadeAt(this.pos.x + (dx / l) * k, this.pos.y, this.pos.z + (dz / l) * k, SMOKE);
+        }
         if (!onJob) this.enterFlag();
         return;
       }
@@ -332,7 +355,7 @@ export class Bot extends Character {
         const m = this.memOf(e);
         // head for where they were going, not just where they were
         _t.copy(m.lastPos).addScaledVector(m.lastVel, 0.6);
-        if (Math.random() < 0.5 * this.pers.aggression) {
+        if (Math.random() < 0.5 * this.pers.aggression * Math.min(1, this.game.skill.grenades ?? 1)) {
           // flush them out (a flashbang first, if that's what we carry)
           const def = this.tacDef === FLASH && this.tactical > 0 && Math.random() < 0.6 ? FLASH : GRENADE;
           this.tryGrenadeAt(m.lastPos.x, m.lastPos.y, m.lastPos.z, def);
@@ -344,6 +367,9 @@ export class Bot extends Character {
           const own = this.game.ctf.flags[this.team];
           if (!own || own.carrier !== e) { this.enterFlag(); return; }
         }
+        // circle round instead of walking into their crosshair (more often with teammates keeping them busy)
+        const busy = this.game.bots.some((b) => b !== this && b.alive && b.team === this.team && this.team >= 0 && b.target === e);
+        if (!hz && Math.random() < (this.game.skill.flank || 0) * (busy ? 1.4 : 0.8) * this.pers.aggression && this.enterFlank(e, m)) return;
         this.enterChase(_t, e, 'enemy');
       } else {
         this.pickNext();
@@ -372,6 +398,13 @@ export class Bot extends Character {
       }
     }
     if (this.done) {
+      // flank point reached: now push in on where they were, weapon up
+      if (this.state === STATE.CHASE && this.chaseKind === 'flank' && this.enemy && this.enemy.alive) {
+        const m = this.memOf(this.enemy);
+        if (this.tacDef === FLASH && this.tactical > 0 && (this.game.skill.grenades || 0) >= 1 && Math.random() < 0.5) this.tryGrenadeAt(m.lastPos.x, m.lastPos.y, m.lastPos.z, FLASH);
+        this.enterChase(m.lastPos, this.enemy, 'enemy');
+        return;
+      }
       if (this.state === STATE.CHASE && !this.game.rules.hill) this.enterSearch(this.goal);
       else this.pickNext();
       return;
@@ -494,6 +527,31 @@ export class Bot extends Character {
     this.chaseKind = kind;
     this.stateUntil = this.game.time + 9;
     if (!this.setGoal(pos.x, pos.y, pos.z)) this.done = true;
+  }
+
+  /**
+   * Go round the side: a point off to one side of where they were, reached by a
+   * route that keeps out of their line of fire. Returns false if there isn't one.
+   */
+  enterFlank(e, m) {
+    const nav = this.game.nav, ex = m.lastPos.x, ez = m.lastPos.z;
+    const ux = this.pos.x - ex, uz = this.pos.z - ez, ul = Math.hypot(ux, uz) || 1;
+    if (ul < 8) return false; // too close to bother
+    const side = Math.random() < 0.5 ? 1 : -1;
+    for (let tries = 0; tries < 2; tries++) {
+      const s = tries ? -side : side, r = rand(9, 14), back = rand(-2, 4);
+      const px = ex + (-uz / ul) * s * r + (ux / ul) * back, pz = ez + (ux / ul) * s * r + (uz / ul) * back;
+      const n = nav.nearest(px, m.lastPos.y, pz);
+      if (n < 0) continue;
+      this.setState(STATE.CHASE);
+      this.chaseSrc = e; this.chaseKind = 'flank';
+      this.stateUntil = this.game.time + 10;
+      if (this.setGoal(nav.px[n], nav.py[n], nav.pz[n], { avoid: { x: ex, z: ez, r: 9, w: 8 } })) {
+        this.flanks = (this.flanks || 0) + 1; // (stats, for tests)
+        return true;
+      }
+    }
+    return false;
   }
 
   enterSearch(center) {
@@ -635,10 +693,16 @@ export class Bot extends Character {
         this.lookMode = 'move';
         const arrived = this.followPath(CFG.botSprint);
         const dx = this.goal.x - this.pos.x, dz = this.goal.z - this.pos.z;
-        if (dx * dx + dz * dz < 81 && Math.abs(this.goal.y - this.pos.y) < 2.5) {
-          // close to where the enemy should be: weapon up, eyes on the spot
+        const pre = this.game.skill.preaim || 0;
+        if (this.chaseKind !== 'flank' && pre > 0 && dx * dx + dz * dz < pre * pre && Math.abs(this.goal.y - this.pos.y) < 2.5) {
+          // close to where the enemy should be: weapon up, eyes on the spot (better bots start sooner)
           this.lookMode = 'point';
           this.lookPos.set(this.goal.x, this.goal.y + 1.4, this.goal.z);
+          this.lookUntil = now + 0.2;
+        } else if (this.chaseKind === 'flank' && this.chaseSrc && dx * dx + dz * dz < 36) {
+          const m = this.memOf(this.chaseSrc);
+          this.lookMode = 'point';
+          this.lookPos.set(m.lastPos.x, m.lastPos.y + 1.4, m.lastPos.z);
           this.lookUntil = now + 0.2;
         }
         if (arrived || now > this.stateUntil) this.done = true;
@@ -755,6 +819,14 @@ export class Bot extends Character {
           // at range a steady stance is what makes rifle bursts land.
           this.atSpot = true;
           if (!wantCover) this.repositionT = d < 9 ? rand(0.05, 0.35) : rand(0.55, 1.3);
+          // low cover between us and them? (blocked at crouch height, clear standing)
+          this.lowCover = false;
+          if (g.skill.peek && d > 8) {
+            t.getEye(_e2);
+            const crouchY = this.pos.y + CFG.eyeCrouch, standY = this.pos.y + CFG.eyeStand;
+            this.lowCover = g.world.segmentBlocked(this.pos.x, crouchY, this.pos.z, _e2.x, _e2.y, _e2.z) && !g.world.segmentBlocked(this.pos.x, standY, this.pos.z, _e2.x, _e2.y, _e2.z);
+            if (this.lowCover) this.repositionT = Math.max(this.repositionT, rand(1.8, 3)); // a good spot: hold it
+          }
         }
       }
     } else {
@@ -767,7 +839,10 @@ export class Bot extends Character {
       this.wishX = sx; this.wishZ = sz;
       this.wishSpeed = CFG.botRun * 0.75;
     }
-    this.setCrouch(wantCover && this.spotCovered && this.hasSpot && this.wishSpeed === 0);
+    // peeking: duck behind the low cover between bursts and while reloading, pop up to shoot
+    const peekDuck = this.lowCover && this.atSpot && this.wishSpeed === 0 && (this.burstPause > 0.08 || w.reloadT > 0 || this.reactT > 0.05);
+    if (peekDuck && !this.crouching) this.peeks = (this.peeks || 0) + 1; // (stats, for tests)
+    this.setCrouch((wantCover && this.spotCovered && this.hasSpot && this.wishSpeed === 0) || peekDuck);
   }
 
   /**
@@ -1083,7 +1158,7 @@ export class Bot extends Character {
     _d.set((dx / dh) * c, Math.sin(ang), (dz / dh) * c);
     if (g.world.raycast(_eye.x, _eye.y, _eye.z, _d.x, _d.y, _d.z, 3.5, null)) return false; // wall in the way
     if (g.world.raycast(_eye.x, _eye.y, _eye.z, _d.x, _d.y, _d.z, Math.min(3.5, dh), null) && def === SMOKE) return false;
-    if (def !== SMOKE) this.nextGrenadeT = g.time + rand(5, 10);
+    if (def !== SMOKE) this.nextGrenadeT = g.time + rand(5, 10) / Math.max(0.25, g.skill.grenades ?? 1);
     // a flashbang is thrown so it pops near them, not after rolling past
     const fuse = def === FLASH ? Math.min(def.fuse, dh / (v * Math.cos(Math.atan2(_d.y, Math.hypot(_d.x, _d.z)))) + 0.25) : def.fuse;
     if (!this.throwGrenade(_d, def, fuse)) return false;
@@ -1109,7 +1184,7 @@ export class Bot extends Character {
         const ads = w.def.scope && Math.hypot(this.vel.x, this.vel.z) < 2 ? 1 : 0;
         const cone = w.def.pellets > 1 ? 0 : this.currentSpread(ads) * d;
         // a settled fight at mid range is a good moment for a grenade
-        if (d > 9 && d < 24 && this.trackTime > 0.8 && Math.random() < dt * 0.6 * this.pers.aggression) {
+        if (d > 9 && d < 24 && this.trackTime > 0.8 && Math.random() < dt * 0.6 * this.pers.aggression * (g.skill.grenades ?? 1)) {
           const def = this.tacDef === FLASH && this.tactical > 0 && Math.random() < 0.4 ? FLASH : GRENADE;
           this.tryGrenadeAt(t.pos.x + t.vel.x * 0.8, t.pos.y, t.pos.z + t.vel.z * 0.8, def);
         }

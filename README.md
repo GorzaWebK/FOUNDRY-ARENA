@@ -551,6 +551,17 @@ combat systems:
   cover, and run from grenades that land near them. Bots carrying flashbangs throw
   them ahead of a push (and look away); bots carrying smoke cover their retreat
   with it. A flashbanged bot can't see and stumbles; smoke blocks their sight.
+- **Tactics** — they **flank**: when you break line of sight they may circle
+  round to your side on a route that avoids your line of fire (more often while a
+  teammate keeps you busy), flashbang the corner and push in. They make
+  **call-outs**: a bot that spots you tells teammates nearby, who converge. They
+  **peek** from low cover: stand to shoot, duck between bursts and to reload.
+  They **pre-aim** where they last saw you while closing in, and a flag carrier
+  smokes their run home.
+- **Difficulty** — Easy, Normal, Hard and **Veteran** differ in tactics as well
+  as aim: Easy bots don't flank, call out or peek and rarely throw grenades;
+  Normal adds flanking and call-outs; Hard adds peeking; Veteran does all of it
+  more often, reacts in about a tenth of a second and pre-aims from 20 m.
 - **Personality** — every bot rolls its own aggression, aim and preferences, so
   they do not all behave alike.
 
