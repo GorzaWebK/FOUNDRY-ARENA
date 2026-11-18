@@ -1,5 +1,8 @@
 import { defineConfig } from 'vite';
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+
+const VERSION = JSON.parse(readFileSync(new URL('./package.json', import.meta.url))).version;
 
 // Version stamp: the git commit this build was made from. Players compare it
 // when joining a room, so an old tab can't join a newer host (or vice versa).
@@ -20,5 +23,6 @@ export default defineConfig({
   define: {
     __BUILD__: JSON.stringify(buildId()),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __VERSION__: JSON.stringify(VERSION),
   },
 });

@@ -967,3 +967,12 @@ body.soft-flash #flashbang { background: #8b9096; transition: opacity 0.35s ease
 .rp-row .small-btn { padding: 4px 9px; font-size: 12px; }
 .rp-row select { font-size: 13px; padding: 3px 6px; }
 .small-btn.danger { color: #ff7a6a; border-color: rgba(255, 90, 80, 0.4); }
+
+/* first run + credits */
+.wl-step input[type='text'] { width: 100%; font-size: 18px; padding: 10px 12px; margin: 6px 0 12px; }
+.wl-step .row { margin: 8px 0; }
+.credits-panel { width: min(560px, 100%); }
+.credits-panel h4 { margin: 14px 0 4px; }
+.cr-ver { font: 600 12px var(--mono); color: var(--dim); margin: 2px 0 6px; }
+.cr-list { margin: 0; padding-left: 18px; line-height: 1.6; font-size: 14px; }
+.foot-meta .link-btn { margin-left: 10px; padding: 0; }

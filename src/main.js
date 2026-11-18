@@ -33,7 +33,7 @@ import { FIREBASE_CONFIG } from './online-config.js';
 import { MAX_HUMANS } from './config.js';
 import { cleanRoomCode, migrateCode } from './transport.js';
 import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
-import { BUILD, BUILD_TIME } from './version.js';
+import { BUILD, BUILD_TIME, VERSION } from './version.js';
 import { START_SR, RANKED_MODES, RANKED_MAPS, TIERS, tierIndex, tierName, tierColor, seasonId, seasonName, msToSeasonEnd, srChange } from './ranked.js';
 import { getAccount, exportCode, parseCode, importAccount, friendCode, cleanFriendCode, showFriendCode } from './account.js';
 import { SKINS, SKIN_KILLS, skinSwatchCss, skinUnlocked, skinLockText } from './skins.js';
@@ -50,7 +50,7 @@ import { filterChat } from './chatfilter.js';
   // version stamp on the main menu, so players can compare before joining
   const el = document.getElementById('version-note');
   const day = BUILD_TIME ? BUILD_TIME.slice(0, 10) : '';
-  if (el) el.textContent = 'Build ' + BUILD;
+  if (el) el.textContent = `v${VERSION} · build ${BUILD}`;
   if (el && day) el.title = `Built ${day}`;
 }
 
@@ -2305,6 +2305,50 @@ async function startTutorial() {
 game.onTutorialDone = () => { settings.tutorialDone = true; saveSettings(settings); };
 $('btn-tutorial').addEventListener('click', startTutorial);
 $('btn-welcome-go').addEventListener('click', startTutorial);
+
+// ---------------------------------------------------------------- first run
+let benchFrames = null; // frame times while the welcome is up (menu background running)
+function startWelcome() {
+  $('welcome-ov').classList.remove('hidden');
+  for (const [i, id] of ['wl-1', 'wl-2', 'wl-3'].entries()) $(id).classList.toggle('hidden', i !== 0);
+  $('wl-name').value = settings.name || '';
+  setTimeout(() => $('wl-name').focus(), 50);
+  benchFrames = [];
+}
+/** Graphics for this computer, from how the menu background ran: frames per second at High. */
+function suggestQuality() {
+  const f = (benchFrames || []).slice(20); // skip the first frames (shaders compiling)
+  benchFrames = null;
+  if (f.length < 20) return settings.quality;
+  f.sort((a, b) => a - b);
+  const fps = 1 / f[Math.floor(f.length / 2)];
+  return fps >= 55 ? 'high' : fps >= 40 ? 'medium' : 'low';
+}
+function welcomeName() {
+  const n = cleanName($('wl-name').value);
+  if (n) { settings.name = n; nameInput.value = n; saveSettings(settings); updateBoardEntry(); }
+  $('wl-1').classList.add('hidden');
+  $('wl-2').classList.remove('hidden');
+  // give the measurement a moment if it's only just started
+  const pick = () => {
+    const q = suggestQuality();
+    $('wl-gfx').value = q;
+    $('wl-gfx-line').textContent = `We picked ${q[0].toUpperCase() + q.slice(1)} for this computer.`;
+    settings.quality = q; saveSettings(settings); onSetting('quality');
+  };
+  if (benchFrames && benchFrames.length < 60) setTimeout(pick, 1200); else pick();
+}
+$('btn-wl-next').addEventListener('click', welcomeName);
+$('wl-name').addEventListener('keydown', (e) => { if (e.code === 'Enter') welcomeName(); });
+$('wl-gfx').addEventListener('change', () => { settings.quality = $('wl-gfx').value; saveSettings(settings); onSetting('quality'); });
+$('btn-wl-next2').addEventListener('click', () => { $('wl-2').classList.add('hidden'); $('wl-3').classList.remove('hidden'); });
+
+// ---------------------------------------------------------------- credits
+$('btn-credits').addEventListener('click', () => {
+  $('cr-ver').textContent = `Version ${VERSION} · build ${BUILD}${BUILD_TIME ? ` · ${BUILD_TIME.slice(0, 10)}` : ''}`;
+  $('credits-ov').classList.remove('hidden');
+});
+$('btn-credits-done').addEventListener('click', () => $('credits-ov').classList.add('hidden'));
 $('btn-welcome-no').addEventListener('click', () => { settings.tutorialDone = true; saveSettings(settings); $('welcome-ov').classList.add('hidden'); });
 $('btn-range-reset').addEventListener('click', () => { if (game.range) game.range.resetStats(); resume(); });
 $('btn-quit').addEventListener('click', leaveToMenu);
@@ -2583,6 +2627,7 @@ function frame(now) {
   if (dt <= 0) return;
   tick(dt, true);
   dynamicResolution(dt);
+  if (benchFrames && benchFrames.length < 400) benchFrames.push(dt);
 }
 
 /** Settings → Dynamic resolution: drop the resolution while frames run slow, raise it back when there's room. */
@@ -2627,9 +2672,15 @@ else party.restore(settings.name || 'Player');
 renderParty();
 updateBoardEntry();
 if (!params.has('nolobby')) lobby.connect();
-// first visit: offer the tutorial (not when arriving through an invite, and not to people who've already played)
-if (!settings.tutorialDone && !game.career.stats.matches && !params.get('join') && !params.get('party') && !params.has('notut')) $('welcome-ov').classList.remove('hidden');
+// first visit: a name, graphics that suit this computer, and the tutorial (not when
+// arriving through an invite, and not for people who've already played)
+if (!settings.tutorialDone && !game.career.stats.matches && !params.get('join') && !params.get('party') && !params.has('notut')) startWelcome();
 requestAnimationFrame(frame);
+// the loading screen goes once the menu is up
+{
+  const boot = $('boot');
+  if (boot) { clearInterval(window.__bootTips); boot.classList.add('done'); setTimeout(() => boot.remove(), 600); }
+}
 
 // handy for debugging / automated tests
 window.__game = game;
