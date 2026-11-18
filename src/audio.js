@@ -453,16 +453,6 @@ export class AudioSys {
         this._noise(o, t + 0.3, 0.025, 'bandpass', 4200, 6, 0.15);
         break;
       }
-      case 'crossbow': {
-        // a thwack and a twang: string slap, then the limbs ringing
-        const o = this._out(pos, 0.55 * vol, 6, 0.35); if (!o) return;
-        this._noise(o, t, 0.035, 'bandpass', 1800, 2, 0.9);
-        this._tone(o, t, 0.06, 'triangle', 320, 140, 0.5);
-        this._tone(o, t + 0.005, 0.28, 'sine', 196, 180, 0.22);
-        this._tone(o, t + 0.005, 0.22, 'sine', 392, 370, 0.08);
-        this._noise(o, t + 0.02, 0.18, 'highpass', 5000, 0.6, 0.12, 0.05); // the bolt whistling off
-        break;
-      }
       case 'lmg': {
         this._shot(pos, 0.75 * vol, 14, { crack: [2900, 0.025, 0.95], body: [950, 0.65, 0.13, 1.05], low: [135, 44, 0.12, 0.8], sub: [80, 34, 0.1, 0.5], tail: [0.3, 450, 0.36], mech: [[0.04, 1700, 5, 0.22], [0.06, 3200, 7, 0.12]], verb: 1.1 });
         break;

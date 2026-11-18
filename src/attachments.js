@@ -21,12 +21,12 @@ export const ATTACHMENTS = {
   muzzle: [
     { id: 'none', name: 'None' },
     {
-      id: 'supp', name: 'Suppressor', kills: 10, not: ['crossbow', 'shotgun'],
+      id: 'supp', name: 'Suppressor', kills: 10, not: ['shotgun'],
       desc: 'Quiet shots that others only hear from close by, and a small flash. Damage falls off sooner.',
       mods: (d) => ({ noise: Math.round(d.noise * 0.35), falloffStart: d.falloffStart * 0.85, falloffEnd: d.falloffEnd * 0.85, suppressed: true }),
     },
     {
-      id: 'comp', name: 'Compensator', kills: 30, not: ['crossbow'],
+      id: 'comp', name: 'Compensator', kills: 30,
       desc: 'Tames the muzzle: 30% less recoil and kick.',
       mods: (d) => ({ recoil: d.recoil * 0.7, kick: d.kick * 0.75 }),
     },
@@ -47,7 +47,7 @@ export const ATTACHMENTS = {
   mag: [
     { id: 'none', name: 'None' },
     {
-      id: 'ext', name: 'Extended mag', kills: 25, not: ['crossbow'],
+      id: 'ext', name: 'Extended mag', kills: 25,
       desc: 'Half as many rounds again, but a slower reload.',
       mods: (d) => ({ magSize: Math.max(d.magSize + 1, Math.round(d.magSize * 1.5)), reload: d.reload * 1.12 }),
     },

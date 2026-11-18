@@ -464,7 +464,6 @@ export class Net {
     if (++c.msgN > 200) { if (c.floods >= 3) this.kick(c, true); return; }
     if (m.t === 'u') this._hostState(c, m.d);
     else if (m.t === 'f') this._hostFire(c, m);
-    else if (m.t === 'bo') this._hostBolt(c, m);
     else if (m.t === 'g') this._hostGrenade(c, m);
     else if (m.t === 'k') this._hostKnife(c, m);
     else if (m.t === 'vote') this._vote(c.id, m.i);
@@ -620,40 +619,6 @@ export class Net {
       c.tacId = tac;
       c.tacDef = TACTICAL_BY_ID[tac];
     }
-  }
-
-  /** A remote player loosed a crossbow bolt: the host flies the real one, others see a copy. */
-  _hostBolt(c, m) {
-    const g = this.game;
-    if (!c.alive || g.over) return;
-    const def = WEAPONS[m.w];
-    if (!def || !def.projectile || !Array.isArray(m.o) || !Array.isArray(m.d) || !m.o.every(num) || !m.d.every(num)) return;
-    const now = performance.now() / 1000;
-    if (now - c.lastFireT < def.interval * 0.6) return;
-    c.lastFireT = now;
-    c.weaponIdx = 0;
-    c.protectedUntil = 0;
-    const l = Math.hypot(m.d[0], m.d[1], m.d[2]);
-    if (l < 0.5) return;
-    // from where they said, if that's close to where we have them
-    c.getEye(_eye);
-    const o = Math.hypot(m.o[0] - _eye.x, m.o[1] - _eye.y, m.o[2] - _eye.z) < 2.5 ? m.o : [_eye.x, _eye.y, _eye.z];
-    g.bolts.fire(c, def, o[0], o[1], o[2], m.d[0] / l, m.d[1] / l, m.d[2] / l, true);
-    this.broadcast({ t: 'bo', id: c.id, w: def.index, o: o.map(r2), d: [r3(m.d[0] / l), r3(m.d[1] / l), r3(m.d[2] / l)] }, c.conn);
-    g.audio.play(def.id, c.pos);
-    g.emitNoise(c.pos.x, c.pos.y, c.pos.z, def.noise, c, 'shot');
-  }
-
-  /** Host: our own (or a bot's) bolt, for everyone to see. */
-  onBolt(shooter, def, o, d) {
-    if (!this.game.remotes.some((r) => r.conn)) return;
-    this.broadcast({ t: 'bo', id: shooter.id, w: def.index, o: [r2(o.x), r2(o.y), r2(o.z)], d: [r3(d.x), r3(d.y), r3(d.z)] });
-  }
-
-  /** Client: we loosed a bolt. */
-  sendBolt(def, o, d) {
-    if (!this.conn) return;
-    this.conn.send({ t: 'bo', w: def.index, o: [r2(o.x), r2(o.y), r2(o.z)], d: [r3(d.x), r3(d.y), r3(d.z)] });
   }
 
   /** A remote player fired. Relay the visuals and check their hit claims. */
@@ -906,14 +871,6 @@ export class Net {
       case 'shot':
         if (m.id !== p.id) this.showShot(m);
         break;
-      case 'bo': {
-        // someone else's crossbow bolt (looks only: the host's copy does the damage)
-        const def = WEAPONS[m.w], c = g.charById(m.id);
-        if (!def || !def.projectile || !c || c === p || !Array.isArray(m.o) || !Array.isArray(m.d) || !m.o.every(num) || !m.d.every(num)) break;
-        g.bolts.fire(c, def, m.o[0], m.o[1], m.o[2], m.d[0], m.d[1], m.d[2], false);
-        g.audio.play(def.id, c.pos);
-        break;
-      }
       case 'kill': {
         const victim = g.charById(m.v);
         if (!victim || !victim.alive) break;

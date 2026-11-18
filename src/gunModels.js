@@ -383,42 +383,6 @@ function dmr(mats) {
   };
 }
 
-function crossbow(mats) {
-  const k = kit(mats), g = new THREE.Group();
-  k.box(g, 0.04, 0.05, 0.56, 'woodDark', 0, -0.01, -0.12); // stock / rail body
-  k.box(g, 0.012, 0.008, 0.46, 'metal', 0, 0.018, -0.16); // the bolt's groove
-  // the bow: two limbs swept back from the front, and the string between their tips
-  const lim = (side) => {
-    k.box(g, 0.24, 0.022, 0.03, 'polymer', side * 0.13, 0.004, -0.38, 0, side * 0.32, 0);
-    k.box(g, 0.02, 0.026, 0.03, 'metalLight', side * 0.245, 0.004, -0.31); // cam
-  };
-  lim(1); lim(-1);
-  k.box(g, 0.07, 0.05, 0.05, 'metal', 0, 0.0, -0.4); // riser
-  k.box(g, 0.49, 0.004, 0.004, 'white', 0, 0.006, -0.12); // string (drawn)
-  k.box(g, 0.06, 0.02, 0.06, 'metal', 0, 0.015, -0.11); // latch
-  // sight: a ring on a post
-  k.box(g, 0.006, 0.04, 0.008, 'metal', 0, 0.045, -0.3);
-  k.box(g, 0.02, 0.004, 0.008, 'orange', 0, 0.066, -0.3);
-  k.box(g, 0.024, 0.02, 0.02, 'metal', 0, 0.04, 0.05);
-  k.box(g, 0.03, 0.09, 0.045, 'wood', 0, -0.08, 0.08, -0.3); // grip
-  k.guard(g, -0.0, 0.07, -0.035, -0.065);
-  k.box(g, 0.04, 0.075, 0.18, 'wood', 0, -0.03, 0.24); // butt
-  k.box(g, 0.042, 0.085, 0.02, 'polymer', 0, -0.032, 0.335);
-  // the loaded bolt: shaft, steel tip, fletching (it's the "mag": gone once fired)
-  const mag = k.group(g, 0, 0.026, -0.2);
-  k.cyl(mag, 0.005, 0.42, 'polymerLight', 0, 0, 0, 6);
-  k.cone(mag, 0.0, 0.009, 0.04, 'metalLight', 0, 0, -0.23);
-  k.box(mag, 0.002, 0.016, 0.05, 'orange', 0, 0.008, 0.17);
-  k.box(mag, 0.016, 0.002, 0.05, 'orange', 0, 0.003, 0.17);
-  return {
-    group: g, parts: { mag }, casing: null,
-    points: {
-      muzzle: V(0, 0.026, -0.44), eject: V(0, 0.03, -0.1), sight: V(0, 0.066, 0),
-      grip: V(0, -0.075, 0.09), fore: V(0, -0.03, -0.26), magwell: V(0, 0.03, -0.2), center: V(0, 0, -0.1),
-    },
-  };
-}
-
 function revolver(mats) {
   const k = kit(mats), g = new THREE.Group();
   k.box(g, 0.03, 0.05, 0.11, 'metal', 0, 0.006, 0.0); // frame
@@ -444,7 +408,7 @@ function revolver(mats) {
   };
 }
 
-const BUILDERS = { pistol, rifle, smg, shotgun, sniper, lmg, burst, dmr, crossbow, revolver };
+const BUILDERS = { pistol, rifle, smg, shotgun, sniper, lmg, burst, dmr, revolver };
 
 /** First-person gun: separate meshes so parts can move. */
 export function buildGun(id, mats) {
@@ -518,7 +482,7 @@ export function fitAttachments(spec, id, mats, list) {
 /** Extended mag: a longer magazine. */
 export function setMagSize(spec, ext) {
   const m = spec.parts && spec.parts.mag;
-  if (!m || spec.id === 'crossbow' || spec.id === 'revolver') return;
+  if (!m || spec.id === 'revolver') return;
   m.scale.y = ext ? 1.4 : 1;
 }
 

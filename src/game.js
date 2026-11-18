@@ -15,7 +15,6 @@ import { Player } from './player.js';
 import { Bot } from './bot.js';
 import { damageAtDistance, GRENADE, FLASH, KNIFE, makeLoadout, makeSingle } from './weapons.js';
 import { SmokeClouds } from './smoke.js';
-import { Bolts } from './bolts.js';
 import { ATT_SLOTS, ATTACHMENTS, fits, attUnlocked } from './attachments.js';
 import { applyCrosshair } from './settings.js';
 import { Career } from './career.js';
@@ -120,8 +119,6 @@ export class Game {
 
     this.effects = new Effects(this.scene);
     this.smokes = new SmokeClouds(this.scene);
-    this.bolts = new Bolts(this);
-    this.rayCharHit = rayChar;
     this.viewmodel = new ViewModel();
     this.announcer = new Announcer(settings, audio, hud);
     this.killcam = new KillCam(this);
@@ -722,7 +719,6 @@ export class Game {
 
   fireWeapon(shooter, w, ads) {
     const def = w.def;
-    if (def.projectile) { this.fireBolt(shooter, w, ads); return; }
     const fx = this.effects, world = this.world;
     shooter.getEye(_o);
     shooter.aimDir(_dir);
@@ -808,46 +804,6 @@ export class Game {
     this.countShot(shooter, victims.some((v) => !v.c.isProtected() && !this.sameTeam(v.c, shooter)));
     this.emitNoise(shooter.pos.x, shooter.pos.y, shooter.pos.z, def.noise, shooter, 'shot');
     for (const v of victims) this.damage(v.c, v.dmg, shooter, v.head, def);
-  }
-
-  /** Crossbow: loose a bolt (a real projectile; see bolts.js). */
-  fireBolt(shooter, w, ads) {
-    const def = w.def;
-    shooter.getEye(_o);
-    shooter.aimDir(_dir);
-    const spread = shooter.currentSpread(ads);
-    shooter.getMuzzle(_muz);
-    _right.crossVectors(_dir, UP);
-    if (_right.lengthSq() < 1e-6) _right.set(1, 0, 0);
-    _right.normalize();
-    _up.crossVectors(_right, _dir);
-    const a = Math.random() * Math.PI * 2, r = spread * Math.sqrt(Math.random());
-    _d.copy(_dir).addScaledVector(_right, Math.cos(a) * r).addScaledVector(_up, Math.sin(a) * r).normalize();
-    const client = this.mode === 'client';
-    this.bolts.fire(shooter, def, _o.x, _o.y, _o.z, _d.x, _d.y, _d.z, !client, _muz);
-    shooter.protectedUntil = 0;
-    this.audio.play(def.id, shooter.isPlayer ? null : shooter.pos);
-    shooter.onFired(def);
-    this.stats.shots++;
-    if (client) { this.net.sendBolt(def, _o, _d); return; }
-    if (this.mode === 'host') this.net.onBolt(shooter, def, _o, _d);
-    this.emitNoise(shooter.pos.x, shooter.pos.y, shooter.pos.z, def.noise, shooter, 'shot');
-  }
-
-  /** Authority: a bolt hit someone. */
-  boltHit(b, victim, head) {
-    const s = b.shooter;
-    if (!this.chars.includes(s)) return;
-    const hurt = !victim.isProtected() && !this.sameTeam(victim, s);
-    this.countShot(s, hurt);
-    if (s.isPlayer && this.forCareer) this.career.shot(hurt);
-    this.damage(victim, b.def.damage * (head ? CFG.headshotMult : 1), s, head, b.def);
-  }
-
-  /** Authority: a bolt hit a wall. */
-  boltMissed(b) {
-    this.countShot(b.shooter, false);
-    if (b.shooter.isPlayer && this.forCareer) this.career.shot(false);
   }
 
   damage(victim, amount, attacker, head, def) {
@@ -1142,7 +1098,6 @@ export class Game {
   }
 
   clearGrenades() {
-    if (this.bolts) this.bolts.clear();
     for (let i = this.grenades.length - 1; i >= 0; i--) this.removeGrenade(i);
     if (this.smokes) this.smokes.clear();
   }
@@ -1504,7 +1459,6 @@ export class Game {
     for (const r of this.remotes) r.update(dt);
     for (const b of this.bots) b.update(dt);
     this.updateGrenades(dt);
-    this.bolts.update(dt);
     this.updatePickups(dt);
     if (this.rules.hill && !this.attract) this.updateHill(dt);
     if (this.ctf && !this.attract) this.ctf.update(dt);
@@ -1560,7 +1514,6 @@ export class Game {
     for (const r of this.remotes) r.update(dt);
     for (const p of this.pickups) p.update(dt, this.time, false);
     this.updateGrenades(dt);
-    this.bolts.update(dt);
     if (this.rules.hill) this.hill.t = Math.max(0, this.hill.t - dt); // re-synced by snapshots
     if (this.ctf) this.ctf.updateVisuals(dt, this.time);
     if (this.obj) this.obj.updateVisuals(dt, this.time);

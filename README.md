@@ -349,15 +349,16 @@ no server to make them cheat-proof.
 
 ### Weapon skins
 
-Every gun has five camos: Woodland, Desert, Arctic, Crimson and Tiger. A gun's
-camos unlock once you have **50 kills with that gun** (career stats count them).
-Pick them under **Weapon skins…** (next to Loadout, or in Career): each gun
-shows its swatches, your progress towards 50, and which one you're wearing.
+Every gun has five camos, unlocked one at a time by kills with that gun (career
+stats count them): **Woodland at 50, Desert at 100, Arctic at 150, Crimson at
+200 and Tiger at 250**. Pick them under **Skins…** (next to Loadout, or in
+Career): each gun shows its swatches, your progress towards the next camo, and
+which one you're wearing.
 Skins show on your gun in first person and on your character, other players
 see them in multiplayer, and some bots run camos too.
 
 Two mastery camos sit on top: **Gold** for a gun once you're level 20 (or have
-prestiged) and have 150 kills with it, and **Diamond** (for any gun) once the
+prestiged) and have 300 kills with it, and **Diamond** (for any gun) once the
 pistol, rifle, SMG, shotgun, sniper and LMG all have Gold (the newer guns don't
 count towards it, so nobody loses a Diamond they had). Both cover the whole gun, metal included, and shine.
 
@@ -408,7 +409,6 @@ parts are merged into one mesh per material).
 | LMG           | 60 / 120      | 17      | huge belt, heavy: slower movement, long reload       |
 | Burst rifle   | 30 / 90       | 20 × 3  | each trigger pull fires a three-round burst; red-dot sight |
 | Marksman rifle| 12 / 48       | 42      | semi-auto with a low-power optic (a wide scope view with a chevron): three body shots or a head and a body |
-| Crossbow      | 1 / 14        | 110     | fires a real bolt that flies at 85 m/s and drops, so lead moving targets and aim a touch high at range. One hit kills. Almost silent (bots barely hear it); bolts stick in walls |
 | Pistol        | 12 / ∞        | 25      | the standard sidearm                                 |
 | Revolver      | 6 / ∞         | 52      | the other sidearm: slow and heavy, two body shots up close |
 | Grenade       | 2 (max 3)     | up to 130 | 2.3 s fuse, bounces, 7.5 m blast; walls block it; hurts you too |
@@ -428,7 +428,7 @@ fire and a muzzle flash that lights up your hands. Other players carry the gun
 they are actually using: the primary in their hands with the sidearm holstered on
 the hip, or the sidearm out with the primary slung across their back.
 
-**Loadout:** pick one of eight primaries, a sidearm (pistol or revolver) and a
+**Loadout:** pick one of seven primaries, a sidearm (pistol or revolver) and a
 tactical (flashbang or smoke) on the main menu, or from the pause menu for your
 next spawn. Snipers Only always gives the pistol.
 
@@ -452,9 +452,9 @@ gun:
 The panel compares the gun's numbers with and without your set as you hover
 over options. Attachments show on the gun in first person and on your character
 (others see them in multiplayer), apply from your next spawn, and bots run random
-sets. A suppressor doesn't fit the shotgun or crossbow.
+sets. A suppressor doesn't fit the shotgun.
 
-Every gun but the crossbow is hitscan, and reloads by themselves when the magazine runs dry. Headshots deal 2×. Damage falls off with distance. Moving,
+All guns are hitscan, and reload by themselves when the magazine runs dry. Headshots deal 2×. Damage falls off with distance. Moving,
 jumping and holding the trigger widen the cone; crouching and aiming tighten it.
 
 ## Maps
@@ -715,7 +715,6 @@ src/medals.js         medal and achievement definitions
 src/attachments.js    Gunsmith attachments: slots, unlocks, stat changes
 src/seasonpass.js     the free season pass: themes, tiers, rewards
 src/music.js          music sequencer (menu + adaptive match music) and map ambience
-src/bolts.js          crossbow bolts (projectiles)
 src/career.js         career stats (local, part of the account)
 src/skins.js          weapon camos: patterns, unlocks, colours
 src/progress.js       XP, levels, prestige, equipped cosmetics

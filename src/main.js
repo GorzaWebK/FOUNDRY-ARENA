@@ -36,7 +36,7 @@ import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
 import { BUILD, BUILD_TIME, VERSION } from './version.js';
 import { START_SR, RANKED_MODES, RANKED_MAPS, TIERS, tierIndex, tierName, tierColor, seasonId, seasonName, msToSeasonEnd, srChange } from './ranked.js';
 import { getAccount, exportCode, parseCode, importAccount, friendCode, cleanFriendCode, showFriendCode } from './account.js';
-import { SKINS, SKIN_KILLS, skinSwatchCss, skinUnlocked, skinLockText } from './skins.js';
+import { SKINS, skinSwatchCss, skinUnlocked, skinLockText, nextCamo, camoKills } from './skins.js';
 import { SLOTS, ITEMS, itemOf, unlocksAt, packCosmetics, unpackCosmetics } from './cosmetics.js';
 import { MEDALS, MEDAL_BY_ID, ACHIEVEMENTS, ACH_BY_ID } from './medals.js';
 import { ATT_SLOTS, ATTACHMENTS, fits, attUnlocked, attList, withAttachments } from './attachments.js';
@@ -2013,10 +2013,10 @@ function renderCareer() {
     const b = document.createElement('td'); b.textContent = n;
     const p = document.createElement('td'); p.className = 'l';
     if (gun) {
-      // skin swatches: click one to wear it (locked until SKIN_KILLS kills with this gun)
+      // skin swatches: click one to wear it (camos unlock one at a time: every 50 kills with this gun)
       const row = document.createElement('div'); row.className = 'swatches';
       const current = settings.skins[id] || 'none';
-      const open = n >= SKIN_KILLS;
+      const next = nextCamo(n);
       for (const sk of SKINS) {
         const b = document.createElement('button');
         b.type = 'button';
@@ -2034,10 +2034,11 @@ function renderCareer() {
         });
         row.append(b);
       }
-      if (!open) {
+      if (next) {
         const prog = document.createElement('span');
         prog.className = 'prog';
-        prog.textContent = `${n}/${SKIN_KILLS}`;
+        prog.textContent = `${n}/${camoKills(next.id)}`;
+        prog.title = `Next: ${next.name} at ${camoKills(next.id)} kills`;
         row.append(prog);
       }
       p.append(row);

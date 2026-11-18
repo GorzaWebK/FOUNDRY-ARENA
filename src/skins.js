@@ -1,13 +1,14 @@
-// Weapon skins (camos). A gun's skins unlock after SKIN_KILLS kills with that
-// gun (counted in career stats). A skin repaints the gun's body parts (stock,
+// Weapon skins (camos). A gun's camos unlock one at a time, every SKIN_KILLS
+// kills with that gun (counted in career stats): the first at 50, the next at
+// 100, and so on. A skin repaints the gun's body parts (stock,
 // grip, furniture, receiver covers); barrels, sights and accents stay as they are.
 
 import * as THREE from 'three';
 
-export const SKIN_KILLS = 50;
-export const GOLD_KILLS = 150; // plus level 20 (or any prestige)
+export const SKIN_KILLS = 50; // kills between one camo and the next
+export const GOLD_KILLS = 300; // plus level 20 (or any prestige)
 export const GOLD_LEVEL = 20;
-export const SKIN_GUNS = ['pistol', 'rifle', 'smg', 'shotgun', 'sniper', 'lmg', 'burst', 'dmr', 'crossbow', 'revolver'];
+export const SKIN_GUNS = ['pistol', 'rifle', 'smg', 'shotgun', 'sniper', 'lmg', 'burst', 'dmr', 'revolver'];
 /** Diamond needs Gold on these (the six original guns, so adding guns never takes Diamond away). */
 export const DIAMOND_GUNS = ['pistol', 'rifle', 'smg', 'shotgun', 'sniper', 'lmg'];
 
@@ -25,6 +26,16 @@ export const SKINS = [
 export const COMMON_SKINS = SKINS.filter((s) => s.colors && !s.special);
 export const SKIN_BY_ID = Object.fromEntries(SKINS.map((s) => [s.id, s]));
 export const skinIndex = (id) => Math.max(0, SKINS.findIndex((s) => s.id === id));
+
+/** Kills with a gun that unlock this common camo: 50 for the first, 50 more for each after. */
+export function camoKills(id) {
+  const i = COMMON_SKINS.findIndex((s) => s.id === id);
+  return i < 0 ? 0 : (i + 1) * SKIN_KILLS;
+}
+/** The next camo still to unlock on a gun with `kills` kills, or null. */
+export function nextCamo(kills) {
+  return COMMON_SKINS.find((s) => kills < camoKills(s.id)) || null;
+}
 
 // palette keys a skin paints over (see gunModels.js PALETTE)
 export const SKINNED = ['polymer', 'polymerLight', 'olive', 'tan', 'wood', 'woodDark', 'metalLight'];
@@ -125,7 +136,7 @@ export function skinColor(id, key) {
   return skin.colors[skin.stripes && key === 'polymer' ? 0 : i];
 }
 
-/** Gold on `weaponId`: level 20 (or any prestige) and 150 kills with it. */
+/** Gold on `weaponId`: level 20 (or any prestige) and 300 kills with it. */
 export function goldUnlocked(career, progress, weaponId) {
   return (progress.level >= GOLD_LEVEL || progress.prestige > 0) && career.weaponKills(weaponId) >= GOLD_KILLS;
 }
@@ -135,12 +146,13 @@ export function skinUnlocked(career, weaponId, id, progress = null) {
   if (id === 'none') return true;
   if (id === 'gold') return !!progress && goldUnlocked(career, progress, weaponId);
   if (id === 'diamond') return !!progress && DIAMOND_GUNS.every((w) => goldUnlocked(career, progress, w));
-  return career.weaponKills(weaponId) >= SKIN_KILLS;
+  return career.weaponKills(weaponId) >= camoKills(id);
 }
 
 /** Why a skin is locked, for tooltips. */
 export function skinLockText(career, weaponId, id, progress, gunName) {
   if (id === 'gold') return `Gold: level ${GOLD_LEVEL} and ${GOLD_KILLS} ${gunName} kills (${career.weaponKills(weaponId)}/${GOLD_KILLS})`;
   if (id === 'diamond') return 'Diamond: Gold on the pistol, rifle, SMG, shotgun, sniper and LMG';
-  return `${SKIN_BY_ID[id].name}: ${Math.max(0, SKIN_KILLS - career.weaponKills(weaponId))} more ${gunName} kills`;
+  const need = camoKills(id), have = career.weaponKills(weaponId);
+  return `${SKIN_BY_ID[id].name}: ${need} ${gunName} kills (${Math.min(have, need)}/${need}, ${Math.max(0, need - have)} to go)`;
 }

@@ -33,7 +33,6 @@ const VIEW = {
   lmg: { hip: [0.17, -0.17, -0.38], adsZ: -0.46, flash: 1.25, reload: 'mag', flashT: 0.05 },
   burst: { hip: [0.16, -0.155, -0.4], adsZ: -0.36, flash: 1.0, reload: 'mag', flashT: 0.04 },
   dmr: { hip: [0.16, -0.165, -0.38], adsZ: -0.32, flash: 1.3, reload: 'mag', flashT: 0.05 },
-  crossbow: { hip: [0.15, -0.16, -0.36], adsZ: -0.36, flash: 0, reload: 'mag', flashT: 0.01 },
   revolver: { hip: [0.14, -0.13, -0.4], adsZ: -0.4, flash: 1.1, reload: 'mag', flashT: 0.06 },
 };
 
@@ -244,7 +243,7 @@ export class ViewModel {
     this.heat = Math.max(this.heat, heat);
     if (def.id === 'shotgun') { this.delayedEject = 0.44; this.puff(3); }
     else if (def.id === 'sniper') { this.delayedEject = 0.5; this.puff(3); }
-    else if (this.models[def.id] && !this.models[def.id].casing) { /* crossbow, revolver: nothing to throw out */ }
+    else if (this.models[def.id] && !this.models[def.id].casing) { /* revolver: nothing to throw out */ }
     else this.pendingEject++;
   }
 
@@ -407,8 +406,6 @@ export class ViewModel {
     const m = this.models[this.current];
     const P = m.parts, H = m.homes;
     m.group.visible = !s.unarmed; // Infected: knife only
-    // crossbow: the bolt on the rail is gone once it's fired, until the reload puts another there
-    if (m.id === 'crossbow' && P.mag) P.mag.visible = s.mag > 0 || (s.reloadFrac >= 0 && s.reloadFrac > 0.45);
     const hipW = 1 - s.ads;
 
     // bob

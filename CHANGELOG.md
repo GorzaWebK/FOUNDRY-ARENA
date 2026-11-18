@@ -11,6 +11,8 @@ The first full release.
   pre-aim and play every objective. New Veteran difficulty.
 - **Weapons:** burst rifle, marksman rifle and revolver (a second sidearm choice).
 - **Gunsmith:** four attachment slots per gun, unlocked by kills with that gun.
+- **Camos:** unlocked one at a time, every 50 kills with a gun (Woodland 50,
+  Desert 100, Arctic 150, Crimson 200, Tiger 250); Gold needs 300 kills.
 - **Medals and achievements:** 35 medals, 33 achievements, nine exclusive
   calling cards.
 - **Season pass:** free for everyone, monthly, 30 tiers and four rotating themes.

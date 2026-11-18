@@ -5,8 +5,6 @@
 // Special weapon fields:
 //   burst, burstGap   one trigger pull fires `burst` rounds, `burstGap` s apart
 //                     (`interval` is the pause after a whole burst)
-//   projectile        fires a bolt that flies and drops (speed m/s, gravity m/s²)
-//                     instead of a hitscan bullet; see bolts.js
 
 import { withAttachments } from './attachments.js';
 
@@ -101,17 +99,6 @@ const DEFS = [
     noise: 52, botRange: 26, botMaxRange: 80,
   },
   {
-    id: 'crossbow', name: 'Crossbow', blurb: 'Silent. One bolt kills. Lead your target; it drops.',
-    damage: 110, pellets: 1, projectile: { speed: 85, gravity: 7 },
-    magSize: 1, reserveStart: 14, reserveMax: 24, ammoBox: 5,
-    auto: false, interval: 0.25, reload: 1.45,
-    spreadMin: 0.006, spreadMax: 0.03, heatPerShot: 0, heatDecay: 2,
-    adsSpread: 0.15, adsFov: 0.55, moveSpread: 1.4,
-    falloffStart: 400, falloffEnd: 500, falloffMin: 1,
-    range: 300, recoil: 0.03, kick: 0.06, speedMult: 1,
-    noise: 7, botRange: 18, botMaxRange: 45,
-  },
-  {
     id: 'revolver', name: 'Revolver', blurb: 'Six heavy rounds. Two to the body up close.',
     damage: 52, pellets: 1, sidearm: true,
     magSize: 6, reserveStart: Infinity, reserveMax: Infinity, ammoBox: 0,
@@ -128,7 +115,7 @@ const DEFS = [
 export const WEAPONS = DEFS.map((d, i) => ({ ...d, index: i }));
 export const WEAPON_BY_ID = Object.fromEntries(WEAPONS.map((w) => [w.id, w]));
 export const PISTOL = WEAPON_BY_ID.pistol;
-export const PRIMARIES = ['rifle', 'burst', 'smg', 'shotgun', 'dmr', 'sniper', 'lmg', 'crossbow'];
+export const PRIMARIES = ['rifle', 'burst', 'smg', 'shotgun', 'dmr', 'sniper', 'lmg'];
 export const DEFAULT_PRIMARY = 'rifle';
 export const SECONDARIES = ['pistol', 'revolver'];
 export const DEFAULT_SECONDARY = 'pistol';

@@ -23,7 +23,7 @@
       <style>@keyframes bootbar{from{transform:translateX(-40%)}to{transform:translateX(260%)}}#boot.done{opacity:0;pointer-events:none}</style>
       <script>
         (function () {
-          var tips = ['Hold the throw key to cook a grenade; let go to throw.', 'Q and E lean you round corners.', 'Crossbow bolts drop: aim a touch high at range.', 'The Gunsmith unlocks attachments as you get kills with a gun.', 'Every bit of XP also fills the free season pass.', 'If the host leaves, the match carries on with a new host.', 'Domination: three zones, a point a second for each one you hold.', 'Bots flank, call you out to their friends and peek from cover.'];
+          var tips = ['Hold the throw key to cook a grenade; let go to throw.', 'Q and E lean you round corners.', 'Burst rifles fire three rounds a pull: land five to drop someone.', 'The Gunsmith unlocks attachments as you get kills with a gun.', 'Every bit of XP also fills the free season pass.', 'If the host leaves, the match carries on with a new host.', 'Domination: three zones, a point a second for each one you hold.', 'Bots flank, call you out to their friends and peek from cover.'];
           var i = Math.floor(Math.random() * tips.length), el = document.getElementById('boot-tip');
           el.textContent = 'Tip: ' + tips[i];
           window.__bootTips = setInterval(function () { i = (i + 1) % tips.length; el.textContent = 'Tip: ' + tips[i]; }, 2600);
@@ -340,7 +340,7 @@
         <div id="career-stats" class="c-page">
           <div id="career-grid" class="career-grid"></div>
           <h4>Kills and skins by weapon</h4>
-          <table class="career-weapons"><thead><tr><th class="l">Weapon</th><th>Kills</th><th class="l prog-h">Skins <small>camos at 50 kills, Gold at level 20 and 150, Diamond with Gold on the first six guns</small></th></tr></thead><tbody id="career-weapons"></tbody></table>
+          <table class="career-weapons"><thead><tr><th class="l">Weapon</th><th>Kills</th><th class="l prog-h">Skins <small>a camo every 50 kills, Gold at level 20 and 300 kills, Diamond with Gold on the first six guns</small></th></tr></thead><tbody id="career-weapons"></tbody></table>
         </div>
         <div id="career-medals" class="c-page hidden"><div id="medal-grid" class="medal-grid"></div></div>
         <div id="career-achs" class="c-page hidden"><div id="ach-list" class="ach-list"></div></div>
