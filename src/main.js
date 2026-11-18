@@ -97,6 +97,8 @@ function setState(s) {
   if (s === 'menu') { renderDaily(); renderLevelChip(); }
   hud.show(s === 'playing' || s === 'paused');
   input.active = s === 'playing';
+  // into play: nothing on the page keeps the keyboard focus (a text box would eat keys, a button would take Space)
+  if (s === 'playing' && document.activeElement && document.activeElement !== document.body && !chatting) document.activeElement.blur();
   audio.muted = s === 'menu' || (s === 'paused' && !net.active);
   if (s !== 'playing') hud.setScoreboard(false, game);
   hud.setLockHint(false);
@@ -1895,6 +1897,39 @@ $('btn-range-reset').addEventListener('click', () => { if (game.range) game.rang
 $('btn-quit').addEventListener('click', leaveToMenu);
 $('btn-menu').addEventListener('click', leaveToMenu);
 
+/**
+ * Belt and braces for the keyboard: while playing, keys must be live unless chat
+ * is open; and the pause menu can't be used with the mouse captured, so a pause
+ * that ends up with the pointer locked (a browser quirk) goes straight back to play.
+ */
+function inputWatchdog() {
+  if (state === 'playing' && !chatting && !input.active) input.active = true;
+}
+setInterval(() => {
+  if (state === 'paused' && !NOLOCK && input.locked && document.pointerLockElement === canvas) {
+    pausedLockedT = (pausedLockedT || 0) + 1;
+    if (pausedLockedT >= 2) { pausedLockedT = 0; setState('playing'); hud.setLockHint(false); }
+  } else pausedLockedT = 0;
+}, 250);
+let pausedLockedT = 0;
+
+// Ctrl+Shift+F9: a small readout of what the game sees from the keyboard and mouse (for bug reports)
+let inputDebug = null;
+window.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey && e.shiftKey && e.code === 'F9')) return;
+  if (inputDebug) { clearInterval(inputDebug.t); inputDebug.el.remove(); inputDebug = null; return; }
+  const el = document.createElement('pre');
+  el.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99;margin:0;padding:8px 10px;background:rgba(0,0,0,.8);color:#7fdc9a;font:12px monospace;pointer-events:none';
+  document.body.append(el);
+  const t = setInterval(() => {
+    const f = document.activeElement;
+    el.textContent = `state ${state}  keys-on ${input.active}  mouse-locked ${input.locked}/${!!document.pointerLockElement}\n`
+      + `chat ${chatting}  focus ${f ? f.tagName.toLowerCase() + (f.id ? '#' + f.id : '') : '-'}  page-focused ${document.hasFocus()}\n`
+      + `held [${[...input.keys].join(' ')}]  last key ${input.lastKey || '-'} ${input.lastKeyT ? ((performance.now() - input.lastKeyT) / 1000).toFixed(1) + 's ago' : ''}  build ${BUILD}`;
+  }, 100);
+  inputDebug = { el, t };
+}, true);
+
 input.onLockChange = (locked) => {
   if (NOLOCK) return;
   if (locked) hud.setLockHint(false);
@@ -2096,6 +2131,7 @@ function tick(dt, render) {
     hud.setScoreboard(input.act('scoreboard'), game);
     game.update(dt);
     if (game.forCareer && !game.over) { game.matchPlayT += dt; game.career.tick(dt); }
+    inputWatchdog();
   } else if (state === 'menu' || state === 'ended' || (state === 'paused' && net.active)) {
     game.update(dt);
   }

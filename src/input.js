@@ -17,14 +17,17 @@ export class Input {
     this.binds = defaultBinds(); // action -> [code, code]; replaced with the saved bindings
     this.capture = null; // while rebinding: called with the next key / mouse code instead
 
+    // Capture phase: the game hears a key before any element on the page can stop it
+    // (a text box with focus, say), so play can never go deaf to the keyboard.
     window.addEventListener('keydown', (e) => {
       if (this.capture) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) this.capture(e.code); return; }
+      this.lastKey = e.code; this.lastKeyT = performance.now();
       if (this.active && this.isBound(e.code)) e.preventDefault();
       if (e.repeat) return;
       this.keys.add(e.code);
       this.pressed.add(e.code);
-    });
-    window.addEventListener('keyup', (e) => { this.keys.delete(e.code); });
+    }, true);
+    window.addEventListener('keyup', (e) => { this.keys.delete(e.code); }, true);
     window.addEventListener('blur', () => { this.keys.clear(); this.left = this.right = false; });
     document.addEventListener('mousemove', (e) => {
       if (!this.locked) return;
