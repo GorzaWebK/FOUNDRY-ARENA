@@ -32,7 +32,7 @@ import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
 import { BUILD, BUILD_TIME } from './version.js';
 import { getAccount, exportCode, parseCode, importAccount } from './account.js';
 import { SKINS, SKIN_KILLS, skinSwatchCss, skinUnlocked, skinLockText } from './skins.js';
-import { SLOTS, ITEMS, itemOf, itemUnlocked, unlocksAt } from './cosmetics.js';
+import { SLOTS, ITEMS, itemOf, itemUnlocked, unlocksAt, packCosmetics, unpackCosmetics } from './cosmetics.js';
 import { XP, levelFromXp, MAX_LEVEL } from './progress.js';
 import { msToReset, msToWeekReset } from './challenges.js';
 
@@ -584,7 +584,8 @@ const FB_EMU = params.get('fbemu');
 const cloudConfig = FB_EMU
   ? { apiKey: 'demo-key', projectId: 'demo-foundry', databaseURL: `http://${FB_EMU}:9000?ns=demo-foundry-default-rtdb` }
   : FIREBASE_CONFIG;
-let lobby = cloudConfig ? new CloudLobby(lobbyHooks, cloudConfig, FB_EMU || '') : new Lobby(lobbyHooks);
+// ?p2plobby forces the peer-to-peer lobby (development / testing)
+let lobby = cloudConfig && !params.has('p2plobby') ? new CloudLobby(lobbyHooks, cloudConfig, FB_EMU || '') : new Lobby(lobbyHooks);
 
 /** Keep the lobby's listing of our room up to date (or take it down). */
 function syncPublicRoom() {
@@ -605,7 +606,17 @@ function updateBoardEntry() {
     matches: c.matches, wins: c.wins, kills: c.kills, deaths: c.deaths, heads: c.heads,
     bestStreak: c.bestStreak, longest: c.longest, knives: c.knives, nades: c.nades, caps: c.caps,
     shots: c.shots, hits: c.hits, time: Math.floor(c.time || 0),
+    // profile extras: how you look, and your favourite gun
+    cos: packCosmetics(pr.equipped(), pr.level, pr.prestige).join(','),
+    ...favouriteGun(c),
   });
+}
+
+/** The gun you've killed most with: { fav, favK }. */
+function favouriteGun(c) {
+  let fav = 'none', favK = 0;
+  for (const w of WEAPON_LIST) { const k = (c.weapons && c.weapons[w.id]) || 0; if (k > favK) { fav = w.id; favK = k; } }
+  return { fav, favK };
 }
 
 const lobbyStatus = () => (lobby.online ? (lobby instanceof CloudLobby ? 'Connected to the online service.' : 'Connected to the lobby.') : lobby.connecting ? 'Connecting…' : 'Looking for the lobby…');
@@ -754,8 +765,12 @@ function renderBoard() {
   const body = $('board-body');
   body.textContent = '';
   const top = all.slice(0, 100);
+  boardRanked = { all, byAccount };
   top.forEach((e, i) => {
     const tr = document.createElement('tr');
+    tr.dataset.i = i;
+    tr.title = 'View profile';
+    tr.addEventListener('click', () => openProfile(e));
     if (e === mineRow) tr.className = 'me';
     const cells = [String(i + 1), e.name, `${e.prestige ? '★' + e.prestige + ' ' : ''}${e.level}`, stat.show ? stat.show(e) : fmt(stat.score(e))];
     cells.forEach((t, k) => { const td = document.createElement('td'); if (k === 1) td.className = 'l'; td.textContent = t; tr.append(td); });
@@ -774,6 +789,61 @@ function renderBoard() {
     : lobby.refused ? "The server didn't accept your stats: they don't add up against your play time." : 'Play a match to get on the board.';
   $('board-status').textContent = `${byAccount.size} player${byAccount.size === 1 ? '' : 's'} · ${lobby.online ? 'live' : 'offline: showing the last copy you saw'}. ${lobby instanceof CloudLobby ? 'Checked against play time by the server.' : "Stats come from each player's own game."}`;
 }
+
+let boardRanked = null;
+
+/** A player's profile: card, title, level, favourite gun, stats and where they rank. */
+async function openProfile(e) {
+  const token = (openProfile.token = (openProfile.token || 0) + 1);
+  const show = (prof) => {
+    const cos = unpackCosmetics(prof && prof.cos ? prof.cos.split(',').map(Number) : [e.level, e.prestige]);
+    cos.level = e.level; cos.prestige = e.prestige; // the board row is the checked source for these
+    $('pf-card').style.background = itemOf('card', cos.equipped.card).css;
+    $('pf-name').textContent = e.name;
+    $('pf-title').textContent = itemOf('title', cos.equipped.title).name;
+    const lv = $('pf-level');
+    lv.textContent = `${e.prestige ? '★' : ''}${e.level}`;
+    lv.classList.toggle('pr', e.prestige > 0);
+    lv.title = e.prestige ? `Prestige ${e.prestige}, level ${e.level}` : `Level ${e.level}`;
+    const fav = prof && prof.fav && WEAPON_BY_ID[prof.fav];
+    $('pf-fav').innerHTML = fav ? `Favourite gun: <b>${esc(fav.name)}</b> (${fmt(prof.favK)} kills)` : prof ? 'No favourite gun yet.' : '';
+  };
+  show(null);
+  const pct = (a, b) => (b ? `${Math.round((100 * a) / b)}%` : '—');
+  const cells = [
+    ['Kills', fmt(e.kills)], ['Deaths', fmt(e.deaths)], ['K/D', (e.kills / Math.max(1, e.deaths)).toFixed(2)],
+    ['Wins', fmt(e.wins)], ['Matches', fmt(e.matches)], ['Win rate', pct(e.wins, e.matches)],
+    ['Headshots', fmt(e.heads)], ['Headshot %', pct(e.heads, e.kills)], ['Accuracy', pct(e.hits, e.shots)],
+    ['Best streak', fmt(e.bestStreak)], ['Longest kill', `${e.longest} m`], ['Flag captures', fmt(e.caps)],
+    ['Knife kills', fmt(e.knives)], ['Grenade kills', fmt(e.nades)], ['Time played', fmtTime(e.time)],
+  ];
+  const grid = $('pf-grid');
+  grid.textContent = '';
+  for (const [k, v] of cells) {
+    const d = document.createElement('div');
+    d.className = 'cstat';
+    const b = document.createElement('b'); b.textContent = v;
+    const s = document.createElement('span'); s.textContent = k;
+    d.append(b, s);
+    grid.append(d);
+  }
+  // where they place on each board
+  const ranks = [];
+  if (boardRanked) {
+    const rows = [...boardRanked.byAccount.values()];
+    for (const st of BOARD_STATS) {
+      if (st.min && !st.min(e)) continue;
+      const list = rows.filter((x) => (!st.min || st.min(x)) && st.score(x) > 0).sort((a, b) => st.score(b) - st.score(a) || a.at - b.at);
+      const i = list.indexOf(e);
+      if (i >= 0 && i < 10) ranks.push(`#${i + 1} ${st.name.toLowerCase()}`);
+    }
+  }
+  $('pf-ranks').textContent = ranks.length ? `Top 10 in: ${ranks.join(', ')}.` : '';
+  $('profile-ov').classList.remove('hidden');
+  const prof = await lobby.getProfile(e.id);
+  if (token === openProfile.token) show(prof);
+}
+$('btn-pf-done').addEventListener('click', () => $('profile-ov').classList.add('hidden'));
 
 function openBoard() { lobby.refresh(); renderBoard(); $('board-ov').classList.remove('hidden'); }
 $('btn-board').addEventListener('click', openBoard);
@@ -1367,6 +1437,7 @@ window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') closeParty();
     return;
   }
+  if (!$('profile-ov').classList.contains('hidden')) { if (e.code === 'Escape') $('profile-ov').classList.add('hidden'); return; }
   for (const id of ['rooms-ov', 'board-ov']) {
     if (!$(id).classList.contains('hidden')) {
       if (e.code === 'Escape') $(id).classList.add('hidden');

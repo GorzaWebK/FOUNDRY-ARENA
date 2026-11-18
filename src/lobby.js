@@ -45,6 +45,9 @@ export function cleanEntry(e) {
   if (!e || typeof e !== 'object' || typeof e.id !== 'string' || !/^[A-Za-z0-9]{8,40}$/.test(e.id)) return null;
   const out = { id: e.id, name: clean(e.name) || 'Player', at: int(e.at, 4e12) };
   if (typeof e.bid === 'string' && /^[0-9a-f]{16}$/.test(e.bid)) out.bid = e.bid;
+  // profile extras: packed cosmetics (see cosmetics.js) and favourite gun
+  if (typeof e.cos === 'string' && /^[0-9,]{1,64}$/.test(e.cos)) out.cos = e.cos;
+  if (typeof e.fav === 'string' && /^[a-z]{1,12}$/.test(e.fav)) { out.fav = e.fav; out.favK = int(e.favK, 1e7); }
   for (const [k, max] of Object.entries(BOARD_FIELDS)) out[k] = int(e[k], max);
   // impossible combinations
   out.wins = Math.min(out.wins, out.matches);
@@ -279,9 +282,15 @@ export class Lobby {
     if (!e) return;
     const prev = this.me;
     this.me = e;
-    if (prev && Object.keys(BOARD_FIELDS).every((k) => prev[k] === e[k]) && prev.name === e.name) return;
+    if (prev && Object.keys(BOARD_FIELDS).every((k) => prev[k] === e[k]) && prev.name === e.name && prev.cos === e.cos && prev.fav === e.fav) return;
     this._merge([e], this.role !== 'hub');
     if (this.role === 'member' && this.conn) this.conn.send({ t: 'me', e });
+  }
+
+  /** A player's profile extras ({ cos, fav, favK }), from their board entry. */
+  async getProfile(id) {
+    const e = this.board.get(id);
+    return e && (e.cos || e.fav) ? { cos: e.cos || '', fav: e.fav || '', favK: e.favK || 0 } : null;
   }
 
   /** We're hosting a public room (or null: not any more). `info` is re-sent as it changes. */

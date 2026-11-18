@@ -229,6 +229,8 @@ and time played. It comes through the lobby: your game sends your career stats
 whenever they change, and every player keeps a copy of the board, so it's still
 there when the player holding the lobby leaves, and it fills back in when people
 come back online. Set your name on the main menu so people know who you are.
+Click anyone on the board to open their **profile**: calling card, title, level,
+favourite gun, 15 stats and every board they're in the top 10 of.
 Stats come from each player's own game: values are sanity-checked, but there's
 no server to make them cheat-proof.
 

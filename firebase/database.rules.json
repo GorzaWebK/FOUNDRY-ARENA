@@ -111,6 +111,28 @@
           ".validate": false
         }
       }
+    },
+    "profiles": {
+      ".read": true,
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['cos','fav','favK','at']) && newData.child('at').val() === now && (!data.exists() || now - data.child('at').val() >= 10000)",
+        "cos": {
+          ".validate": "newData.isString() && newData.val().matches(/^[0-9,]{1,64}$/)"
+        },
+        "fav": {
+          ".validate": "newData.isString() && newData.val().matches(/^[a-z]{1,12}$/)"
+        },
+        "favK": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000000"
+        },
+        "at": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
     }
   }
 }

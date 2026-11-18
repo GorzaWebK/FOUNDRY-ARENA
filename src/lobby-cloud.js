@@ -86,6 +86,7 @@ export class CloudLobby {
       this.role = 'cloud';
       this.connecting = false;
       if (this.me) this._writeMe(true);
+      this._writeProfile();
       if (this.myRoom) this._putRoom();
       this.beat = setInterval(() => this._beat(), 5000);
     } catch (e) {
@@ -114,6 +115,13 @@ export class CloudLobby {
   // ---------------------------------------------------------------- leaderboard
 
   setMe(entry) {
+    // profile extras live in profiles/<uid> (written less often)
+    const prof = {
+      cos: typeof entry.cos === 'string' && /^[0-9,]{1,64}$/.test(entry.cos) ? entry.cos : '1,0',
+      fav: typeof entry.fav === 'string' && /^[a-z]{1,12}$/.test(entry.fav) ? entry.fav : 'none',
+      favK: typeof entry.favK === 'number' && entry.favK >= 0 ? Math.min(1e7, Math.floor(entry.favK)) : 0,
+    };
+    if (!this.prof || this.prof.cos !== prof.cos || this.prof.fav !== prof.fav || this.prof.favK !== prof.favK) { this.prof = prof; this.profDirty = true; }
     const e = { name: clean(entry.name) || 'Player' };
     for (const k of Object.keys(BOARD_FIELDS)) e[k] = typeof entry[k] === 'number' && entry[k] >= 0 ? Math.floor(entry[k]) : 0;
     e.level = Math.max(1, e.level);
@@ -124,6 +132,31 @@ export class CloudLobby {
     this.me = e;
     if (!same) this.meDirty = true;
     if (this.online) this._writeMe();
+  }
+
+  /** Write our profile extras (at most every 30 s). */
+  async _writeProfile() {
+    if (!this.prof || !this.profDirty || !this.uid || Date.now() - (this.profAt || 0) < 30000) return;
+    this.profDirty = false;
+    this.profAt = Date.now();
+    try { await this.D.set(this.D.ref(this.db, `profiles/${this.uid}`), { ...this.prof, at: this.D.serverTimestamp() }); }
+    catch (e) { this.profDirty = true; }
+  }
+
+  /** Someone's profile extras ({ cos, fav, favK }), or null. Cached for a minute. */
+  async getProfile(id) {
+    if (!this.D || !/^[A-Za-z0-9]{8,40}$/.test(id)) return null;
+    this.profCache = this.profCache || new Map();
+    const hit = this.profCache.get(id);
+    if (hit && Date.now() - hit.t < 60000) return hit.v;
+    let v = null;
+    try {
+      const s = await this.D.get(this.D.ref(this.db, `profiles/${id}`));
+      const p = s.val();
+      if (p && typeof p.cos === 'string' && /^[0-9,]{1,64}$/.test(p.cos)) v = { cos: p.cos, fav: /^[a-z]{1,12}$/.test(p.fav || '') ? p.fav : '', favK: typeof p.favK === 'number' ? p.favK : 0 };
+    } catch (e) { /* not readable (rules not updated yet) or offline */ }
+    this.profCache.set(id, { t: Date.now(), v });
+    return v;
   }
 
   /** Write our row (throttled to the rules' pace). */
@@ -198,6 +231,7 @@ export class CloudLobby {
   _beat() {
     if (!this.online) return;
     this._writeMe();
+    this._writeProfile();
     if (this.myRoom && Date.now() - (this.roomAt || 0) > ROOM_BEAT_MS) this._putRoom();
   }
 
