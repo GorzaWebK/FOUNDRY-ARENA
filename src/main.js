@@ -1359,7 +1359,7 @@ function pause() {
 /** Pause menu: "Switch to Crimson / Cobalt" in team modes. */
 function syncSwitchTeam() {
   const r = game.rules, b = $('btn-switch-team');
-  const show = !!r.teams && !r.training && !game.over && !game.attract;
+  const show = !!r.teams && !r.noSwitch && !r.training && !game.over && !game.attract;
   b.classList.toggle('hidden', !show);
   if (show) b.textContent = `Switch to ${TEAM_NAMES[1 - Math.max(0, game.player.team)]}`;
 }

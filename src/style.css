@@ -189,6 +189,9 @@ table.final { margin-top: 14px; }
 #hp-num.low { color: #ff5a5a; }
 
 #ammo { position: absolute; right: 22px; bottom: 20px; text-align: right; }
+#ammo.unarmed #ammo-count { display: none; }
+#slots.unarmed .slot { opacity: 0.25; }
+#slots.unarmed .slot:last-child { opacity: 1; }
 #ammo-name { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
 #ammo-count { font-family: var(--mono); font-weight: 700; line-height: 1; }
 #ammo-mag { font-size: 52px; } #ammo-mag.low { color: #ff5a5a; }

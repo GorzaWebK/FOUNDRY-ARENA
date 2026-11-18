@@ -18,6 +18,7 @@ import { SmokeClouds } from './smoke.js';
 import { applyCrosshair } from './settings.js';
 import { Career } from './career.js';
 import { Ctf } from './ctf.js';
+import { OBJECTIVES, INFECTED_SPEED } from './objectives.js';
 import { Progress, XP } from './progress.js';
 import { itemOf } from './cosmetics.js';
 import { weaponIdOf } from './career.js';
@@ -269,6 +270,7 @@ export class Game {
     this.assignTeams();
     if (this.rules.hill) this.resetHill();
     if (this.rules.ctf && this.map.flags) this.ctf = new Ctf(this);
+    this.makeObj();
     this.killcam.reset();
     if (this.mode === 'host') this.net.onStart(); // tell clients before anyone spawns
     for (const c of this.chars) this.respawn(c, true);
@@ -344,10 +346,18 @@ export class Game {
     this.chars = [p, ...this.remotes];
     for (const c of this.chars) this.resetScore(c);
     if (this.rules.ctf && this.map.flags) this.ctf = new Ctf(this);
+    this.makeObj();
   }
 
   clearCtf() {
     if (this.ctf) { this.ctf.dispose(); this.ctf = null; }
+    if (this.obj) { this.obj.dispose(); this.obj = null; }
+  }
+
+  /** Domination, Search & Destroy, Infected: the mode's objective (see objectives.js). */
+  makeObj() {
+    const O = !this.attract && this.rules.objective && OBJECTIVES[this.rules.objective];
+    this.obj = O ? new O(this) : null;
   }
 
   /** Fresh scores, streaks and lives for a new match. */
@@ -358,6 +368,7 @@ export class Game {
     c.lives = this.rules.lives || 0;
     c.hillTime = 0;
     c.caps = 0;
+    c.speedMul = 1;
     // for the end-of-match awards (kept by whoever runs the match)
     c.st = { shots: 0, hits: 0, heads: 0, knives: 0, nades: 0, bestStreak: 0, longest: 0, returns: 0 };
   }
@@ -389,6 +400,9 @@ export class Game {
     add('Demolitions', best((c) => c.st.nades, 1), (v) => `${v} grenade kill${v === 1 ? '' : 's'}`);
     add('Butcher', best((c) => c.st.knives, 1), (v) => `${v} knife kill${v === 1 ? '' : 's'}`);
     if (this.rules.hill) add('Hill Keeper', best((c) => c.hillTime || 0, 10), (v) => `${Math.round(v)} s on the hill`);
+    if (this.rules.objective === 'dom') add('Zone Captain', best((c) => c.caps || 0, 1), (v) => `${v} zone capture${v === 1 ? '' : 's'}`);
+    if (this.rules.objective === 'sd') add('Demolitions Expert', best((c) => c.caps || 0, 1), (v) => `${v} plant${v === 1 ? '' : 's'} and defuse${v === 1 ? '' : 's'}`);
+    if (this.rules.objective === 'infected') add('Patient Zero', best((c) => c.st.knives, 2), (v) => `${v} infection${v === 1 ? '' : 's'}`);
     if (this.rules.ctf) {
       add('Flag Runner', best((c) => c.caps || 0, 1), (v) => `${v} capture${v === 1 ? '' : 's'}`);
       add('Defender', best((c) => c.st.returns || 0, 1), (v) => `${v} flag return${v === 1 ? '' : 's'}`);
@@ -445,7 +459,7 @@ export class Game {
 
   /** Team colours in team modes, everyone's own colour otherwise. */
   paint(c) {
-    const color = this.rules.teams && c.team >= 0 ? TEAM_COLORS[c.team] : c.baseColor;
+    const color = this.rules.teams && c.team >= 0 ? (this.obj && this.obj.teamColor ? this.obj.teamColor(c.team) : TEAM_COLORS[c.team]) : c.baseColor;
     c.color = color;
     if (c.model) c.model.setColor(color, c.name);
   }
@@ -456,6 +470,7 @@ export class Game {
    */
   assignTeams() {
     if (!this.rules.teams) { for (const c of this.chars) { c.team = -1; this.paint(c); } return; }
+    if (this.rules.objective === 'infected') { for (const c of this.chars) { c.team = 0; this.paint(c); } return; }
     const n = [0, 0];
     const put = (c, t) => { c.team = t; n[t]++; };
     for (const c of this.chars) c.team = -1;
@@ -506,7 +521,7 @@ export class Game {
 
   /** A player asked to switch sides mid-match (host / solo). */
   switchTeam(c, t) {
-    if (this.over || this.attract || !this.rules.teams) return false;
+    if (this.over || this.attract || !this.rules.teams || this.rules.noSwitch) return false;
     c.teamPref = t;
     if (!this.setTeam(c, t)) return false;
     // the rest of their party comes along
@@ -520,6 +535,7 @@ export class Game {
   /** A late arrival joins the team they picked, or else the smaller one. */
   joinTeam(c) {
     if (!this.rules.teams) { c.team = -1; this.paint(c); return; }
+    if (this.obj && this.obj.joinTeam) { c.team = this.obj.joinTeam(c); c.speedMul = c.team === 1 && this.obj.noGuns && this.obj.noGuns(c) ? INFECTED_SPEED : 1; this.paint(c); return; }
     const mate = this.partyMates(c).find((m) => m.team >= 0);
     if (mate) { c.team = mate.team; this.paint(c); this.balanceBots(); return; }
     if (c.isHuman && (c.teamPref === 0 || c.teamPref === 1)) { c.team = c.teamPref; this.paint(c); this.balanceBots(); return; }
@@ -646,6 +662,9 @@ export class Game {
       if (seen) score -= 9;
       // Capture the Flag: spawn on your own side of the map
       if (this.ctf && who.team >= 0) { const h = this.map.flags[who.team]; score -= Math.hypot(s.x - h[0], s.z - h[2]) * 0.45; }
+      // Search & Destroy (and other objective modes with a home side)
+      const home = this.obj && this.obj.spawnHome && who.team >= 0 ? this.obj.spawnHome(who.team) : null;
+      if (home) score -= Math.hypot(s.x - home[0], s.z - home[2]) * 0.6;
       if (minD < 9) score -= 30;
       if (this.time - s.lastUsed < 4) score -= 40;
       if (score > bestScore) { bestScore = score; best = s; }
@@ -657,6 +676,7 @@ export class Game {
   respawn(c, first = false) {
     const s = this.pickSpawn(c);
     c.spawnAt(s.x, s.y, s.z, s.yaw);
+    if (this.obj && this.obj.onSpawn) this.obj.onSpawn(c);
     if (this.mode === 'host') this.net.onSpawn(c);
     if (c.isPlayer && !first) this.audio.play('respawn');
   }
@@ -786,7 +806,7 @@ export class Game {
     const teamKill = this.sameTeam(victim, attacker);
     if (attacker !== victim && !teamKill) { // a team kill earns nothing
       attacker.kills++;
-      if (this.rules.teams && !this.rules.hill && !this.rules.ctf && attacker.team >= 0) this.teamScore[attacker.team]++; // objective modes score otherwise
+      if (this.rules.teams && !this.rules.hill && !this.rules.ctf && !this.rules.objective && attacker.team >= 0) this.teamScore[attacker.team]++; // objective modes score otherwise
       const st = attacker.st;
       if (st) {
         if (def === KNIFE) st.knives++;
@@ -801,6 +821,7 @@ export class Game {
     const weapon = def ? def.name : '?';
     this.presentKill(victim, attacker, head, weapon);
     if (this.mode === 'host') this.net.onKill(victim, attacker, head, weapon);
+    if (this.obj && this.obj.onKill) this.obj.onKill(victim, attacker);
     if (attacker !== victim) attacker.applyGunLevel();
     if (!this.over && this.rules.won(this)) {
       if (this.attract) { for (const c of this.chars) { c.kills = 0; c.deaths = 0; } } // menu background loops forever
@@ -947,7 +968,10 @@ export class Game {
     _d.set(v.pos.x, v.pos.y + v.height * 0.6, v.pos.z);
     this.effects.hitBurst(_d.x, _d.y, _d.z, v.pos.x - a.pos.x, 0, v.pos.z - a.pos.z, v.isProtected() ? 0x8fd3ff : v.color, back);
     this.audio.play('stab', a.isPlayer ? null : _d);
-    this.damage(v, back ? KNIFE.backstab : KNIFE.damage, a, back, KNIFE);
+    // the infected hit harder: two swings from the front, one from behind (a lone infected: always one)
+    const claws = this.obj && this.obj.noGuns && this.obj.noGuns(a);
+    const alpha = claws && this.obj.alone && this.obj.alone();
+    this.damage(v, back || alpha ? KNIFE.backstab : claws ? 70 : KNIFE.damage, a, back, KNIFE);
   }
 
   // ======================================================================
@@ -1353,6 +1377,7 @@ export class Game {
     if (this.rules.hill && !this.attract) this.updateHill(dt);
     if (this.ctf && !this.attract) this.ctf.update(dt);
     if (this.ctf) this.ctf.updateVisuals(dt, this.time);
+    if (this.obj) { this.obj.update(dt); if (this.obj) this.obj.updateVisuals(dt, this.time); }
     this.hillXp();
     this.updateHillFx(this.time);
     this.effects.update(dt);
@@ -1377,6 +1402,7 @@ export class Game {
     this.updateGrenades(dt);
     if (this.rules.hill) this.hill.t = Math.max(0, this.hill.t - dt); // re-synced by snapshots
     if (this.ctf) this.ctf.updateVisuals(dt, this.time);
+    if (this.obj) this.obj.updateVisuals(dt, this.time);
     this.hillXp();
     this.updateHillFx(this.time);
     this.effects.update(dt);

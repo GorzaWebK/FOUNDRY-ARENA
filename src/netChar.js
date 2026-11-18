@@ -43,6 +43,8 @@ export class NetChar extends Character {
   /** On clients the host tells us what this player carries; the host itself knows. */
   gear() {
     if (this.game.mode !== 'client') return super.gear();
+    const obj = this.game.obj;
+    if (obj && obj.noGuns && obj.noGuns(this)) return [null, null, null, 'none', 'none'];
     const held = (WEAPONS[this.netHeld] || WEAPONS[1]).id;
     const prim = (WEAPONS[this.netPrim] || WEAPONS[1]).id;
     const skinP = (SKINS[this.netSkinP] || SKINS[0]).id, skinS = (SKINS[this.netSkinS] || SKINS[0]).id;

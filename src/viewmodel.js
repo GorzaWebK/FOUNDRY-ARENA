@@ -376,6 +376,7 @@ export class ViewModel {
     this.root.visible = !s.hidden; // looking through a scope
     const m = this.models[this.current];
     const P = m.parts, H = m.homes;
+    m.group.visible = !s.unarmed; // Infected: knife only
     const hipW = 1 - s.ads;
 
     // bob
@@ -434,9 +435,15 @@ export class ViewModel {
       const sw = smooth(0.1, 0.6, u);
       const up = smooth(0, 0.14, u) * (1 - smooth(0.72, 1, u));
       const kn = this.knife;
-      kn.visible = !s.hidden && u > 0.02 && u < 0.98;
+      kn.visible = !s.hidden && (s.unarmed || (u > 0.02 && u < 0.98));
       kn.position.set(0.34 - sw * 0.62, -0.42 + up * 0.22 + Math.sin(sw * Math.PI) * 0.1, -0.5);
       kn.rotation.set(0.2, -0.55 + sw * 1.5, -1.35 + sw * 0.5);
+    } else if (s.unarmed) {
+      // held ready, low on the right
+      const kn = this.knife;
+      kn.visible = !s.hidden;
+      kn.position.set(0.24 + bx_ * 2 + this.swayX, -0.21 + by_ * 2 + this.swayY - this.sprintT * 0.04, -0.48);
+      kn.rotation.set(0.22 - this.sprintT * 0.3, 0.12, -0.25);
     } else {
       this.knife.visible = false;
     }

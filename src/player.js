@@ -42,7 +42,7 @@ export class Player extends Character {
     super.spawnAt(x, y, z, yaw);
     const g = this.game;
     g.killcam.stop();
-    if (g.rules.lives && this.lives === 1 && this.deaths > 0) g.announcer.announce('Last Life');
+    if (g.rules.lives && !g.rules.objective && this.lives === 1 && this.deaths > 0) g.announcer.announce('Last Life');
     this.ads = 0;
     this.scoped = false;
     this.recoilP = this.recoilY = 0;
@@ -146,7 +146,7 @@ export class Player extends Character {
       if (this.crouching) speed = CFG.crouchSpeed;
       else if (this.ads > 0.5) speed = CFG.adsSpeed;
       else if (this.sprinting) speed = CFG.sprintSpeed;
-      speed *= w.def.speedMult;
+      speed *= w.def.speedMult * (this.speedMul || 1);
       const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
       const wx = (-sy * mf + cy * ms) * speed;
       const wz = (-cy * mf - sy * ms) * speed;
@@ -258,6 +258,7 @@ export class Player extends Character {
       busy: input.act('fire') || input.act('aim') || this.sprinting || this.sliding || this.weapon.reloadT > 0
         || this.switchT > 0 || this.meleeT > 0 || !!this.cook,
       cooking: !!this.cook,
+      unarmed: !!(g.obj && g.obj.noGuns && g.obj.noGuns(this)),
     });
   }
 

@@ -96,7 +96,9 @@ export class Hud {
     this._set('mag', w.mag, (v) => { e.mag.textContent = v; });
     this._set('magLow', w.mag <= w.def.magSize * 0.25, (v) => e.mag.classList.toggle('low', v));
     this._set('res', w.reserve, (v) => { e.res.textContent = v === Infinity ? '∞' : v; });
-    this._set('wname', w.def.name, (v) => { e.wname.textContent = v; });
+    const unarmed = !!(game.obj && game.obj.noGuns && game.obj.noGuns(p));
+    this._set('wname', unarmed ? 'KNIFE' : w.def.name, (v) => { e.wname.textContent = v; });
+    this._set('unarmed', unarmed, (v) => { $('ammo').classList.toggle('unarmed', v); $('slots').classList.toggle('unarmed', v); });
     const rl = w.reloadT > 0 ? 'RELOADING' : w.mag === 0 ? (w.reserve > 0 ? `PRESS ${this.reloadKey} TO RELOAD` : 'NO AMMO') : '';
     this._set('rl', rl, (v) => { e.reload.textContent = v; });
     this._set('slot', p.weaponIdx, (v) => this.slots.forEach((s, i) => s.classList.toggle('on', i === v)));
@@ -276,8 +278,29 @@ export class Hud {
       this._set('hillIn', carrying, (v) => e.hillStatus.classList.toggle('on', v));
       this._set('hillOn', 'ctf', () => {});
     }
+    // Domination / Search & Destroy / Infected: the objective's status line and markers
+    const obj = game.obj;
+    const ms = obj && !game.over ? (p.alive ? obj.markers(p) : []) : [];
+    for (let i = 0; i < 4; i++) {
+      const el = $('obj-marker-' + i), m = ms[i];
+      this._set('omOn' + i, !!m, (v) => el.classList.toggle('hidden', !v));
+      if (!m) continue;
+      this._set('omC' + i, m.color, (v) => { el.style.color = v; });
+      this._set('omT' + i, m.label, (v) => { el.lastChild.textContent = v; });
+      this.placeMarker(el, m.x, m.y, m.z, game.camera);
+    }
+    if (obj) {
+      const st = obj.status(p);
+      e.hillStatus.classList.toggle('hidden', !st);
+      if (st) {
+        this._set('hillText', st.text, (v) => { e.hillStatus.textContent = v; });
+        this._set('hillCol', st.color, (v) => { e.hillStatus.style.color = v; });
+        this._set('hillIn', !!st.on, (v) => e.hillStatus.classList.toggle('on', v));
+      }
+      this._set('hillOn', 'obj', () => {});
+    }
     // King of the Hill: status line + a marker pointing at the zone
-    if (!ctf) this._set('hillOn', !!h, (v) => { e.hillStatus.classList.toggle('hidden', !v); });
+    if (!ctf && !obj) this._set('hillOn', !!h, (v) => { e.hillStatus.classList.toggle('hidden', !v); });
     if (h) {
       const holder = game.hill.holder;
       const left = Math.max(0, Math.ceil(game.hill.t));

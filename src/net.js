@@ -594,6 +594,7 @@ export class Net {
     const snap = { t: 's', mt: r2(g.matchTime), c, p, ts: g.teamScore };
     if (g.rules.hill) snap.hl = [g.hill.idx, r2(g.hill.t), g.hill.holder];
     if (g.ctf) snap.fl = g.ctf.snapshot();
+    if (g.obj) snap.ob = g.obj.snapshot();
     this.broadcast(snap);
   }
 
@@ -621,6 +622,11 @@ export class Net {
   /** A flag event (take / drop / return / home / cap) for team `team`'s flag. */
   onFlag(kind, team, who) {
     this.broadcast({ t: 'fl', k: kind, tm: team, id: who ? who.id : -1 });
+  }
+
+  /** An objective event (Domination / Search & Destroy / Infected): see objectives.js. */
+  onObjective(kind, data) {
+    this.broadcast({ t: 'ob', k: kind, d: data });
   }
 
   onPickup(i, c) {
@@ -729,7 +735,8 @@ export class Net {
       const [id, name, color, bot, team, cos, sr] = e;
       seen.add(id);
       // team colours come from our own palette (Settings → Team colours), not the host's
-      const col = g.rules && g.rules.teams && (team === 0 || team === 1) ? TEAM_COLORS[team] : num(color) ? color : 0xffffff;
+      const tcol = (t) => (g.obj && g.obj.teamColor ? g.obj.teamColor(t) : TEAM_COLORS[t]);
+      const col = g.rules && g.rules.teams && (team === 0 || team === 1) ? tcol(team) : num(color) ? color : 0xffffff;
       if (id === g.player.id) {
         g.player.name = cleanName(name) || 'You';
         g.player.color = col;
@@ -830,6 +837,17 @@ export class Net {
           g.ctf.present(m.k, m.tm, num(m.id) ? g.charById(m.id) : null);
         }
         break;
+      case 'ob':
+        if (g.obj && typeof m.k === 'string' && m.k.length < 12 && m.d && typeof m.d === 'object') {
+          // only plain numbers, short words and number lists get through
+          const d = {};
+          for (const [key, v] of Object.entries(m.d)) {
+            if (num(v) || (typeof v === 'string' && v.length < 12)) d[key] = v;
+            else if (Array.isArray(v) && v.length <= 16 && v.every(num)) d[key] = v;
+          }
+          g.obj.present(m.k, d);
+        }
+        break;
       case 'bye':
         this._lost('The host closed the room.', false);
         break;
@@ -868,6 +886,7 @@ export class Net {
       g.hill.idx = idx; g.hill.t = t; g.hill.holder = holder;
     }
     if (g.ctf && Array.isArray(m.fl)) g.ctf.applySnapshot(m.fl);
+    if (g.obj && Array.isArray(m.ob) && m.ob.length <= 16 && m.ob.every((v) => num(v) || (Array.isArray(v) && v.every(num)))) g.obj.applySnapshot(m.ob);
     if (Array.isArray(m.c)) {
       for (const e of m.c) {
         if (!Array.isArray(e) || e.length < 12) continue;

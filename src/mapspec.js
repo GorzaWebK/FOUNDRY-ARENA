@@ -202,5 +202,7 @@ export function customMaps() { return [...custom.values()]; }
 export function fitMode(modeId, map) {
   if (modeId === 'ctf' && !map.flags) return 'tdm';
   if (modeId === 'koth' && !(map.hills && map.hills.length)) return 'tdm';
+  if (modeId === 'dom' && !(map.hills && map.hills.length >= 3)) return 'tdm';
+  if (modeId === 'sd' && !(map.flags && map.hills && map.hills.length >= 2)) return 'tdm';
   return modeId;
 }

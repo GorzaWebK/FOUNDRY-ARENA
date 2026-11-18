@@ -256,8 +256,8 @@ export class Bot extends Character {
   hear(x, y, z, src, kind, frac) {
     if (!this.alive || this.target) return;
     if (src && this.game.sameTeam(src, this)) return; // a teammate's noise is nothing to investigate
-    // King of the Hill / Capture the Flag: look toward noises, but the objective is the job
-    if ((this.game.rules.hill || this.game.ctf) && kind === 'shot') {
+    // King of the Hill / Capture the Flag / Domination / S&D: look toward noises, but the objective is the job
+    if ((this.game.rules.hill || this.game.ctf || (this.game.obj && this.game.rules.objective !== 'infected')) && kind === 'shot') {
       if (this.game.time > this.lookUntil) { this.lookPos.set(x, y + 1.4, z); this.lookUntil = this.game.time + 1.2; }
       return;
     }
@@ -331,6 +331,22 @@ export class Bot extends Character {
         return;
       }
     }
+    // Domination / S&D: planting, defusing or racing to the bomb keeps going unless they're close;
+    // Infected: no gun, so go straight at them with the knife
+    if (t && this.game.obj) {
+      const job = this.objJob;
+      const onJob = this.state === STATE.OBJECTIVE && !this.done && job;
+      if (this.noGuns()) {
+        this.enemy = t; this.lastCombatT = now;
+        if (this.state !== STATE.ATTACK) this.enterAttack();
+        return;
+      }
+      // on the way to (or holding) a zone: shoot on the move, only stop to fight up close
+      if (onJob && this.pos.distanceTo(t.pos) > (job.stand ? 6 : 13)) {
+        this.enemy = t; this.lastCombatT = now;
+        return;
+      }
+    }
     if (t) {
       this.enemy = t;
       this.lastCombatT = now;
@@ -362,6 +378,8 @@ export class Bot extends Character {
         }
         const hz = this.game.hillZone();
         if (hz && Math.hypot(m.lastPos.x - hz[0], m.lastPos.z - hz[2]) > hz[3] + 6) { this.enterHill(); return; }
+        // Domination / S&D: back to the objective rather than chasing
+        if (this.game.obj && !this.noGuns() && this.game.rules.objective !== 'infected') { this.pickNext(); return; }
         // Capture the Flag: don't wander off after them, unless they have our flag
         if (this.game.ctf) {
           const own = this.game.ctf.flags[this.team];
@@ -414,6 +432,10 @@ export class Bot extends Character {
     if (g.rules.hill && this.state === STATE.PATROL && this.hillIdx !== g.hill.idx) { this.enterHill(); return; }
     // Capture the Flag: flags move, so look again at what the job is every so often
     if (g.ctf && (this.state === STATE.PATROL || this.state === STATE.SEARCH) && now > this.nextObjT) { this.enterFlag(); return; }
+    if (g.obj && (this.state === STATE.PATROL || this.state === STATE.SEARCH || this.state === STATE.OBJECTIVE || this.state === STATE.COLLECT) && now > this.nextObjT) {
+      const job = g.obj.botJob(this);
+      if (job) { this.enterObj(job); return; }
+    }
     if (!g.rules.hill && !g.ctf && (this.state === STATE.PATROL || this.state === STATE.SEARCH) && now > this.nextNeedCheck) {
       this.nextNeedCheck = now + 1;
       const p = this.choosePickup(this.state === STATE.SEARCH ? 10 : Infinity);
@@ -422,6 +444,13 @@ export class Bot extends Character {
   }
 
   pickNext() {
+    const obj = this.game.obj;
+    if (obj) {
+      const job = obj.botJob(this);
+      const p = this.health < 40 && !this.noGuns() ? this.choosePickup(18) : null;
+      if (p && p.type === 'health') { this.enterCollect(p); return; }
+      if (job) { this.enterObj(job); return; }
+    }
     if (this.game.ctf) {
       const p = this.health < 40 && !this.game.ctf.carrying(this) ? this.choosePickup(20) : null;
       if (p && p.type === 'health') this.enterCollect(p);
@@ -576,6 +605,30 @@ export class Bot extends Character {
     this.pickup = p;
     this.stateUntil = this.game.time + 25;
     if (!this.setGoal(p.pos.x, p.pos.y, p.pos.z)) this.done = true;
+  }
+
+  /** Infected: no gun in hand. */
+  noGuns() { const o = this.game.obj; return !!(o && o.noGuns && o.noGuns(this)); }
+
+  /**
+   * Domination / Search & Destroy / Infected: head for an objective job
+   * { x, y, z, stay, stand, sprint } from objectives.js. `stay` = seconds to hold
+   * on arrival; `stand` = keep still there (planting, defusing).
+   */
+  enterObj(job) {
+    const now = this.game.time;
+    // the same job again while we're already on it: keep going
+    const same = this.state === STATE.OBJECTIVE && this.objJob && !this.done && Math.hypot(this.objJob.x - job.x, this.objJob.z - job.z) < 2.5;
+    this.nextObjT = now + (job.stand ? 0.6 : job.stay ? 2.2 : 0.8);
+    if (same) { this.objJob.stay = Math.max(this.objJob.stay, job.stay); return; }
+    this.setState(STATE.OBJECTIVE);
+    this.objJob = job;
+    this.objHoldT = 0;
+    this.stateUntil = now + 25;
+    if (!this.setGoal(job.x, job.y, job.z)) {
+      // not reachable from here: try a spot close to it
+      if (!this.setGoal(job.x + rand(-2, 2), job.y, job.z + rand(-2, 2))) this.done = true;
+    }
   }
 
   enterAttack() {
@@ -744,7 +797,24 @@ export class Bot extends Character {
       case STATE.OBJECTIVE: {
         const t = this.target;
         this.lookMode = t && this.pos.distanceTo(t.pos) < 22 ? 'target' : 'move';
-        if (this.followPath(CFG.botSprint) || now > this.stateUntil) this.done = true;
+        const job = this.game.obj && this.objJob;
+        if (!job) {
+          if (this.followPath(CFG.botSprint) || now > this.stateUntil) this.done = true;
+          break;
+        }
+        const there = this.followPath(job.sprint || this.noGuns() ? CFG.botSprint : CFG.botRun);
+        if (there) {
+          // hold the spot: still (planting / defusing) or watching around
+          this.wishSpeed = 0;
+          this.objHoldT += dt;
+          if (!t && !job.stand && now > this.lookUntil) {
+            const a = Math.random() * Math.PI * 2;
+            this.lookPos.set(this.pos.x + Math.cos(a) * 10, this.pos.y + 1.5, this.pos.z + Math.sin(a) * 10);
+            this.lookMode = 'point';
+            this.lookUntil = now + rand(1, 2.5);
+          } else if (!t && now <= this.lookUntil) this.lookMode = 'point';
+          if (this.objHoldT >= (job.stay || 0)) this.done = true;
+        } else if (now > this.stateUntil) this.done = true;
         break;
       }
       case STATE.ATTACK: this.updateAttack(dt); break;
@@ -783,6 +853,20 @@ export class Bot extends Character {
     if (!t) { this.wishSpeed = 0; return; }
     const w = this.weapon;
     const d = this.pos.distanceTo(t.pos);
+
+    // Infected: run them down and knife them
+    if (this.noGuns()) {
+      if (d > 2.2) {
+        if (!this.path || now > this.repathT || this.goal.distanceTo(t.pos) > 2.5) {
+          this.repathT = now + 0.5;
+          if (!this.setGoal(t.pos.x, t.pos.y, t.pos.z)) { this.wishX = (t.pos.x - this.pos.x) / (d || 1); this.wishZ = (t.pos.z - this.pos.z) / (d || 1); this.wishSpeed = CFG.botSprint; }
+        }
+        if (this.path) this.followPath(CFG.botSprint);
+      } else this.wishSpeed = 1;
+      if (this.knifeT <= 0 && d < 2.7 && Math.abs(t.pos.y - this.pos.y) < 1.5 && this.reactT <= 0 && Math.random() < dt * 8) this.knife();
+      this.hasSpot = false;
+      return;
+    }
 
     // out of useful range: close the distance along a path (still shooting)
     if (d > w.def.botMaxRange) {
@@ -984,7 +1068,9 @@ export class Bot extends Character {
       flee = true;
       break;
     }
-    let maxSp = Math.max(this.wishSpeed, pushed ? 2.5 : 0, flee ? CFG.botSprint : 0);
+    const sm = this.speedMul || 1; // Infected run faster
+    if (sm !== 1) { wx *= sm; wz *= sm; }
+    let maxSp = Math.max(this.wishSpeed * sm, pushed ? 2.5 : 0, flee ? CFG.botSprint : 0);
     if (this.isBlind() && !flee) maxSp *= 0.45; // blinded: feeling their way
     const wl = Math.hypot(wx, wz);
     if (wl > maxSp && wl > 0) { wx *= maxSp / wl; wz *= maxSp / wl; }
@@ -1176,7 +1262,7 @@ export class Bot extends Character {
       this.trackTime += dt;
       this.reactT -= dt;
       const facing = this.lookMode === 'target';
-      if (facing && this.reactT <= 0 && !t.isProtected()) {
+      if (facing && this.reactT <= 0 && !t.isProtected() && !this.noGuns()) {
         const d = this.pos.distanceTo(t.pos);
         const tol = 0.05 + Math.atan2(0.4, d) + (w.def.pellets > 1 ? 0.05 : 0);
         // would the shot have a chance? (moving + sustained fire bloom the cone)

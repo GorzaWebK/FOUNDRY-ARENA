@@ -56,8 +56,15 @@ The pause menu's **Next match** section changes mode and map between matches.
 | **Gun Game**          | every 2 kills hand you the next gun: LMG → rifle → SMG → shotgun → sniper → pistol. One pistol kill wins. Unlimited reserve ammo |
 | **Last One Standing** | 5 lives each, no respawns after that; the last player alive wins. Once you're out you spectate the survivors over their shoulder (fire / aim to cycle, jump for the overhead view); players joining mid-round watch until the next one |
 | **Snipers Only**      | free-for-all with sniper rifles and pistols; first to 15 kills                |
+| **Domination**        | Cobalt vs Crimson over three zones, A, B and C. Stand in a zone with no enemy in it to capture it (about 4 s from neutral, quicker with teammates; an enemy zone has to go back through neutral first). Every zone your team holds scores a point a second; first to 200. Letters, rings and HUD markers show who holds what |
+| **Search & Destroy**  | rounds with one life each. One attacker carries the bomb: stand still on site A or B for 3.5 s to plant it, then hold for 40 s until it goes off. Defenders win by stopping the plant, running out the 100 s round clock or defusing (stand still on the bomb for 6 s). Wiping out the other side also wins the round. A dead carrier drops the bomb for a teammate to pick up. Sides swap every round; first to 4 rounds. The dead watch the rest of the round |
+| **Infected**          | everyone starts as a survivor; after 8 seconds one player turns. The infected carry only a knife (left click swings it), run faster and come back after 2 seconds. Two swings kill from the front, one from behind, and the first infected kills in one swing until someone else turns. Every survivor they kill joins them. Survivors win if any of them last the 5 minutes |
 
-Every mode has a 10 minute clock; when it runs out the mode's best score wins.
+Every mode has a clock (10 minutes; 5 for Infected, 30 for Search & Destroy);
+when it runs out the mode's best score wins.
+
+King of the Hill already moves its zone every minute, which is the same idea as
+a "hardpoint", so the new zone mode is Domination instead.
 
 In team modes, **Team** on the main menu picks Cobalt, Crimson or Auto, and the
 pause menu's **Switch team** button moves you mid-match (you respawn on your new
@@ -246,8 +253,8 @@ unlock **Night Shift**. Neither can be earned any other way.
 
 Press **Ranked** (Play online card) to play for your **skill rating (SR)**. It
 drops you into the fullest open ranked room, or hosts one others will land in.
-Ranked rooms have fixed rules: Team Deathmatch, King of the Hill or Capture the
-Flag on the built-in arena maps, standard settings, five normal bots, and the
+Ranked rooms have fixed rules: Team Deathmatch, King of the Hill, Capture the
+Flag, Domination or Search & Destroy on the built-in arena maps, standard settings, five normal bots, and the
 host can't change any of it. A match counts when another player is in it and
 you were there for most of it.
 
@@ -400,7 +407,8 @@ look it borrows (materials, sky, set dressing).
   Community maps for everyone, where players can vote it up, play it solo or
   host a room on it (everyone who joins gets the map automatically).
 - Maps without flags or a hill play Team Deathmatch when Capture the Flag or King
-  of the Hill is picked.
+  of the Hill is picked. Domination needs at least three hills; Search & Destroy
+  needs both flag bases (the teams' sides) and two hills (the bomb sites).
 - Keys: `V` select, `B` block, `R` ramp, `T` stairs, `S` spawn, `P` pickup,
   `F` flag, `H` hill, `E` erase, `Del` delete, `Ctrl+Z` / `Ctrl+Y` undo / redo,
   `Ctrl+D` duplicate, arrows nudge, `[` `]` lower / raise, wheel to zoom,
@@ -533,7 +541,12 @@ game at your own [PeerServer](https://github.com/peers/peerjs-server).
 Each bot (`src/bot.js`) is a state machine layered on perception, navigation and
 combat systems:
 
-- **States** — Patrol, Chase, Attack, Retreat, Search, Collect.
+- **States** — Patrol, Chase, Attack, Retreat, Search, Collect, Objective.
+- **Objectives** — in Domination a third of each team holds zones it owns and the
+  rest go for the others; in Search & Destroy the carrier heads for a site and
+  stands still to plant while teammates cover, and the nearest defender goes for
+  the defuse. On the way they shoot on the move and only stop to fight up close.
+  Infected bots sprint at the nearest survivor and knife them.
 - **Perception** — ~125° view cone plus line-of-sight raycasts; they hear gunshots,
   explosions and running footsteps, and remember where each enemy was last seen.
 - **Navigation** — a multi-level nav grid is generated from the map at load
@@ -577,6 +590,7 @@ src/game.js           match flow, hitscan, grenades, damage, spawning, pickups, 
 src/modes.js          game modes: rules, scoring, ranking, HUD text, results
 src/killcam.js        rolling recording + kill cam replay
 src/ctf.js            Capture the Flag: flags, rules, flag models
+src/objectives.js     Domination, Search & Destroy and Infected: rules, zones, bomb, HUD
 src/career.js         career stats (local, part of the account)
 src/skins.js          weapon camos: patterns, unlocks, colours
 src/progress.js       XP, levels, prestige, equipped cosmetics

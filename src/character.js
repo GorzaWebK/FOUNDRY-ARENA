@@ -220,6 +220,8 @@ export class Character {
 
   /** What a third-person model should show: [in hand, stowed, 'hip' | 'back', hand skin, stowed skin]. */
   gear() {
+    const obj = this.game.obj;
+    if (obj && obj.noGuns && obj.noGuns(this)) return [null, null, null, 'none', 'none']; // infected: bare hands
     const ws = this.weapons, held = this.weapon.def.id;
     if (ws.length < 2) return [held, null, null, this.skinOf(held), 'none'];
     const stowed = this.weaponIdx === 0 ? ws[1].def.id : ws[0].def.id;
@@ -244,6 +246,9 @@ export class Character {
    * frame (semi-auto weapons only fire on a press). Returns true if a shot left.
    */
   tryFire(held, pressed, ads = 0) {
+    // Infected: no guns, the trigger swings the knife
+    const obj = this.game.obj;
+    if (obj && obj.noGuns && obj.noGuns(this)) { if (held) this.knife(); return false; }
     const w = this.weapon;
     if (!held || this.switchT > 0 || w.reloadT > 0 || w.cooldown > 0 || this.meleeT > 0 || this.cook) return false;
     if (!w.def.auto && !pressed) return false;

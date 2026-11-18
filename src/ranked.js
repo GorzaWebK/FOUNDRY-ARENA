@@ -11,7 +11,7 @@
 // counts when at least two players are in it and you were there for most of it.
 
 export const START_SR = 1000;
-export const RANKED_MODES = ['tdm', 'koth', 'ctf'];
+export const RANKED_MODES = ['tdm', 'koth', 'ctf', 'dom', 'sd'];
 export const RANKED_MAPS = ['foundry', 'span', 'cloister', 'depot', 'skyline', 'dockyard'];
 export const PLACEMENT_GAMES = 5;
 export const MAX_SR_STEP = 45; // (the server refuses bigger jumps)
