@@ -167,7 +167,7 @@ export class Party {
   // ---------------------------------------------------------------- member
 
   /** Join a friend's party. `quietRetry`: keep trying (after a reload / lost leader). */
-  async join(code, name, quietRetry = false) {
+  async join(code, name, quietRetry = false, attempt = 0) {
     code = cleanPartyCode(code);
     if (code.length < 5) throw new Error('Enter the 5-letter party code.');
     if (!quietRetry || this.code !== code) this.leave(false);
@@ -211,6 +211,12 @@ export class Party {
     } catch (e) {
       if (token !== this.token) return;
       if (quietRetry && !e.final) { this._retry(token); return; }
+      // a first hiccup (a slow tab, a dropped handshake): try again before giving up
+      if (!e.final && attempt < 2 && !/not found/i.test(e.message)) {
+        await new Promise((r) => setTimeout(r, 1500));
+        if (token === this.token) return this.join(code, name, false, attempt + 1);
+        return;
+      }
       this._clear();
       this._save();
       this.hooks.onChange();

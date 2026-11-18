@@ -220,6 +220,18 @@ kills, 8 wins, 8 flag captures and so on), picked fresh every Monday. Each pays
 first full week unlocks the **Overtime** calling card, and five full weeks
 unlock **Night Shift**. Neither can be earned any other way.
 
+### Leaderboard
+
+**Leaderboard** (bottom of the main menu) ranks everyone who has played, by
+name: level, kills, wins, K/D (from 25 kills), headshots, best streak, longest
+kill, flag captures, knife and grenade kills, accuracy (from 500 shots), matches
+and time played. It comes through the lobby: your game sends your career stats
+whenever they change, and every player keeps a copy of the board, so it's still
+there when the player holding the lobby leaves, and it fills back in when people
+come back online. Set your name on the main menu so people know who you are.
+Stats come from each player's own game: values are sanity-checked, but there's
+no server to make them cheat-proof.
+
 ### Weapon skins
 
 Every gun has five camos: Woodland, Desert, Arctic, Crimson and Tiger. A gun's
@@ -330,7 +342,11 @@ connect to them directly.
 3. **Private rooms:** fill in **Password** before hosting and only players who
    type the same password can join (it's never put in the invite link, so send it
    separately).
-4. **Party:** press **Party…** (top of the Play with friends card) and **Start a
+4. **Public rooms:** tick **Public** next to the password before pressing **Host a
+   room** and your room is listed under **Browse rooms** (top of the Play online
+   card) for anyone to join, with its mode, map and player count. A public room
+   can still have a password: it shows a lock and asks for it on Join.
+5. **Party:** press **Party…** (top of the Play online card) and **Start a
    party**, then send friends the invite link or the 5-letter party code (up to 4
    players). Whoever started the party leads: when they host or join a room, the
    whole party is brought in with them (password and all), they stay together
@@ -339,22 +355,29 @@ connect to them directly.
    leaves too. Members' Host and Join buttons are off while they're in a party;
    if they're busy in a solo match, they follow as soon as they leave it. A
    reload keeps you in your party (that tab remembers it).
-5. Press `Enter` to chat.
-6. The host can switch bots on or off mid-match from the pause menu, pick the
+6. Press `Enter` to chat.
+7. The host can switch bots on or off mid-match from the pause menu, pick the
    next match's mode and map there, and restart or start the next match from the
    end screen. Closing the room (or the
    host's tab) ends the session for everyone.
-7. **Dropped?** If your connection drops (or you reload the tab by accident), the
+8. **Dropped?** If your connection drops (or you reload the tab by accident), the
    game tries to get you back into the room by itself. The host keeps your kills,
    deaths, team, lives and award stats for 3 minutes, matched by your player ID,
    and gives them back when you rejoin. Leaving with **Leave game** gives your
    place up, and when the host closes the room everyone is told rather than
    left retrying.
-8. Everyone has to be on the same version of the game. It's shown in the
+9. Everyone has to be on the same version of the game. It's shown in the
    main menu's bottom right corner. If someone has an old tab open, joining tells them who
    needs to refresh (`Ctrl+Shift+R`) instead of letting them in.
 
 How it works:
+
+- **The lobby** (`src/lobby.js`) is how public rooms and the leaderboard work
+  without a server. The first player online takes a well-known address on the
+  same PeerJS network and becomes the hub; everyone else connects to them. Hosts
+  of public rooms announce them to the hub every few seconds. If the hub
+  leaves, the others take over within a couple of seconds and the rooms
+  reappear as hosts re-announce.
 
 - Connections are WebRTC data channels set up with [PeerJS](https://peerjs.com/).
   Browsers find each other through PeerJS's free public signalling server; once
@@ -434,6 +457,7 @@ src/net.js            multiplayer session: host/client protocol
 src/netChar.js        characters driven over the network (interpolated)
 src/transport.js      PeerJS (WebRTC) and local-tab transports
 src/party.js          parties: friends who follow their leader between rooms
+src/lobby.js          serverless lobby: public room list and the leaderboard
 src/config.js         gameplay tuning, difficulty presets, bot roster
 src/maps/index.js     map registry
 src/maps/*.js         the maps (data only); range.js is the training range

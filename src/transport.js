@@ -70,8 +70,8 @@ function wrapPeerConn(dc) {
 }
 
 const peerTransport = {
-  /** `remake`: where a new code comes from if this one is taken. */
-  host(code, remake = makeRoomCode) {
+  /** `remake`: where a new code comes from if this one is taken. `retries`: how many times. */
+  host(code, remake = makeRoomCode, retries = 4) {
     return new Promise((resolve, reject) => {
       let attempts = 0;
       const tryCode = (c) => {
@@ -98,7 +98,7 @@ const peerTransport = {
         peer.on('error', (err) => {
           if (opened) return;
           peer.destroy();
-          if (err.type === 'unavailable-id' && attempts++ < 4) tryCode(remake());
+          if (err.type === 'unavailable-id' && attempts++ < retries) tryCode(remake());
           else reject(new Error(err.type === 'unavailable-id' ? 'Could not reserve a room code.' : 'Could not reach the matchmaking server.'));
         });
       };
@@ -138,7 +138,32 @@ const peerTransport = {
 // ------------------------------------------------------------------ BroadcastChannel (same browser, for development)
 
 const localTransport = {
-  host(code) {
+  /** Like PeerJS, a code can only be held once: ask whether anyone has it first. */
+  host(code, remake = makeRoomCode, retries = 4) {
+    return new Promise((resolve, reject) => {
+      const probe = new BroadcastChannel(PREFIX + code);
+      const me = 'p' + Math.random().toString(36).slice(2, 10);
+      const ticket = Math.random();
+      let taken = false;
+      probe.onmessage = (ev) => {
+        const m = ev.data;
+        if (!m) return;
+        if (m.k === 'here' && m.to === me) taken = true;
+        // two tabs claiming at the same moment: the higher ticket wins
+        if (m.k === 'claim' && m.from !== me) { if (m.ticket > ticket) taken = true; else probe.postMessage({ k: 'claim', from: me, ticket }); }
+      };
+      probe.postMessage({ k: 'anyone', to: 'host', from: me });
+      probe.postMessage({ k: 'claim', from: me, ticket });
+      setTimeout(() => {
+        probe.close();
+        if (!taken) { resolve(localTransport._host(code)); return; }
+        if (retries > 0) localTransport.host(remake(), remake, retries - 1).then(resolve, reject);
+        else reject(new Error('Could not reserve a room code.'));
+      }, 500);
+    });
+  },
+
+  _host(code) {
     const ch = new BroadcastChannel(PREFIX + code);
     const conns = new Map();
     const room = {
@@ -149,6 +174,7 @@ const localTransport = {
     ch.onmessage = (ev) => {
       const m = ev.data;
       if (m.to !== 'host') return;
+      if (m.k === 'anyone') { ch.postMessage({ k: 'here', to: m.from }); return; }
       if (m.k === 'hello') {
         const conn = {
           id: m.from, open: true, onMessage: null, onClose: null,
@@ -166,7 +192,7 @@ const localTransport = {
         if (c && c.open) { c.open = false; conns.delete(m.from); if (c.onClose) c.onClose(); }
       }
     };
-    return Promise.resolve(room);
+    return room;
   },
 
   join(code) {

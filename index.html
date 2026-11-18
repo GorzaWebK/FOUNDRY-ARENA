@@ -116,9 +116,9 @@
           </section>
           <div class="col-stack">
           <section class="card">
-            <h4 class="h-with-btn">Play with friends <button id="btn-party" class="link-btn">Party…</button></h4>
+            <h4 class="h-with-btn">Play online <button id="btn-rooms" class="link-btn">Browse rooms</button><button id="btn-party" class="link-btn party-link">Party…</button></h4>
             <label class="row mp"><span>Your name</span><input type="text" id="mp-name" maxlength="16" placeholder="Player" autocomplete="off" spellcheck="false" /></label>
-            <label class="row mp"><span>Password</span><input type="password" id="mp-pass" maxlength="32" placeholder="optional" autocomplete="off" /></label>
+            <div class="row mp"><span>Password</span><div class="pass-pub"><input type="password" id="mp-pass" maxlength="32" placeholder="optional" autocomplete="off" /><label class="pub-tick" title="List your room in Browse rooms so anyone can join"><input type="checkbox" id="mp-public" /> Public</label></div></div>
             <button id="btn-host" class="wide-btn">Host a room</button>
             <div class="mp-actions">
               <input type="text" id="mp-code" maxlength="8" placeholder="ROOM CODE" autocomplete="off" spellcheck="false" />
@@ -142,6 +142,7 @@
             <button id="btn-open-controls" class="small-btn">Controls</button>
             <button id="btn-custom" class="small-btn accent">Customize</button>
             <button id="btn-career" class="small-btn">Career</button>
+            <button id="btn-board" class="small-btn">Leaderboard</button>
             <button id="btn-account" class="small-btn">Account…</button>
           </div>
           <p class="foot-meta"><span id="lvl-chip" class="lvl-chip"></span><span class="acct-line" title="Your player ID">ID <b id="acct-id-menu" class="acct-id">—</b></span><span id="version-note"></span></p>
@@ -304,6 +305,30 @@
         <p class="note">Importing swaps this browser over to that account and reloads.</p>
         <p id="acct-status" class="note"></p>
         <div class="btn-row"><button id="btn-acct-done">Done</button></div>
+      </div>
+    </div>
+
+    <!-- ============================== PUBLIC ROOMS ============================== -->
+    <div id="rooms-ov" class="overlay hidden">
+      <div class="panel wide-panel">
+        <h2>PUBLIC ROOMS</h2>
+        <p class="note">Rooms anyone can join. To list your own, tick <b>Public</b> before you press Host a room.</p>
+        <div class="rooms-head"><span id="rooms-status" class="note"></span><button id="btn-rooms-refresh" class="small-btn">Refresh</button></div>
+        <div id="rooms-list" class="rooms-list"></div>
+        <p id="rooms-msg" class="note"></p>
+        <div class="btn-row"><button id="btn-rooms-host">Host a public room</button><button id="btn-rooms-done" class="primary">DONE</button></div>
+      </div>
+    </div>
+
+    <!-- ============================== LEADERBOARD ============================== -->
+    <div id="board-ov" class="overlay hidden">
+      <div class="panel wide-panel">
+        <h2>LEADERBOARD</h2>
+        <div id="board-tabs" class="board-tabs"></div>
+        <div class="board-wrap"><table class="board-table"><thead><tr><th>#</th><th class="l">Player</th><th>Level</th><th id="board-col">Kills</th></tr></thead><tbody id="board-body"></tbody></table></div>
+        <p id="board-me" class="note"></p>
+        <p id="board-status" class="note"></p>
+        <div class="btn-row"><button id="btn-board-done" class="primary">DONE</button></div>
       </div>
     </div>
 

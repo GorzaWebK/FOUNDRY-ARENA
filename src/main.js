@@ -23,6 +23,8 @@ import { Input } from './input.js';
 import { Game } from './game.js';
 import { Net, cleanName } from './net.js';
 import { Party, PARTY_MAX, cleanPartyCode } from './party.js';
+import { Lobby, boardId } from './lobby.js';
+import { MAX_HUMANS } from './config.js';
 import { cleanRoomCode } from './transport.js';
 import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
 import { BUILD, BUILD_TIME } from './version.js';
@@ -236,7 +238,8 @@ syncLoadout();
 // ---------------------------------------------------------------- multiplayer lobby UI
 const nameInput = $('mp-name'), codeInput = $('mp-code');
 nameInput.value = settings.name;
-nameInput.addEventListener('input', () => { settings.name = cleanName(nameInput.value); saveSettings(settings); if (party.active) party.setName(settings.name || 'Player'); });
+nameInput.addEventListener('input', () => { settings.name = cleanName(nameInput.value); saveSettings(settings); if (party.active) party.setName(settings.name || 'Player'); clearTimeout(nameBoardT); nameBoardT = setTimeout(() => { updateBoardEntry(); syncPublicRoom(); }, 1500); });
+let nameBoardT = 0;
 codeInput.addEventListener('input', () => { codeInput.value = cleanRoomCode(codeInput.value); });
 codeInput.addEventListener('keydown', (e) => { if (e.code === 'Enter') joinGame(); });
 if (params.get('join')) codeInput.value = cleanRoomCode(params.get('join'));
@@ -283,6 +286,7 @@ function updateRoomUi() {
   $('end-wait').classList.toggle('hidden', net.role !== 'client');
   hud.chatHint(on && state === 'playing' && !chatting);
   syncBotsUi();
+  if (typeof lobby !== 'undefined') syncPublicRoom();
 }
 
 $('btn-copy').addEventListener('click', async () => {
@@ -369,6 +373,7 @@ async function hostGame() {
   setMpBusy(true);
   setMpStatus('Creating a room…');
   try {
+    hostPublic = $('mp-public').checked;
     await net.host(settings.name, $('mp-pass').value.trim());
   } catch (e) {
     setMpStatus(e.message, true);
@@ -551,6 +556,165 @@ function renderParty() {
   if (on && !lead && !$('mp-status').classList.contains('err') && !net.active) setMpStatus("You're in a party: you follow your leader into rooms.");
   else if (!on && /^You're in a party/.test($('mp-status').textContent)) setMpStatus('');
 }
+
+// ---------------------------------------------------------------- lobby: public rooms + leaderboard
+// (see lobby.js: a serverless meeting point shared by everyone with the game open)
+
+let hostPublic = false; // the room we're hosting is listed publicly
+const lobby = new Lobby({
+  onRooms: () => { if (!$('rooms-ov').classList.contains('hidden')) renderRooms(); },
+  onBoard: () => { if (!$('board-ov').classList.contains('hidden')) renderBoard(); },
+  onStatus: () => {
+    if (!$('rooms-ov').classList.contains('hidden')) renderRooms();
+    if (!$('board-ov').classList.contains('hidden')) renderBoard();
+  },
+});
+
+/** Keep the lobby's listing of our room up to date (or take it down). */
+function syncPublicRoom() {
+  if (net.role === 'host' && hostPublic) {
+    lobby.setRoom({
+      code: net.code, host: settings.name || 'Player', mode: game.rules.name, map: game.map.name,
+      n: net.humanCount, max: MAX_HUMANS, bots: game.botsOn !== false && game.bots.length > 0, locked: !!net.password,
+    });
+  } else lobby.setRoom(null);
+}
+
+/** Our row on the leaderboard: career stats, level and name. */
+function updateBoardEntry() {
+  const c = game.career.stats, pr = game.progress;
+  lobby.setMe({
+    id: boardId(getAccount().id), name: settings.name || 'Player',
+    level: pr.level, prestige: pr.prestige, xp: pr.xp,
+    matches: c.matches, wins: c.wins, kills: c.kills, deaths: c.deaths, heads: c.heads,
+    bestStreak: c.bestStreak, longest: c.longest, knives: c.knives, nades: c.nades, caps: c.caps,
+    shots: c.shots, hits: c.hits, time: Math.floor(c.time || 0),
+  });
+}
+
+const lobbyStatus = () => (lobby.role === 'hub' || lobby.role === 'member' ? 'Connected to the lobby.' : lobby.connecting ? 'Connecting to the lobby…' : 'Looking for the lobby…');
+
+function renderRooms() {
+  $('rooms-status').textContent = lobbyStatus();
+  const list = $('rooms-list');
+  list.textContent = '';
+  const rooms = lobby.joinable().sort((a, b) => (b.n < b.max) - (a.n < a.max) || b.n - a.n);
+  const follower = party.active && !party.leader;
+  if (!rooms.length) {
+    const p = document.createElement('div');
+    p.className = 'rooms-empty';
+    p.textContent = lobby.online ? 'No public rooms right now. Host one and others can find it here.' : 'Waiting for the lobby. Rooms show up here as soon as it connects.';
+    list.append(p);
+  }
+  for (const r of rooms) {
+    const row = document.createElement('div');
+    row.className = 'room-row';
+    const info = document.createElement('div');
+    const title = document.createElement('b');
+    title.textContent = `${r.host}'s room${r.locked ? '  🔒' : ''}`;
+    const sub = document.createElement('small');
+    sub.textContent = `${r.mode} · ${r.map}${r.bots ? ' · bots on' : ''} · code ${r.code}`;
+    info.append(title, sub);
+    const n = document.createElement('span');
+    const full = r.n >= r.max;
+    n.className = 'rn' + (full ? ' full' : '');
+    n.textContent = `${r.n}/${r.max}`;
+    const act = document.createElement('div');
+    act.className = 'pw-join';
+    const btn = document.createElement('button');
+    btn.textContent = full ? 'Full' : 'Join';
+    btn.disabled = full || follower;
+    if (follower) btn.title = 'Your party leader picks the room';
+    let pw = null;
+    btn.addEventListener('click', () => {
+      if (r.locked && !pw) {
+        pw = document.createElement('input');
+        pw.type = 'password'; pw.placeholder = 'Password'; pw.maxLength = 32;
+        pw.addEventListener('keydown', (e) => { if (e.code === 'Enter') btn.click(); e.stopPropagation(); });
+        act.prepend(pw);
+        pw.focus();
+        return;
+      }
+      closeRooms();
+      codeInput.value = r.code;
+      joinRoom(r.code, pw ? pw.value.trim() : '');
+    });
+    act.append(btn);
+    row.append(info, n, act);
+    list.append(row);
+  }
+  $('rooms-msg').textContent = follower ? "You're in a party: your leader picks the room." : '';
+  $('btn-rooms-host').disabled = follower || net.active;
+}
+
+function openRooms() { lobby.refresh(); renderRooms(); $('rooms-ov').classList.remove('hidden'); }
+function closeRooms() { $('rooms-ov').classList.add('hidden'); }
+$('btn-rooms').addEventListener('click', openRooms);
+$('btn-rooms-done').addEventListener('click', closeRooms);
+$('btn-rooms-refresh').addEventListener('click', () => { lobby.refresh(); renderRooms(); });
+$('btn-rooms-host').addEventListener('click', () => { closeRooms(); $('mp-public').checked = true; hostGame(); });
+
+// leaderboard: one tab per stat
+const BOARD_STATS = [
+  { id: 'level', name: 'Level', col: 'XP', score: (e) => e.prestige * 1e9 + e.xp, show: (e) => fmt(e.xp) },
+  { id: 'kills', name: 'Kills', score: (e) => e.kills },
+  { id: 'wins', name: 'Wins', score: (e) => e.wins },
+  { id: 'kd', name: 'K/D', col: 'K/D', min: (e) => e.kills >= 25, minText: '25 kills', score: (e) => e.kills / Math.max(1, e.deaths), show: (e) => (e.kills / Math.max(1, e.deaths)).toFixed(2) },
+  { id: 'heads', name: 'Headshots', score: (e) => e.heads },
+  { id: 'bestStreak', name: 'Best streak', col: 'Streak', score: (e) => e.bestStreak },
+  { id: 'longest', name: 'Longest kill', col: 'Metres', score: (e) => e.longest, show: (e) => `${e.longest} m` },
+  { id: 'caps', name: 'Captures', score: (e) => e.caps },
+  { id: 'knives', name: 'Knife kills', col: 'Knife', score: (e) => e.knives },
+  { id: 'nades', name: 'Grenade kills', col: 'Grenade', score: (e) => e.nades },
+  { id: 'acc', name: 'Accuracy', col: 'Accuracy', min: (e) => e.shots >= 500, minText: '500 shots', score: (e) => e.hits / Math.max(1, e.shots), show: (e) => `${Math.round((100 * e.hits) / Math.max(1, e.shots))}%` },
+  { id: 'matches', name: 'Matches', score: (e) => e.matches },
+  { id: 'time', name: 'Time played', col: 'Time', score: (e) => e.time, show: (e) => fmtTime(e.time) },
+];
+let boardTab = 'level';
+const tabs = $('board-tabs');
+for (const s of BOARD_STATS) {
+  const b = document.createElement('button');
+  b.className = 'small-btn';
+  b.dataset.id = s.id;
+  b.textContent = s.name;
+  b.addEventListener('click', () => { boardTab = s.id; renderBoard(); });
+  tabs.append(b);
+}
+
+function renderBoard() {
+  updateBoardEntry();
+  const stat = BOARD_STATS.find((s) => s.id === boardTab);
+  for (const b of tabs.children) b.classList.toggle('on', b.dataset.id === boardTab);
+  $('board-col').textContent = stat.col || stat.name;
+  const myId = boardId(getAccount().id);
+  const all = [...lobby.board.values()].filter((e) => (!stat.min || stat.min(e)) && stat.score(e) > 0);
+  all.sort((a, b) => stat.score(b) - stat.score(a) || a.at - b.at);
+  const body = $('board-body');
+  body.textContent = '';
+  const top = all.slice(0, 100);
+  top.forEach((e, i) => {
+    const tr = document.createElement('tr');
+    if (e.id === myId) tr.className = 'me';
+    const cells = [String(i + 1), e.name, `${e.prestige ? '★' + e.prestige + ' ' : ''}${e.level}`, stat.show ? stat.show(e) : fmt(stat.score(e))];
+    cells.forEach((t, k) => { const td = document.createElement('td'); if (k === 1) td.className = 'l'; td.textContent = t; tr.append(td); });
+    body.append(tr);
+  });
+  if (!top.length) {
+    const tr = document.createElement('tr'), td = document.createElement('td');
+    td.colSpan = 4; td.className = 'l';
+    td.textContent = stat.min ? `Nobody has ${stat.minText} yet.` : 'Nobody on the board yet. Play a match!';
+    tr.append(td); body.append(tr);
+  }
+  const rank = all.findIndex((e) => e.id === myId);
+  const me = lobby.board.get(myId);
+  $('board-me').textContent = rank >= 0 ? `You're #${rank + 1} of ${all.length} for ${stat.name.toLowerCase()}${settings.name ? '' : '. Set your name on the main menu so people know who you are'}.`
+    : stat.min && me && !stat.min(me) ? `You'll show up here after ${stat.minText}.` : 'Play a match to get on the board.';
+  $('board-status').textContent = `${lobby.board.size} player${lobby.board.size === 1 ? '' : 's'} · ${lobby.online ? 'live from the lobby' : 'offline: showing the last copy you saw'}. Stats come from each player's own game.`;
+}
+
+function openBoard() { lobby.refresh(); renderBoard(); $('board-ov').classList.remove('hidden'); }
+$('btn-board').addEventListener('click', openBoard);
+$('btn-board-done').addEventListener('click', () => $('board-ov').classList.add('hidden'));
 
 function openParty() { setPartyStatus(''); renderParty(); $('party-ov').classList.remove('hidden'); }
 function closeParty() { $('party-ov').classList.add('hidden'); }
@@ -1037,6 +1201,7 @@ $('btn-career-reset').addEventListener('click', () => {
   if (!window.confirm('Reset all your career stats to zero? This also re-locks weapon skins. It can\'t be undone (unless you have an account code from before).')) return;
   game.career.reset();
   renderCareer();
+  updateBoardEntry();
 });
 
 $('btn-account').addEventListener('click', openAccount);
@@ -1138,6 +1303,12 @@ window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') closeParty();
     return;
   }
+  for (const id of ['rooms-ov', 'board-ov']) {
+    if (!$(id).classList.contains('hidden')) {
+      if (e.code === 'Escape') $(id).classList.add('hidden');
+      return;
+    }
+  }
   for (const id of ['settings-ov', 'keys-ov']) {
     if (!$(id).classList.contains('hidden')) {
       if (e.code === 'Escape') $(id).classList.add('hidden');
@@ -1179,7 +1350,7 @@ window.addEventListener('resize', () => game.resize());
 window.addEventListener('beforeunload', (e) => {
   if (state === 'playing' || state === 'paused') { e.preventDefault(); e.returnValue = ''; }
 });
-window.addEventListener('pagehide', () => { party.suspend(); net.leave(false); game.career.flush(); game.progress.flush(); });
+window.addEventListener('pagehide', () => { lobby.close(); party.suspend(); net.leave(false); game.career.flush(); game.progress.flush(); });
 
 game.onMatchEnd = () => {
   const res = game.rules.result(game);
@@ -1198,6 +1369,7 @@ game.onMatchEnd = () => {
     if (won) pr.challenge('win', 1, { mode: game.rules.id });
   }
   game.progress.save();
+  updateBoardEntry();
   renderEndXp();
   $('end-title').textContent = res.draw ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT';
   $('end-title').style.color = res.draw ? '#e9e4da' : won ? '#ffb04a' : '#8e949b';
@@ -1358,10 +1530,13 @@ const savedParty = party.saved();
 if (invited.length === 5 && (!savedParty || savedParty.code !== invited)) { $('party-code').value = invited; openParty(); joinParty(invited); }
 else party.restore(settings.name || 'Player');
 renderParty();
+updateBoardEntry();
+if (!params.has('nolobby')) lobby.connect();
 requestAnimationFrame(frame);
 
 // handy for debugging / automated tests
 window.__game = game;
 window.__net = net;
 window.__party = party;
+window.__lobby = lobby;
 window.__app = { get state() { return state; }, startMatch, hostGame, joinGame, pause, resume, setState, openChat, closeChat, input, settings };
