@@ -844,3 +844,15 @@ body.soft-flash #flashbang { background: #8b9096; transition: opacity 0.35s ease
 .invite-toast p { margin: 0 0 10px; font-size: 13px; color: var(--dim); }
 .invite-toast .btn-row { margin: 0; }
 #btn-friends.on { color: var(--accent); }
+
+/* ---- ranked ---- */
+.host-row { grid-template-columns: 1fr 1.2fr 1.2fr; }
+.ranked-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; padding-top: 6px; padding-bottom: 6px; }
+.ranked-btn small { display: block; font-size: 10px; letter-spacing: 0.06em; opacity: 0.85; margin-top: 2px; }
+.end-ranked { margin: 4px 0 8px; font-family: var(--cond); font-size: 18px; letter-spacing: 0.04em; }
+.end-ranked b { font-size: 22px; }
+.end-ranked .up { color: #7fdc9a; } .end-ranked .down { color: #ff8a7a; }
+.rk-tier { font-family: var(--cond); font-weight: 800; letter-spacing: 0.04em; }
+.sb-rank { display: inline-block; min-width: 20px; margin-right: 5px; padding: 0 3px; font: 800 10px var(--cond); letter-spacing: 0.04em; text-align: center; border: 1px solid currentColor; border-radius: 3px; vertical-align: 1px; }
+.host-row .wide-btn { height: 44px; padding: 4px 6px; white-space: nowrap; font-size: 12.5px; letter-spacing: 0.06em; overflow: hidden; }
+.ranked-btn small { font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }

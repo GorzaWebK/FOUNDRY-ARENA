@@ -34,6 +34,7 @@ import { MAX_HUMANS } from './config.js';
 import { cleanRoomCode } from './transport.js';
 import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
 import { BUILD, BUILD_TIME } from './version.js';
+import { START_SR, RANKED_MODES, RANKED_MAPS, TIERS, tierIndex, tierName, tierColor, seasonId, seasonName, msToSeasonEnd, srChange } from './ranked.js';
 import { getAccount, exportCode, parseCode, importAccount, friendCode, cleanFriendCode, showFriendCode } from './account.js';
 import { SKINS, SKIN_KILLS, skinSwatchCss, skinUnlocked, skinLockText } from './skins.js';
 import { SLOTS, ITEMS, itemOf, itemUnlocked, unlocksAt, packCosmetics, unpackCosmetics } from './cosmetics.js';
@@ -130,7 +131,11 @@ function customFor(id) {
 }
 /** The rules the next match will use. */
 // (objective modes fall back to Team Deathmatch on custom maps without flags / hills)
-function nextRules() { return makeRules(fitMode(settings.mode, getMap(settings.map)), customFor(settings.mode)); }
+let rankedRoom = null; // host of a ranked room: { map, mode } for the next match
+function nextRules() {
+  if (rankedRoom) { const r = makeRules(rankedRoom.mode, null); r.ranked = true; return r; }
+  return makeRules(fitMode(settings.mode, getMap(settings.map)), customFor(settings.mode));
+}
 
 const TEAM_PREF = { auto: -1, cobalt: 0, crimson: 1 };
 function syncMatchPickers() {
@@ -291,8 +296,10 @@ function updateRoomUi() {
   $('pause-title').textContent = on ? 'MENU' : 'PAUSED';
   $('btn-restart').classList.toggle('hidden', net.role === 'client');
   const training = !!game.rules.training && !game.attract;
-  $('next-match').classList.toggle('hidden', net.role === 'client' || training);
-  $('btn-bots').classList.toggle('hidden', net.role === 'client' || training);
+  const ranked = !!game.rules.ranked && !game.attract;
+  $('next-match').classList.toggle('hidden', net.role === 'client' || training || ranked);
+  $('btn-bots').classList.toggle('hidden', net.role === 'client' || training || ranked);
+  if (ranked) $('btn-restart').classList.add('hidden');
   $('btn-range-reset').classList.toggle('hidden', !training);
   $('btn-restart').textContent = training ? 'Restart range' : 'Restart match';
   $('btn-quit').textContent = on ? (net.role === 'host' ? 'Close room' : 'Leave game') : 'Main menu';
@@ -375,10 +382,10 @@ async function startMatch() {
   if (!net.active) cancelRejoin();
   audio.resume();
   audio.setVolume(settings.volume);
-  game.newMatch({
-    botCount: settings.botCount, bots: settings.bots, difficulty: settings.difficulty,
-    map: getMap(settings.map), rules: nextRules(),
-  });
+  game.newMatch(rankedRoom
+    // ranked: the same for everyone, whatever the host's own settings are
+    ? { botCount: 5, bots: true, difficulty: 'normal', map: getMap(rankedRoom.map), rules: nextRules() }
+    : { botCount: settings.botCount, bots: settings.bots, difficulty: settings.difficulty, map: getMap(settings.map), rules: nextRules() });
   setState('playing');
   const ok = await lock();
   if (!ok && state === 'playing') hud.setLockHint(true);
@@ -583,7 +590,7 @@ const lobbyHooks = {
   onRooms: () => { if (!$('rooms-ov').classList.contains('hidden')) renderRooms(); },
   onBoard: () => { if (!$('board-ov').classList.contains('hidden')) renderBoard(); },
   onStatus: () => {
-    if (typeof syncPresence === 'function' && lobby.online) { syncPresence(); watchFriends(); }
+    if (typeof syncPresence === 'function' && lobby.online) { syncPresence(); watchFriends(); refreshRank(); }
     if (!$('rooms-ov').classList.contains('hidden')) renderRooms();
     if (!$('board-ov').classList.contains('hidden')) renderBoard();
   },
@@ -608,7 +615,7 @@ function syncPublicRoom() {
   if (net.role === 'host' && hostPublic) {
     lobby.setRoom({
       code: net.code, host: settings.name || 'Player', mode: game.rules.name, map: game.map.name,
-      n: net.humanCount, max: MAX_HUMANS, bots: game.botsOn !== false && game.bots.length > 0, locked: !!net.password,
+      n: net.humanCount, max: MAX_HUMANS, bots: game.botsOn !== false && game.bots.length > 0, locked: !!net.password, rk: !!game.rules.ranked,
     });
   } else lobby.setRoom(null);
 }
@@ -705,7 +712,7 @@ async function quickPlay() {
   // give the lobby a moment if we've only just opened the page
   for (let i = 0; i < 25 && !lobby.online; i++) await new Promise((r) => setTimeout(r, 200));
   if (lobby.online) await new Promise((r) => setTimeout(r, 600)); // a fresh room list
-  const open = lobby.joinable().filter((r) => !r.locked && r.n < r.max).sort((a, b) => b.n - a.n);
+  const open = lobby.joinable().filter((r) => !r.locked && !r.rk && r.n < r.max).sort((a, b) => b.n - a.n);
   setMpBusy(false);
   for (const r of open.slice(0, 3)) {
     setMpStatus(`Joining ${r.host}'s room (${r.mode}, ${r.map})…`);
@@ -753,6 +760,15 @@ const BOARD_STATS = [
 ];
 let boardTab = 'level';
 const tabs = $('board-tabs');
+// the Ranked tab first: this season's skill ratings (from the online service)
+{
+  const b = document.createElement('button');
+  b.className = 'small-btn';
+  b.dataset.id = 'ranked';
+  b.textContent = 'Ranked';
+  b.addEventListener('click', () => { boardTab = 'ranked'; renderBoard(); });
+  tabs.append(b);
+}
 for (const s of BOARD_STATS) {
   const b = document.createElement('button');
   b.className = 'small-btn';
@@ -762,7 +778,39 @@ for (const s of BOARD_STATS) {
   tabs.append(b);
 }
 
+async function renderRankedBoard() {
+  for (const b of tabs.children) b.classList.toggle('on', b.dataset.id === 'ranked');
+  $('board-col').textContent = 'SR';
+  document.querySelector('.board-table thead th:nth-child(3)').textContent = 'Tier';
+  const body = $('board-body');
+  const msg = (t) => { body.textContent = ''; const tr = document.createElement('tr'), td = document.createElement('td'); td.colSpan = 4; td.className = 'l'; td.textContent = t; tr.append(td); body.append(tr); };
+  const days = Math.ceil(msToSeasonEnd() / 86400000);
+  $('board-status').textContent = `${seasonName()} · ends in ${days} day${days === 1 ? '' : 's'}. Ratings are checked by the server.`;
+  if (!lobby.listRanked) { msg('Ranked needs the online service, which is unavailable right now.'); $('board-me').textContent = ''; return; }
+  msg('Loading…');
+  let rows;
+  try { rows = await lobby.listRanked(); } catch (e) { msg("Couldn't load the ranked board."); return; }
+  if (boardTab !== 'ranked') return;
+  // one row per account (newest sign-in wins ties)
+  const seen = new Set();
+  rows = rows.filter((r) => { const k = r.bid || r.id; if (seen.has(k)) return false; seen.add(k); return true; });
+  body.textContent = '';
+  if (!rows.length) msg('No ranked matches yet this season. Press Ranked on the main menu to play one.');
+  rows.slice(0, 100).forEach((r, i) => {
+    const tr = document.createElement('tr');
+    if (r.mine) tr.className = 'me';
+    const placing = r.games < 5;
+    const cells = [String(i + 1), r.name, placing ? `placement ${r.games}/5` : tierName(r.sr), String(r.sr)];
+    cells.forEach((t, k) => { const td = document.createElement('td'); if (k === 1) td.className = 'l'; if (k === 2) { td.className = 'rk-tier'; td.style.color = placing ? '' : tierColor(r.sr); } td.textContent = t; tr.append(td); });
+    body.append(tr);
+  });
+  const mine = rows.findIndex((r) => r.mine);
+  $('board-me').textContent = mine >= 0 ? `You're #${mine + 1} of ${rows.length} this season (${rows[mine].wins} win${rows[mine].wins === 1 ? '' : 's'} in ${rows[mine].games} match${rows[mine].games === 1 ? '' : 'es'}).` : myRank ? `You haven't played ranked this season. You start at ${myRank.sr} SR.` : '';
+}
+
 function renderBoard() {
+  if (boardTab === 'ranked') { renderRankedBoard(); return; }
+  document.querySelector('.board-table thead th:nth-child(3)').textContent = 'Level';
   updateBoardEntry();
   const stat = BOARD_STATS.find((s) => s.id === boardTab);
   for (const b of tabs.children) b.classList.toggle('on', b.dataset.id === boardTab);
@@ -1171,6 +1219,90 @@ $('btn-fr-add').addEventListener('click', () => {
   renderFriends();
 });
 
+// ---------------------------------------------------------------- ranked
+// (see ranked.js) SR lives in Firebase ranked/<uid>, checked by the rules.
+
+let myRank = null; // { sr, peak, games, wins, season }
+async function refreshRank() {
+  if (!lobby.myRanked || !lobby.online) { renderRankChip(); return; }
+  try { myRank = await lobby.myRanked(); game.player.sr = myRank.sr; if (myRank.peak) game.progress.setRankPeak(tierIndex(myRank.peak)); } catch (e) { /* offline */ }
+  renderRankChip();
+}
+function renderRankChip() {
+  const c = $('rank-chip');
+  if (!lobby.myRanked) { c.textContent = ''; return; }
+  c.textContent = !myRank ? '' : myRank.games < 5 ? `placement ${myRank.games}/5` : `${tierName(myRank.sr)} · ${myRank.sr}`;
+  c.style.color = myRank && myRank.games >= 5 ? tierColor(myRank.sr) : '';
+  $('btn-ranked').title = myRank ? `${seasonName(myRank.season)}: ${tierName(myRank.sr)}, ${myRank.sr} SR (${myRank.wins} wins in ${myRank.games} matches). Fixed rules; your skill rating goes up or down.` : 'Ranked: fixed rules, your skill rating goes up or down.';
+}
+
+/** Ranked: into the fullest open ranked room, or host one. */
+async function rankedPlay() {
+  if (net.active || (party.active && !party.leader)) return;
+  if (!lobby.myRanked) { setMpStatus('Ranked needs the online service, which is unavailable right now.', true); return; }
+  cancelRejoin();
+  audio.resume();
+  setMpBusy(true);
+  setMpStatus('Finding a ranked match…');
+  for (let i = 0; i < 25 && !lobby.online; i++) await new Promise((r) => setTimeout(r, 200));
+  if (!lobby.online) { setMpBusy(false); setMpStatus("Couldn't reach the online service. Try again in a moment.", true); return; }
+  await refreshRank();
+  await new Promise((r) => setTimeout(r, 400));
+  const rooms = lobby.joinable().filter((r) => r.rk && !r.locked && r.n < r.max).sort((a, b) => b.n - a.n);
+  setMpBusy(false);
+  for (const r of rooms.slice(0, 3)) {
+    setMpStatus(`Joining ${r.host}'s ranked room (${r.mode}, ${r.map})…`);
+    codeInput.value = r.code;
+    try { setMpBusy(true); await net.join(r.code, settings.name, ''); } catch (e) { continue; } finally { setMpBusy(false); }
+    party.enteredRoom(r.code, '');
+    await enterRoom();
+    return;
+  }
+  // nobody's hosting: host a ranked room for others to find
+  rankedRoom = { map: RANKED_MAPS[(Math.random() * RANKED_MAPS.length) | 0], mode: RANKED_MODES[(Math.random() * RANKED_MODES.length) | 0] };
+  setMpStatus('No ranked rooms open. Hosting one: others joining through Ranked will land here.');
+  await hostGame({ quick: true });
+  if (net.role === 'host') hud.centerMessage('RANKED ROOM', 'Your match counts once another player joins', 5, '#ff6b1a');
+  else rankedRoom = null;
+}
+$('btn-ranked').addEventListener('click', rankedPlay);
+
+/** After a ranked match: work out the SR change and send it. */
+async function reportRanked(res) {
+  const el = $('end-ranked');
+  el.classList.add('hidden');
+  if (!game.rules.ranked || !net.active || !lobby.reportRanked) return;
+  const humans = game.chars.filter((c) => c.isHuman);
+  const show = (html) => { el.innerHTML = html; el.classList.remove('hidden'); };
+  if (humans.length < 2) { show('Ranked: not counted (you need at least one other player in the match).'); return; }
+  if (game.time < 60 || game.matchPlayT < game.time * 0.5) { show('Ranked: not counted (you joined too late).'); return; }
+  if (!myRank) await refreshRank();
+  if (!myRank) return;
+  const others = humans.filter((c) => c !== game.player && c.sr >= 0);
+  const lobbySr = others.length ? others.reduce((a, c) => a + c.sr, 0) / others.length : START_SR;
+  const result = res.draw ? 0.5 : res.won ? 1 : 0;
+  // how you did on your own team: top scorer +1 .. bottom -1
+  const team = game.ranking().filter((c) => c.team === game.player.team);
+  const i = team.indexOf(game.player);
+  const perf = team.length > 1 && i >= 0 ? 1 - (2 * i) / (team.length - 1) : 0;
+  const delta = srChange(myRank, lobbySr, result, perf);
+  const before = myRank.sr, tierBefore = tierIndex(before);
+  try {
+    const r = await lobby.reportRanked({ delta, won: result === 1, name: settings.name || 'Player', bid: boardId(getAccount().id) });
+    myRank = { ...myRank, sr: r.after, peak: r.row.peak, games: r.row.games, wins: r.row.wins };
+    game.player.sr = r.after;
+    const t = tierIndex(r.after);
+    const unlocked = game.progress.setRankPeak(tierIndex(r.row.peak));
+    const d = r.after - before;
+    show(`Ranked <b class="${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '+' : ''}${d} SR</b> · ${before} → ${r.after} · <span class="rk-tier" style="color:${tierColor(r.after)}">${myRank.games < 5 ? `placement ${myRank.games}/5` : tierName(r.after)}</span>`);
+    if (t > tierBefore && myRank.games >= 5) hud.centerMessage('RANK UP', tierName(r.after), 4, tierColor(r.after));
+    if (unlocked && ITEMS.card.some((c) => c.rank === tierIndex(r.row.peak))) setTimeout(() => game.announcer.announce('New calling card', `${tierName(r.row.peak)} reached`), 1500);
+    renderRankChip();
+  } catch (e) {
+    show('Ranked: not counted this time (results count at most once every 3 minutes).');
+  }
+}
+
 function openParty() { setPartyStatus(''); renderParty(); $('party-ov').classList.remove('hidden'); }
 function closeParty() { $('party-ov').classList.add('hidden'); }
 $('btn-party').addEventListener('click', openParty);
@@ -1203,6 +1335,7 @@ $('btn-party-room').addEventListener('click', () => { closeParty(); goToPartyRoo
 
 function leaveToMenu() {
   input.exitLock();
+  rankedRoom = null;
   if (typeof editorTesting !== 'undefined') editorTesting = false;
   if (net.active) party.leftRoom();
   net.leave();
@@ -1497,7 +1630,7 @@ function renderCustom() {
     b.type = 'button';
     b.className = s.id === customSlot ? 'on' : '';
     b.textContent = s.name;
-    const n = ITEMS[s.id].filter((i) => itemUnlocked(i, pr.level, pr.prestige, pr.weeksDone)).length;
+    const n = ITEMS[s.id].filter((i) => itemUnlocked(i, pr.level, pr.prestige, pr.weeksDone, pr.rankPeak)).length;
     const sm = document.createElement('small'); sm.textContent = `${n}/${ITEMS[s.id].length}`;
     b.append(sm);
     b.addEventListener('click', () => { customSlot = s.id; renderCustom(); });
@@ -1506,7 +1639,7 @@ function renderCustom() {
   const grid = $('custom-items');
   grid.textContent = '';
   for (const item of ITEMS[customSlot]) {
-    const open = itemUnlocked(item, pr.level, pr.prestige, pr.weeksDone);
+    const open = itemUnlocked(item, pr.level, pr.prestige, pr.weeksDone, pr.rankPeak);
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'citem' + (eq[customSlot] === item.id ? ' on' : '') + (open ? '' : ' locked');
@@ -1515,7 +1648,7 @@ function renderCustom() {
     nm.textContent = customSlot === 'title' ? '' : item.name; // a title's swatch already says it
     const req = document.createElement('small');
     req.textContent = open ? (eq[customSlot] === item.id ? 'equipped' : '')
-      : item.weekly ? (item.weekly === 1 ? 'Finish a week' : `${item.weekly} full weeks`) : item.prestige ? `Prestige ${item.prestige}` : `Level ${item.level}`;
+      : item.rank !== undefined ? `Reach ${TIERS[item.rank][0]}` : item.weekly ? (item.weekly === 1 ? 'Finish a week' : `${item.weekly} full weeks`) : item.prestige ? `Prestige ${item.prestige}` : `Level ${item.level}`;
     nm.append(req);
     b.append(nm);
     b.addEventListener('click', () => {
@@ -1853,6 +1986,7 @@ game.onMatchEnd = () => {
   }
   game.progress.save();
   updateBoardEntry();
+  reportRanked(res);
   renderEndXp();
   $('end-title').textContent = res.draw ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT';
   $('end-title').style.color = res.draw ? '#e9e4da' : won ? '#ffb04a' : '#8e949b';
@@ -1946,7 +2080,8 @@ function startNext() {
   if (net.role === 'client') return;
   const i = game.over ? game.voteWinner() : -1;
   const o = i >= 0 && game.voteOptions ? game.voteOptions[i] : null;
-  if (o) {
+  if (o && rankedRoom) rankedRoom = { map: o[0], mode: o[1] };
+  else if (o) {
     settings.map = o[0];
     settings.mode = o[1];
     saveSettings(settings);

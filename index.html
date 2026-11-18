@@ -120,7 +120,7 @@
             <h4 class="h-with-btn">Play online <button id="btn-rooms" class="link-btn">Rooms</button><button id="btn-friends" class="link-btn party-link">Friends</button><button id="btn-party" class="link-btn party-link">Party…</button></h4>
             <label class="row mp"><span>Your name</span><input type="text" id="mp-name" maxlength="16" placeholder="Player" autocomplete="off" spellcheck="false" /></label>
             <div class="row mp"><span>Password</span><div class="pass-pub"><input type="password" id="mp-pass" maxlength="32" placeholder="optional" autocomplete="off" /><label class="pub-tick" title="List your room in Browse rooms so anyone can join"><input type="checkbox" id="mp-public" /> Public</label></div></div>
-            <div class="host-row"><button id="btn-host" class="wide-btn">Host a room</button><button id="btn-quick" class="wide-btn quick-btn" title="Join the fullest open public room, or host one if there are none">Quick play</button></div>
+            <div class="host-row"><button id="btn-host" class="wide-btn">Host</button><button id="btn-quick" class="wide-btn quick-btn" title="Join the fullest open public room, or host one if there are none">Quick play</button><button id="btn-ranked" class="wide-btn ranked-btn" title="Ranked: fixed rules, your skill rating goes up or down">Ranked<small id="rank-chip"></small></button></div>
             <div class="mp-actions">
               <input type="text" id="mp-code" maxlength="8" placeholder="ROOM CODE" autocomplete="off" spellcheck="false" />
               <button id="btn-join">Join</button>
@@ -216,6 +216,7 @@
       <div class="panel">
         <h2 id="end-title">VICTORY</h2>
         <p id="end-sub" class="tag"></p>
+        <p id="end-ranked" class="end-ranked hidden"></p>
         <div id="end-xp" class="end-xp"></div>
         <div class="end-cols">
           <div>

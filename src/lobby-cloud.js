@@ -18,6 +18,7 @@
 
 import { BUILD } from './version.js';
 import { cleanEntry, BOARD_FIELDS } from './lobby.js';
+import { START_SR, seasonId, seasonReset, MAX_SR_STEP } from './ranked.js';
 
 const ROOM_BEAT_MS = 20000;
 const ROOM_STALE_MS = 60000;
@@ -103,7 +104,7 @@ export class CloudLobby {
     if (!v || typeof v !== 'object' || !/^[A-Z0-9]{4,8}$/.test(code)) return null;
     if (typeof v.at !== 'number' || this.now() - v.at > ROOM_STALE_MS) return null;
     const n = (x, max) => (typeof x === 'number' && x >= 0 ? Math.min(max, Math.floor(x)) : 0);
-    return { code, host: clean(v.host) || 'Player', mode: clean(v.mode, 24), map: clean(v.map, 24), n: n(v.n, 64), max: n(v.max, 64) || 8, bots: !!v.bots, locked: !!v.locked, v: String(v.v || '').slice(0, 40), mine: v.uid === this.uid };
+    return { code, host: clean(v.host) || 'Player', mode: clean(v.mode, 24), map: clean(v.map, 24), n: n(v.n, 64), max: n(v.max, 64) || 8, bots: !!v.bots, locked: !!v.locked, rk: !!v.rk, v: String(v.v || '').slice(0, 40), mine: v.uid === this.uid };
   }
 
   joinable() {
@@ -195,7 +196,7 @@ export class CloudLobby {
     const r = info ? {
       code: String(info.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8),
       host: clean(info.host) || 'Player', mode: clean(info.mode, 24), map: clean(info.map, 24),
-      n: Math.min(64, info.n | 0), max: Math.max(1, Math.min(64, info.max | 0)), bots: !!info.bots, locked: !!info.locked, v: BUILD,
+      n: Math.min(64, info.n | 0), max: Math.max(1, Math.min(64, info.max | 0)), bots: !!info.bots, locked: !!info.locked, rk: !!info.rk, v: BUILD,
     } : null;
     this.myRoom = r && r.code.length >= 4 ? r : null;
     if (old && (!this.myRoom || old.code !== this.myRoom.code)) this._removeRoom(old.code);
@@ -337,6 +338,50 @@ export class CloudLobby {
   async clearInvite(myCode, fromCode) {
     if (!this.uid) return;
     await this.D.remove(this.D.ref(this.db, `invites/${myCode}/${fromCode}`)).catch(() => {});
+  }
+
+  // ---------------------------------------------------------------- ranked
+  // ranked/<uid> = { name, bid, sr, peak, games, wins, season, at }  (checked by the rules)
+
+  get canRanked() { return !!this.uid; }
+
+  /** Our ranked row for this season (a new season starts from the soft reset). */
+  async myRanked() {
+    if (!this.uid) return null;
+    const season = seasonId();
+    if (!this.rk) {
+      try { const s = await this.D.get(this.D.ref(this.db, `ranked/${this.uid}`)); this.rk = s.val(); } catch (e) { this.rk = null; }
+    }
+    const r = this.rk;
+    if (!r || typeof r.sr !== 'number') return { sr: START_SR, peak: START_SR, games: 0, wins: 0, season, fresh: true };
+    if (r.season !== season) return { sr: seasonReset(r.sr), peak: seasonReset(r.sr), games: 0, wins: 0, season, fresh: true, last: r.sr };
+    return { sr: r.sr, peak: r.peak, games: r.games, wins: r.wins, season };
+  }
+
+  /** Apply a ranked result: { delta, won, name, bid }. Returns { before, after, row } or throws. */
+  async reportRanked(res) {
+    const cur = await this.myRanked();
+    if (!cur) throw new Error('Not connected to the online service.');
+    const delta = Math.max(-MAX_SR_STEP, Math.min(MAX_SR_STEP, Math.round(res.delta)));
+    const sr = Math.max(0, Math.min(4000, cur.sr + delta));
+    const row = { name: clean(res.name) || 'Player', sr, peak: Math.max(cur.peak, sr), games: cur.games + 1, wins: cur.wins + (res.won ? 1 : 0), season: cur.season, at: this.D.serverTimestamp() };
+    if (res.bid && /^[0-9a-f]{16}$/.test(res.bid)) row.bid = res.bid;
+    await this.D.set(this.D.ref(this.db, `ranked/${this.uid}`), row);
+    this.rk = { ...row, at: Date.now() };
+    return { before: cur.sr, after: sr, row: this.rk };
+  }
+
+  /** This season's ranked board, best first. */
+  async listRanked() {
+    if (!this.D) throw new Error('Not connected to the online service.');
+    const s = await this.D.get(this.D.query(this.D.ref(this.db, 'ranked'), this.D.orderByChild('sr'), this.D.limitToLast(300)));
+    const season = seasonId(), out = [];
+    s.forEach((c) => {
+      const v = c.val();
+      if (!v || v.season !== season || typeof v.sr !== 'number') return;
+      out.push({ id: c.key, name: clean(v.name) || 'Player', bid: typeof v.bid === 'string' ? v.bid : '', sr: v.sr | 0, peak: v.peak | 0, games: v.games | 0, wins: v.wins | 0, mine: c.key === this.uid });
+    });
+    return out.sort((a, b) => b.sr - a.sr || b.games - a.games);
   }
 
   close() {

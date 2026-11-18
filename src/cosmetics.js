@@ -63,6 +63,10 @@ export const ITEMS = {
     { id: 'void', name: 'Blackened', level: 48, css: 'linear-gradient(135deg,#050505,#1c1f22 45%,#3a3f44 50%,#1c1f22 55%,#050505)' },
     { id: 'overtime', name: 'Overtime', weekly: 1, css: 'repeating-linear-gradient(90deg,transparent 0 22px,rgba(242,180,23,.22) 22px 24px),linear-gradient(180deg,#2a1a08,#0f0b07)' },
     { id: 'nightshift', name: 'Night Shift', weekly: 5, css: 'radial-gradient(circle at 78% 28%,#e9e4da 0 7%,transparent 8%),radial-gradient(circle at 70% 24%,#0b1020 0 8%,transparent 9%),linear-gradient(180deg,#0b1020,#1a2440 60%,#ff6b1a 140%)' },
+    // ranked: reach the tier (any season) to unlock (rank = tier number, see ranked.js)
+    { id: 'r-gold', name: 'Ranked Gold', rank: 6, css: 'radial-gradient(circle at 82% 50%,#f2c14e 0 14%,transparent 15%),repeating-linear-gradient(115deg,rgba(242,193,78,.18) 0 10px,transparent 10px 20px),linear-gradient(90deg,#2a2112,#4a3a18)' },
+    { id: 'r-diamond', name: 'Ranked Diamond', rank: 12, css: 'conic-gradient(from 45deg at 82% 50%,#cfe4ff,#7fb2ff,#2d5aa8,#7fb2ff,#cfe4ff),linear-gradient(90deg,#0d1a2e,#1d3560)' },
+    { id: 'r-master', name: 'Foundry Master', rank: 15, css: 'radial-gradient(ellipse at 82% 120%,#ffd27a 0,#ff6b1a 25%,transparent 55%),repeating-linear-gradient(90deg,rgba(255,107,26,.25) 0 2px,transparent 2px 18px),linear-gradient(90deg,#1a0d06,#3a1606)' },
     { id: 'gilded', name: 'Gilded', prestige: 1, css: 'linear-gradient(135deg,#7a5a10,#ffe08a 45%,#b8860b 70%,#ffe08a)' },
   ],
   helmet: [
@@ -139,7 +143,8 @@ export function itemOf(slot, id) {
 }
 
 /** Can someone at `level` / `prestige` use this item? */
-export function itemUnlocked(item, level, prestige, weeks = 0) {
+export function itemUnlocked(item, level, prestige, weeks = 0, rankPeak = -1) {
+  if (item.rank !== undefined) return rankPeak >= item.rank;
   if (item.weekly) return weeks >= item.weekly;
   if (item.prestige) return prestige >= item.prestige;
   return level >= (item.level || 1);

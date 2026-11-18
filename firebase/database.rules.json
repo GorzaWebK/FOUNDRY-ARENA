@@ -109,6 +109,9 @@
         },
         "$other": {
           ".validate": false
+        },
+        "rk": {
+          ".validate": "newData.isBoolean()"
         }
       }
     },
@@ -238,6 +241,43 @@
           "$other": {
             ".validate": false
           }
+        }
+      }
+    },
+    "ranked": {
+      ".read": true,
+      ".indexOn": [
+        "sr"
+      ],
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid && newData.exists()",
+        ".validate": "newData.hasChildren(['name','sr','peak','games','wins','season','at']) && newData.child('at').val() === now && (!data.exists() || now - data.child('at').val() >= 180000) && newData.child('wins').val() <= newData.child('games').val() && newData.child('peak').val() >= newData.child('sr').val() && ((data.exists() && data.child('season').val() === newData.child('season').val()) ? (newData.child('games').val() === data.child('games').val() + 1 && newData.child('sr').val() - data.child('sr').val() <= 45 && data.child('sr').val() - newData.child('sr').val() <= 45 && newData.child('wins').val() <= data.child('wins').val() + 1 && newData.child('wins').val() >= data.child('wins').val() && newData.child('peak').val() <= (data.child('peak').val() > newData.child('sr').val() ? data.child('peak').val() : newData.child('sr').val())) : (newData.child('games').val() <= 1 && newData.child('wins').val() <= 1 && (newData.child('peak').val() <= 1050 || (data.exists() && newData.child('peak').val() <= 1050 + (data.child('sr').val() - 1000) / 2))))",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 18"
+        },
+        "bid": {
+          ".validate": "newData.isString() && newData.val().matches(/^[0-9a-f]{16}$/)"
+        },
+        "sr": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 4000"
+        },
+        "peak": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 4000"
+        },
+        "games": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
+        },
+        "wins": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
+        },
+        "season": {
+          ".validate": "newData.isString() && newData.val().matches(/^S[0-9]{4}-[0-9]{2}$/)"
+        },
+        "at": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
         }
       }
     }

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { TEAM_COLORS, TEAM_NAMES } from './modes.js';
 import { FLAG_STATE } from './ctf.js';
 import { itemOf } from './cosmetics.js';
+import { tierShort, tierColor } from './ranked.js';
 
 const _hv = new THREE.Vector3();
 // (a getter: the team colours can change in Settings)
@@ -488,7 +489,7 @@ export class Hud {
     if (head.innerHTML !== headHtml) head.innerHTML = headHtml;
     tbody.innerHTML = rows.map((c, i) => (
       `<tr class="${c.isPlayer ? 'me' : ''}${c.alive ? '' : ' dead'}"><td>${i + 1}</td>`
-      + `<td class="l"><i style="background:${hex(c.color)}"></i>${lvBadge(c)}${esc(c.name)}`
+      + `<td class="l"><i style="background:${hex(c.color)}"></i>${game.rules.ranked && c.isHuman && c.sr >= 0 ? `<span class="sb-rank" style="color:${tierColor(c.sr)}" title="${c.sr} SR">${tierShort(c.sr)}</span>` : ''}${lvBadge(c)}${esc(c.name)}`
       + `<small class="sb-title">${esc(itemOf('title', c.cos ? c.cos.equipped.title : 'recruit').name)}</small></td>`
       + `${col ? `<td>${esc(col.value(c))}</td>` : ''}<td>${c.kills}</td><td>${c.deaths}</td>${pingCell(c)}</tr>`
     )).join('');

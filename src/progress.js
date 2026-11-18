@@ -23,7 +23,7 @@ export const XP = {
 };
 
 function blank() {
-  return { v: 1, xp: 0, prestige: 0, equipped: { ...DEFAULT_EQUIPPED }, daily: { day: '', prog: {}, done: {} }, weekly: { week: '', prog: {}, done: {}, full: false }, weeksDone: 0 };
+  return { v: 1, xp: 0, prestige: 0, equipped: { ...DEFAULT_EQUIPPED }, daily: { day: '', prog: {}, done: {} }, weekly: { week: '', prog: {}, done: {}, full: false }, weeksDone: 0, rankPeak: -1 };
 }
 
 /** Level (1..50) and progress into it, from total XP this prestige. */
@@ -49,6 +49,7 @@ export class Progress {
         this.p.weekly = { week: raw.weekly.week, prog: num(raw.weekly.prog), done: num(raw.weekly.done), full: !!raw.weekly.full };
       }
       if (typeof raw.weeksDone === 'number') this.p.weeksDone = Math.max(0, raw.weeksDone | 0);
+      if (typeof raw.rankPeak === 'number') this.p.rankPeak = Math.max(-1, Math.min(15, raw.rankPeak | 0));
       if (raw.equipped && typeof raw.equipped === 'object') {
         for (const s of SLOTS) if (ITEMS[s.id].some((i) => i.id === raw.equipped[s.id])) this.p.equipped[s.id] = raw.equipped[s.id];
       }
@@ -80,7 +81,7 @@ export class Progress {
   newMatch() { this.match = []; this.startXp = this.p.xp; }
 
   /** Is `slot`'s `item` usable now? */
-  has(slot, id) { return itemUnlocked(itemOf(slot, id), this.level, this.prestige, this.p.weeksDone); }
+  has(slot, id) { return itemUnlocked(itemOf(slot, id), this.level, this.prestige, this.p.weeksDone, this.p.rankPeak); }
 
   /** Equipped items, falling back to the default for anything not (or no longer) unlocked. */
   equipped() {
@@ -113,6 +114,10 @@ export class Progress {
   }
 
   get weeksDone() { return this.p.weeksDone; }
+
+  /** Highest ranked tier ever reached (unlocks the ranked calling cards). */
+  get rankPeak() { return this.p.rankPeak; }
+  setRankPeak(t) { if (t > this.p.rankPeak) { this.p.rankPeak = t; this.save(); return true; } return false; }
 
   /** Something that might move a challenge happened. meta: { weapon, mode }. */
   challenge(ev, amount = 1, meta = {}) {

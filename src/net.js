@@ -157,7 +157,7 @@ export class Net {
         this._begin(m);
         resolve();
       };
-      conn.send({ t: 'hello', name: cleanName(name), v: this.version, vt: this.versionTime, pid: this.pid, cos: this._myCos(), tp: this.game.player.teamPref, pw: this.lastPw || undefined, pty: this.game.player.party || undefined });
+      conn.send({ t: 'hello', name: cleanName(name), v: this.version, vt: this.versionTime, pid: this.pid, cos: this._myCos(), tp: this.game.player.teamPref, pw: this.lastPw || undefined, pty: this.game.player.party || undefined, sr: num(this.game.player.sr) ? this.game.player.sr : undefined });
     });
   }
 
@@ -323,6 +323,7 @@ export class Net {
     c.pid = pid;
     c.teamPref = m.tp === 0 || m.tp === 1 ? m.tp : -1;
     c.party = typeof m.pty === 'string' && m.pty ? m.pty.slice(0, 8) : null; // a party always plays together
+    c.sr = num(m.sr) ? clamp(Math.round(m.sr), 0, 4000) : -1; // ranked rating (for everyone's SR maths)
     c.setCosmetics(unpackCosmetics(m.cos));
     c.lastSeen = now;
     c.alive = false;
@@ -341,7 +342,7 @@ export class Net {
     // (someone coming back keeps whatever lives they had left)
     const spectate = !!g.rules.lives && (!saved || c.lives <= 0);
     if (spectate) c.lives = 0;
-    const welcome = { t: 'welcome', v: this.version, vt: this.versionTime, you: c.id, map: g.map.id, cm: g.map.custom ? g.map.spec : undefined, mode: g.rules.id, cr: g.rules.custom, mt: r2(g.matchTime), over: g.over, r: this._roster(), ts: g.teamScore };
+    const welcome = { t: 'welcome', v: this.version, vt: this.versionTime, you: c.id, map: g.map.id, cm: g.map.custom ? g.map.spec : undefined, rk: g.rules.ranked ? 1 : undefined, mode: g.rules.id, cr: g.rules.custom, mt: r2(g.matchTime), over: g.over, r: this._roster(), ts: g.teamScore };
     if (g.over) Object.assign(welcome, { aw: g.awards, vo: g.voteOptions, vn: g.voteTally(), vl: Math.round((g.voteDeadline - performance.now()) / 1000) });
     conn.send(welcome);
     if (!g.over && !spectate) g.respawn(c, true);
@@ -373,7 +374,7 @@ export class Net {
   }
 
   _roster() {
-    return this.game.chars.map((c) => [c.id, c.name, c.color, c.isHuman ? 0 : 1, c.team, packCosmetics(c.cos.equipped, c.cos.level, c.cos.prestige)]);
+    return this.game.chars.map((c) => [c.id, c.name, c.color, c.isHuman ? 0 : 1, c.team, packCosmetics(c.cos.equipped, c.cos.level, c.cos.prestige), c.isHuman && num(c.sr) ? c.sr : -1]);
   }
 
   /** Our own level + cosmetics, packed for the wire. */
@@ -601,7 +602,7 @@ export class Net {
   onStart() {
     const g = this.game;
     this.parked.clear(); // scores belong to the match that just ended
-    this.broadcast({ t: 'start', map: g.map.id, cm: g.map.custom ? g.map.spec : undefined, mode: g.rules.id, cr: g.rules.custom, mt: r2(g.matchTime), r: this._roster() });
+    this.broadcast({ t: 'start', map: g.map.id, cm: g.map.custom ? g.map.spec : undefined, rk: g.rules.ranked ? 1 : undefined, mode: g.rules.id, cr: g.rules.custom, mt: r2(g.matchTime), r: this._roster() });
   }
 
   onSpawn(c) {
@@ -682,10 +683,17 @@ export class Net {
     if (num(m.you)) g.player.id = m.you;
     this._customMap(m);
     g.loadMap(getMap(m.map));
-    g.startClient(num(m.mt) ? m.mt : CFG.timeLimit, makeRules(getMode(m.mode).id, m.cr));
+    g.startClient(num(m.mt) ? m.mt : CFG.timeLimit, this._rules(m));
     this._applyRoster(m.r);
     if (Array.isArray(m.ts)) g.teamScore = [m.ts[0] | 0, m.ts[1] | 0];
     if (m.over) { this._readEnd(m); g.over = true; }
+  }
+
+  /** Client: the match rules the host sent (ranked rooms say so). */
+  _rules(m) {
+    const r = makeRules(getMode(m.mode).id, m.rk ? null : m.cr);
+    if (m.rk) r.ranked = true;
+    return r;
   }
 
   /** Client: the host is playing a custom map, and sent it along: make it loadable. */
@@ -718,7 +726,7 @@ export class Net {
     const seen = new Set();
     for (const e of list) {
       if (!Array.isArray(e) || !num(e[0])) continue;
-      const [id, name, color, bot, team, cos] = e;
+      const [id, name, color, bot, team, cos, sr] = e;
       seen.add(id);
       // team colours come from our own palette (Settings → Team colours), not the host's
       const col = g.rules && g.rules.teams && (team === 0 || team === 1) ? TEAM_COLORS[team] : num(color) ? color : 0xffffff;
@@ -738,6 +746,7 @@ export class Net {
       c.color = col;
       c.model.setColor(col, c.name);
       if (Array.isArray(cos)) c.setCosmetics(unpackCosmetics(cos));
+      c.sr = num(sr) ? clamp(sr, -1, 4000) : -1;
     }
     for (const r of [...g.remotes]) if (!seen.has(r.id)) g.removeRemote(r);
     this.hooks.onRoster();
@@ -840,7 +849,7 @@ export class Net {
       case 'start':
         this._customMap(m);
         g.loadMap(getMap(m.map));
-        g.startClient(num(m.mt) ? m.mt : CFG.timeLimit, makeRules(getMode(m.mode).id, m.cr));
+        g.startClient(num(m.mt) ? m.mt : CFG.timeLimit, this._rules(m));
         this._applyRoster(m.r);
         this.hooks.onMatchStart();
         break;

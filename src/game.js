@@ -7,6 +7,7 @@ import { NavGrid } from './navgrid.js';
 import { buildWorldMeshes, buildSky, buildLights } from './worldMesh.js';
 import { buildDecor } from './decor.js';
 import { Tutorial } from './tutorial.js';
+import { RANKED_MAPS, RANKED_MODES } from './ranked.js';
 import { Effects } from './effects.js';
 import { Pickup } from './pickups.js';
 import { ViewModel } from './viewmodel.js';
@@ -399,9 +400,11 @@ export class Game {
   /** Three [mapId, modeId] choices for the next match: the current pick plus two others. */
   makeVoteOptions() {
     const s = this.settings;
-    const opts = [[getMap(s.map).id, getMode(s.mode).id]];
+    const ranked = !!this.rules.ranked;
+    // ranked rooms only offer the ranked maps and modes
+    const opts = [ranked ? [this.map.id, this.rules.id] : [getMap(s.map).id, getMode(s.mode).id]];
     const combos = [];
-    for (const m of MAPS) for (const r of MODES) combos.push([m.id, r.id]);
+    for (const m of MAPS) for (const r of MODES) if (!ranked || (RANKED_MAPS.includes(m.id) && RANKED_MODES.includes(r.id))) combos.push([m.id, r.id]);
     for (let tries = 0; opts.length < 3 && tries < 300; tries++) {
       const c = combos[(Math.random() * combos.length) | 0];
       if (opts.some((o) => o[0] === c[0] && o[1] === c[1])) continue;

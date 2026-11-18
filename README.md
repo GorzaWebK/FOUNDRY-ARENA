@@ -243,6 +243,30 @@ kills, 8 wins, 8 flag captures and so on), picked fresh every Monday. Each pays
 first full week unlocks the **Overtime** calling card, and five full weeks
 unlock **Night Shift**. Neither can be earned any other way.
 
+### Ranked
+
+Press **Ranked** (Play online card) to play for your **skill rating (SR)**. It
+drops you into the fullest open ranked room, or hosts one others will land in.
+Ranked rooms have fixed rules: Team Deathmatch, King of the Hill or Capture the
+Flag on the built-in arena maps, standard settings, five normal bots, and the
+host can't change any of it. A match counts when another player is in it and
+you were there for most of it.
+
+- Everyone starts a season at 1000 SR. Winning against higher-rated players
+  earns more; losing to them costs less (an Elo-style rating against the other
+  players' average), plus a little for where you finished on your team. The
+  first 5 matches of a season are placement matches and move further.
+- Tiers: Bronze, Silver, Gold, Platinum and Diamond (III, II, I each), then
+  Foundry Master at 1900. Your tier shows under the Ranked button, on the end
+  screen with your SR change, and as a badge on the scoreboard in ranked rooms.
+- Seasons are calendar months. A new season resets everyone halfway back
+  towards 1000.
+- Reaching Gold, Diamond and Foundry Master unlocks ranked calling cards.
+- **Leaderboard → Ranked** lists this season's ratings. Ratings are kept on the
+  online service and its rules check every change (at most one result every 3
+  minutes, at most 45 SR at a time, no skipping matches, no deleting your
+  rating to dodge a bad season).
+
 ### Leaderboard
 
 **Leaderboard** (bottom of the main menu) ranks everyone who has played, by

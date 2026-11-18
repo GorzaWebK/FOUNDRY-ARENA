@@ -70,6 +70,7 @@ function cleanRoom(r) {
     max: int(r.max, 64) || 8,
     bots: !!r.bots,
     locked: !!r.locked,
+    rk: !!r.rk,
     v: String(r.v || '').slice(0, 40),
   };
 }
