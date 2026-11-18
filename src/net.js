@@ -24,6 +24,7 @@ import { CFG, HUMAN_COLORS, MAX_HUMANS } from './config.js';
 import * as THREE from 'three';
 import { WEAPONS, WEAPON_BY_ID, KNIFE, GRENADE, NADES, TACTICALS, TACTICAL_BY_ID, isPrimary, damageAtDistance } from './weapons.js';
 import { getMap } from './maps/index.js';
+import { buildMap, cleanSpec, registerMap } from './mapspec.js';
 import { getMode, makeRules, TEAM_COLORS } from './modes.js';
 import { tracerColor } from './game.js';
 import { NetChar } from './netChar.js';
@@ -340,7 +341,7 @@ export class Net {
     // (someone coming back keeps whatever lives they had left)
     const spectate = !!g.rules.lives && (!saved || c.lives <= 0);
     if (spectate) c.lives = 0;
-    const welcome = { t: 'welcome', v: this.version, vt: this.versionTime, you: c.id, map: g.map.id, mode: g.rules.id, cr: g.rules.custom, mt: r2(g.matchTime), over: g.over, r: this._roster(), ts: g.teamScore };
+    const welcome = { t: 'welcome', v: this.version, vt: this.versionTime, you: c.id, map: g.map.id, cm: g.map.custom ? g.map.spec : undefined, mode: g.rules.id, cr: g.rules.custom, mt: r2(g.matchTime), over: g.over, r: this._roster(), ts: g.teamScore };
     if (g.over) Object.assign(welcome, { aw: g.awards, vo: g.voteOptions, vn: g.voteTally(), vl: Math.round((g.voteDeadline - performance.now()) / 1000) });
     conn.send(welcome);
     if (!g.over && !spectate) g.respawn(c, true);
@@ -600,7 +601,7 @@ export class Net {
   onStart() {
     const g = this.game;
     this.parked.clear(); // scores belong to the match that just ended
-    this.broadcast({ t: 'start', map: g.map.id, mode: g.rules.id, cr: g.rules.custom, mt: r2(g.matchTime), r: this._roster() });
+    this.broadcast({ t: 'start', map: g.map.id, cm: g.map.custom ? g.map.spec : undefined, mode: g.rules.id, cr: g.rules.custom, mt: r2(g.matchTime), r: this._roster() });
   }
 
   onSpawn(c) {
@@ -679,11 +680,22 @@ export class Net {
     const g = this.game;
     g.clearRemotes();
     if (num(m.you)) g.player.id = m.you;
+    this._customMap(m);
     g.loadMap(getMap(m.map));
     g.startClient(num(m.mt) ? m.mt : CFG.timeLimit, makeRules(getMode(m.mode).id, m.cr));
     this._applyRoster(m.r);
     if (Array.isArray(m.ts)) g.teamScore = [m.ts[0] | 0, m.ts[1] | 0];
     if (m.over) { this._readEnd(m); g.over = true; }
+  }
+
+  /** Client: the host is playing a custom map, and sent it along: make it loadable. */
+  _customMap(m) {
+    if (!m.cm || typeof m.map !== 'string' || !m.map.startsWith('c-')) return;
+    try {
+      const map = buildMap(cleanSpec(m.cm));
+      map.id = m.map; // the host's id for it
+      registerMap(map);
+    } catch (e) { /* a bad map: getMap falls back to a built-in one */ }
   }
 
   /** Client: awards + next-match choices from the host, checked before they reach the page. */
@@ -826,6 +838,7 @@ export class Net {
         if (g.onMatchEnd) g.onMatchEnd(g.winner, g.ranking());
         break;
       case 'start':
+        this._customMap(m);
         g.loadMap(getMap(m.map));
         g.startClient(num(m.mt) ? m.mt : CFG.timeLimit, makeRules(getMode(m.mode).id, m.cr));
         this._applyRoster(m.r);

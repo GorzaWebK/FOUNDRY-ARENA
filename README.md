@@ -351,6 +351,34 @@ over brick, Dockyard rust and crane yellow. Oil drums sit in open corners (solid
 cover, placed by `src/world.js` so collision, bullets and the bot nav grid all
 know about them); `npm run check:map` validates maps with them in.
 
+## Map editor and community maps
+
+**Maps** (bottom of the main menu) has three tabs, **Community**, **My maps** and
+**Import code**, and the **Open map editor** button.
+
+The editor is a top-down grid. Draw **blocks**, **ramps** and **stairs** by
+dragging (presets for cover, walls, platforms and high decks, or set any base and
+height), then place **spawns**, **pickups**, the two **flag bases** and **hills**.
+Select to move things or drag a block's edge to resize it; every value can also
+be typed in on the right. Pick the map's size (30–140 m) and which built-in map's
+look it borrows (materials, sky, set dressing).
+
+- **Live check:** the map is built with the real collision world and bot nav
+  grid as you edit, and the panel on the right lists anything wrong: unreachable
+  spawns, pickups or flags, ramps too steep, stairs too steep or too shallow.
+- **Test play** drops you in with bots; **Back to editor** in the pause menu
+  returns you.
+- **Save** keeps it in My maps (part of your account code). **Share code** copies
+  a `FAM1.` code anyone can paste into Import code. **Publish** puts it in
+  Community maps for everyone, where players can vote it up, play it solo or
+  host a room on it (everyone who joins gets the map automatically).
+- Maps without flags or a hill play Team Deathmatch when Capture the Flag or King
+  of the Hill is picked.
+- Keys: `V` select, `B` block, `R` ramp, `T` stairs, `S` spawn, `P` pickup,
+  `F` flag, `H` hill, `E` erase, `Del` delete, `Ctrl+Z` / `Ctrl+Y` undo / redo,
+  `Ctrl+D` duplicate, arrows nudge, `[` `]` lower / raise, wheel to zoom,
+  right-drag to pan.
+
 ## Multiplayer
 
 No server to set up — one player hosts the match in their browser and the others
@@ -540,6 +568,9 @@ src/effects.js        particles, decals, tracers, explosions
 src/pickups.js        pickups
 src/audio.js          synthesised sound
 src/decor.js          set dressing: trims, pipes, cables, signs, hazard edges, drums
+src/mapspec.js        custom map format, building, validation, share codes
+src/editor.js         the map editor
+src/tutorial.js       the first-time tutorial
 src/hud.js            HUD, chat log
 src/settings.js       saved settings
 tools/check-map.mjs   offline map validator

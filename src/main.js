@@ -25,6 +25,8 @@ import { Game } from './game.js';
 import { Net, cleanName } from './net.js';
 import { Party, PARTY_MAX, cleanPartyCode } from './party.js';
 import { Lobby, boardId } from './lobby.js';
+import { MapEditor, loadMyMaps, saveMyMaps } from './editor.js';
+import { buildMap, cleanSpec, registerMap, customMaps, fitMode, specToCode, codeToSpec, validateMap } from './mapspec.js';
 import { CloudLobby } from './lobby-cloud.js';
 import { FIREBASE_CONFIG } from './online-config.js';
 import { MAX_HUMANS } from './config.js';
@@ -126,11 +128,21 @@ function customFor(id) {
   return { limit: r.limits[id] || 0, time: r.time, ff: r.ff, pickups: r.pickups, hardcore: r.hardcore };
 }
 /** The rules the next match will use. */
-function nextRules() { return makeRules(settings.mode, customFor(settings.mode)); }
+// (objective modes fall back to Team Deathmatch on custom maps without flags / hills)
+function nextRules() { return makeRules(fitMode(settings.mode, getMap(settings.map)), customFor(settings.mode)); }
 
 const TEAM_PREF = { auto: -1, cobalt: 0, crimson: 1 };
 function syncMatchPickers() {
-  for (const s of mapSels) s.value = settings.map;
+  // custom maps registered this session get their own options
+  for (const s of mapSels) {
+    for (const m of customMaps()) {
+      if (s.querySelector(`option[value="${m.id}"]`)) continue;
+      const o = document.createElement('option');
+      o.value = m.id; o.textContent = `${m.name} (custom)`; o.title = m.blurb;
+      s.append(o);
+    }
+  }
+  for (const s of mapSels) s.value = getMap(settings.map).id;
   for (const s of modeSels) s.value = settings.mode;
   const r = nextRules();
   // team choice only matters in team modes
@@ -283,6 +295,7 @@ function updateRoomUi() {
   $('btn-range-reset').classList.toggle('hidden', !training);
   $('btn-restart').textContent = training ? 'Restart range' : 'Restart match';
   $('btn-quit').textContent = on ? (net.role === 'host' ? 'Close room' : 'Leave game') : 'Main menu';
+  if (typeof editorTesting !== 'undefined') $('btn-editor-back').classList.toggle('hidden', !(editorTesting && !on && game.map.custom));
   $('btn-again').classList.toggle('hidden', net.role === 'client');
   $('btn-again').textContent = net.role === 'host' ? 'START NEXT MATCH' : 'PLAY AGAIN';
   $('btn-menu').textContent = on ? (net.role === 'host' ? 'Close room' : 'Leave game') : 'Main menu';
@@ -850,6 +863,131 @@ function openBoard() { lobby.refresh(); renderBoard(); $('board-ov').classList.r
 $('btn-board').addEventListener('click', openBoard);
 $('btn-board-done').addEventListener('click', () => $('board-ov').classList.add('hidden'));
 
+// ---------------------------------------------------------------- maps: editor, community, my maps
+// (see editor.js and mapspec.js)
+
+const matCache = new Map();
+const matColor = (mat, themeId) => {
+  if (!matCache.has(themeId)) matCache.set(themeId, buildMap(cleanSpec({ v: 1, theme: themeId, w: 40, d: 40 })).materials);
+  const def = matCache.get(themeId)[mat];
+  return def ? def.color : '#888';
+};
+let editorTesting = false; // a test match from the editor is running
+const editor = new MapEditor($('editor'), {
+  matColor,
+  onClose: () => { editorTesting = false; $('menu').classList.remove('hidden'); if (state === 'menu') startAttract(); },
+  onTest: (spec) => { editorTesting = true; playCustom(spec, 'solo'); },
+  onPublish: async (spec, id) => {
+    if (!lobby.publishMap) throw new Error('Publishing needs the online service, which is unavailable right now. Share the map code instead.');
+    const named = { ...spec, author: settings.name || 'Player' };
+    return lobby.publishMap(named, specToCode(named), id);
+  },
+});
+
+function openEditor(spec = null, docId = null, pub = null) {
+  $('maps-ov').classList.add('hidden');
+  $('menu').classList.add('hidden');
+  editor.open(spec, docId, pub);
+}
+
+/** Play a custom map: solo against bots, or host a room on it. */
+async function playCustom(spec, how) {
+  const map = registerMap(buildMap(cleanSpec(spec)));
+  const check = validateMap(map);
+  if (check.errors.length) { setMapsMsg(`Can't play that map: ${check.errors[0]}`, true); return; }
+  settings.map = map.id; // (not saved: custom maps last for this session)
+  syncMatchPickers();
+  $('maps-ov').classList.add('hidden');
+  if (how === 'host') { await hostGame(); return; }
+  await startMatch();
+  if (editorTesting) hud.centerMessage('TEST PLAY', 'Esc, then Back to editor when you\'re done', 4, '#ff6b1a');
+}
+$('btn-editor-back').addEventListener('click', () => {
+  input.exitLock();
+  net.leave();
+  startAttract();
+  $('menu').classList.add('hidden');
+  editor.resume();
+});
+
+function setMapsMsg(t, err = false) { const e = $('maps-msg'); e.textContent = t || ''; e.classList.toggle('err', !!err); }
+let mapsTab = 'community';
+for (const b of document.querySelectorAll('.maps-tabs button')) b.addEventListener('click', () => { mapsTab = b.dataset.tab; renderMaps(); });
+
+function mapRow(title, sub, buttons) {
+  const row = document.createElement('div');
+  row.className = 'room-row map-row';
+  const info = document.createElement('div');
+  const t = document.createElement('b'); t.textContent = title;
+  const s = document.createElement('small'); s.textContent = sub;
+  info.append(t, s);
+  const act = document.createElement('div');
+  act.className = 'pw-join';
+  for (const [label, fn, cls] of buttons) {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (cls) b.className = cls;
+    b.addEventListener('click', fn);
+    act.append(b);
+  }
+  row.append(info, act);
+  return row;
+}
+
+async function renderMaps() {
+  for (const b of document.querySelectorAll('.maps-tabs button')) b.classList.toggle('on', b.dataset.tab === mapsTab);
+  const body = $('maps-body');
+  body.textContent = '';
+  setMapsMsg('');
+  const follower = party.active && !party.leader;
+  const themeName = (id) => (MAPS.find((m) => m.id === id) || {}).name || id;
+  if (mapsTab === 'mine') {
+    const list = loadMyMaps();
+    if (!list.length) { const p = document.createElement('div'); p.className = 'rooms-empty'; p.textContent = "No saved maps yet. Open the map editor to make one."; body.append(p); }
+    for (const m of list) {
+      const s = m.spec;
+      body.append(mapRow(s.name, `${s.w}×${s.d} m · ${themeName(s.theme)} look · ${s.s.length} blocks · ${s.sp.length} spawns${m.pub ? ' · published' : ''}`, [
+        ['Edit', () => openEditor(s, m.id, m.pub || null)],
+        ['Play', () => playCustom(s, 'solo')],
+        ['Host', () => (follower ? setMapsMsg('Your party leader picks the room.') : playCustom(s, 'host'))],
+        ['Delete', () => { if (window.confirm(`Delete "${s.name}" from My maps?`)) { saveMyMaps(loadMyMaps().filter((x) => x.id !== m.id)); renderMaps(); } }],
+      ]));
+    }
+    return;
+  }
+  if (mapsTab === 'import') {
+    const ta = document.createElement('textarea');
+    ta.rows = 4; ta.placeholder = 'Paste a map code (it starts FAM1.)'; ta.spellcheck = false;
+    ta.addEventListener('keydown', (e) => e.stopPropagation());
+    const row = document.createElement('div'); row.className = 'btn-row';
+    const go = (how) => { try { const spec = codeToSpec(ta.value); if (how === 'edit') openEditor(spec); else playCustom(spec, how); } catch (e) { setMapsMsg(e.message, true); } };
+    for (const [label, how] of [['Play', 'solo'], ['Host a room', 'host'], ['Open in editor', 'edit']]) { const b = document.createElement('button'); b.textContent = label; b.addEventListener('click', () => go(how)); row.append(b); }
+    body.append(ta, row);
+    return;
+  }
+  // community
+  if (!lobby.listMaps) { const p = document.createElement('div'); p.className = 'rooms-empty'; p.textContent = 'Community maps need the online service, which is unavailable right now. You can still share maps with codes.'; body.append(p); return; }
+  const wait = document.createElement('div'); wait.className = 'rooms-empty'; wait.textContent = 'Loading community maps…'; body.append(wait);
+  let maps;
+  try { maps = await lobby.listMaps(); } catch (e) { wait.textContent = "Couldn't load community maps. " + (e.message || ''); return; }
+  if (mapsTab !== 'community') return;
+  body.textContent = '';
+  if (!maps.length) { const p = document.createElement('div'); p.className = 'rooms-empty'; p.textContent = 'No community maps yet. Make one in the editor and press Publish.'; body.append(p); return; }
+  maps.sort((a, b) => b.votes - a.votes || b.at - a.at);
+  for (const m of maps) {
+    const spec = () => codeToSpec(m.code);
+    body.append(mapRow(`${m.name}`, `by ${m.author} · ${m.w}×${m.d} m · ${themeName(m.theme)} look · ▲ ${m.votes}`, [
+      [m.voted ? '▲ Voted' : '▲ Vote', async () => { try { await lobby.voteMap(m.id, !m.voted); renderMaps(); } catch (e) { setMapsMsg("Couldn't vote: " + (e.message || ''), true); } }, m.voted ? 'on' : ''],
+      ['Play', () => { try { playCustom(spec(), 'solo'); } catch (e) { setMapsMsg(e.message, true); } }],
+      ['Host', () => { if (follower) { setMapsMsg('Your party leader picks the room.'); return; } try { playCustom(spec(), 'host'); } catch (e) { setMapsMsg(e.message, true); } }],
+      ...(m.mine ? [['Delete', async () => { if (window.confirm(`Take "${m.name}" down from community maps?`)) { await lobby.deleteMap(m.id).catch(() => {}); renderMaps(); } }]] : []),
+    ]));
+  }
+}
+$('btn-maps').addEventListener('click', () => { renderMaps(); $('maps-ov').classList.remove('hidden'); });
+$('btn-maps-done').addEventListener('click', () => $('maps-ov').classList.add('hidden'));
+$('btn-open-editor').addEventListener('click', () => openEditor());
+
 function openParty() { setPartyStatus(''); renderParty(); $('party-ov').classList.remove('hidden'); }
 function closeParty() { $('party-ov').classList.add('hidden'); }
 $('btn-party').addEventListener('click', openParty);
@@ -882,6 +1020,7 @@ $('btn-party-room').addEventListener('click', () => { closeParty(); goToPartyRoo
 
 function leaveToMenu() {
   input.exitLock();
+  if (typeof editorTesting !== 'undefined') editorTesting = false;
   if (net.active) party.leftRoom();
   net.leave();
   startAttract();
@@ -1456,7 +1595,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (!$('profile-ov').classList.contains('hidden')) { if (e.code === 'Escape') $('profile-ov').classList.add('hidden'); return; }
-  for (const id of ['rooms-ov', 'board-ov', 'welcome-ov']) {
+  for (const id of ['rooms-ov', 'board-ov', 'welcome-ov', 'maps-ov']) {
     if (!$(id).classList.contains('hidden')) {
       if (e.code === 'Escape') $(id).classList.add('hidden');
       return;
@@ -1694,4 +1833,5 @@ window.__game = game;
 window.__net = net;
 window.__party = party;
 window.__lobby = lobby;
+window.__editor = editor;
 window.__app = { get state() { return state; }, startMatch, hostGame, joinGame, pause, resume, setState, openChat, closeChat, input, settings };

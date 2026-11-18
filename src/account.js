@@ -13,7 +13,7 @@ export const RANGE_BEST_KEY = 'foundry-arena-range-best';
 export const CAREER_KEY = 'foundry-arena-career';
 export const PROGRESS_KEY = 'foundry-arena-progress';
 // every key that belongs to an account (add new saved data here)
-const DATA_KEYS = [SETTINGS_KEY, RANGE_BEST_KEY, CAREER_KEY, PROGRESS_KEY];
+const DATA_KEYS = [SETTINGS_KEY, RANGE_BEST_KEY, CAREER_KEY, PROGRESS_KEY, 'foundry-arena-maps'];
 
 const ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // no 0/O/1/I to misread
 const ID_RE = /^FA-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/;

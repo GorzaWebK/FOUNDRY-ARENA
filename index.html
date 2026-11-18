@@ -144,6 +144,7 @@
             <button id="btn-custom" class="small-btn accent">Customize</button>
             <button id="btn-career" class="small-btn">Career</button>
             <button id="btn-board" class="small-btn">Leaderboard</button>
+            <button id="btn-maps" class="small-btn">Maps</button>
             <button id="btn-account" class="small-btn">Account…</button>
           </div>
           <p class="foot-meta"><span id="lvl-chip" class="lvl-chip"></span><span class="acct-line" title="Your player ID">ID <b id="acct-id-menu" class="acct-id">—</b></span><span id="version-note"></span></p>
@@ -204,6 +205,7 @@
           <button id="btn-switch-team" class="hidden">Switch team</button>
           <button id="btn-bots">Bots: On</button>
           <button id="btn-restart">Restart match</button>
+          <button id="btn-editor-back" class="hidden">Back to editor</button>
           <button id="btn-quit">Main menu</button>
         </div>
       </div>
@@ -343,6 +345,22 @@
         <p class="note">You can play it any time from Controls on the main menu.</p>
       </div>
     </div>
+
+    <!-- ============================== MAPS: community, my maps, import ============================== -->
+    <div id="maps-ov" class="overlay hidden">
+      <div class="panel wide-panel">
+        <h2>MAPS</h2>
+        <div class="board-tabs maps-tabs">
+          <button class="small-btn on" data-tab="community">Community</button>
+          <button class="small-btn" data-tab="mine">My maps</button>
+          <button class="small-btn" data-tab="import">Import code</button>
+        </div>
+        <div id="maps-body" class="maps-body"></div>
+        <p id="maps-msg" class="note"></p>
+        <div class="btn-row"><button id="btn-open-editor" class="accent">Open map editor</button><button id="btn-maps-done" class="primary">DONE</button></div>
+      </div>
+    </div>
+    <div id="editor"></div>
 
     <!-- ============================== PLAYER PROFILE ============================== -->
     <div id="profile-ov" class="overlay hidden">

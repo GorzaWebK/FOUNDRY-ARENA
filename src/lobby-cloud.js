@@ -235,6 +235,55 @@ export class CloudLobby {
     if (this.myRoom && Date.now() - (this.roomAt || 0) > ROOM_BEAT_MS) this._putRoom();
   }
 
+  // ---------------------------------------------------------------- community maps
+
+  get canShareMaps() { return !!this.uid; }
+
+  /** Publish (or update our own) map. Returns its id. */
+  async publishMap(spec, code, id = null) {
+    if (!this.uid) throw new Error('Not connected to the online service yet. Try again in a moment.');
+    const D = this.D;
+    const ref = id ? D.ref(this.db, `maps/${id}`) : D.push(D.ref(this.db, 'maps'));
+    try {
+      await D.set(ref, { uid: this.uid, name: spec.name, author: clean(spec.author) || 'Player', w: spec.w, d: spec.d, theme: spec.theme, code, at: D.serverTimestamp() });
+    } catch (e) {
+      if (id) return this.publishMap(spec, code, null); // not ours any more (or gone): publish as new
+      throw new Error("The server didn't accept the map. If you just published, wait 30 seconds and try again.");
+    }
+    return ref.key;
+  }
+
+  /** Community maps, newest first, with vote counts: [{ id, name, author, w, d, theme, code, at, votes, mine, voted }] */
+  async listMaps() {
+    if (!this.D) throw new Error('Not connected to the online service.');
+    const D = this.D;
+    const [ms, vs] = await Promise.all([
+      D.get(D.query(D.ref(this.db, 'maps'), D.orderByChild('at'), D.limitToLast(200))),
+      D.get(D.ref(this.db, 'mapVotes')).catch(() => null),
+    ]);
+    const votes = (vs && vs.val()) || {};
+    const out = [];
+    ms.forEach((c) => {
+      const v = c.val();
+      if (!v || typeof v.code !== 'string' || !v.code.startsWith('FAM1.')) return;
+      const vv = votes[c.key] && typeof votes[c.key] === 'object' ? votes[c.key] : {};
+      out.push({ id: c.key, name: clean(v.name, 28) || 'Untitled', author: clean(v.author) || 'Player', w: v.w | 0, d: v.d | 0, theme: String(v.theme || ''), code: v.code, at: v.at || 0, votes: Object.keys(vv).length, voted: !!vv[this.uid], mine: v.uid === this.uid });
+    });
+    return out.sort((a, b) => b.at - a.at);
+  }
+
+  async voteMap(id, on) {
+    if (!this.uid) return;
+    const ref = this.D.ref(this.db, `mapVotes/${id}/${this.uid}`);
+    if (on) await this.D.set(ref, true); else await this.D.remove(ref);
+  }
+
+  async deleteMap(id) {
+    if (!this.uid) return;
+    await this.D.remove(this.D.ref(this.db, `maps/${id}`));
+    await this.D.remove(this.D.ref(this.db, `mapVotes/${id}/${this.uid}`)).catch(() => {});
+  }
+
   close() {
     if (this.myRoom) this._removeRoom(this.myRoom.code);
     clearInterval(this.beat);

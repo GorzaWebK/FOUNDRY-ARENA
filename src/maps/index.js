@@ -8,9 +8,13 @@ import depot from './depot.js';
 import skyline from './skyline.js';
 import dockyard from './dockyard.js';
 
+import { setBuiltinMaps, customMap } from '../mapspec.js';
+
 export const MAPS = [foundry, span, cloister, depot, skyline, dockyard];
 export const DEFAULT_MAP = foundry.id;
+setBuiltinMaps(MAPS); // custom maps borrow their look from these
 
+/** A built-in map, or a custom one registered this session (see mapspec.js). */
 export function getMap(id) {
-  return MAPS.find((m) => m.id === id) || MAPS[0];
+  return MAPS.find((m) => m.id === id) || customMap(id) || MAPS[0];
 }
