@@ -16,7 +16,11 @@ export const DEFAULTS = {
   botCount: 5,
   bots: true,
   difficulty: 'normal',
-  quality: 'high', // 'high' | 'low'
+  quality: 'high', // 'low' | 'medium' | 'high' | 'ultra'
+  renderScale: 1, // 0.5..1 on top of the quality's resolution
+  fpsCap: 0, // 0 = no cap
+  dynRes: false, // lower the resolution by itself when the frame rate drops
+  reduceMotion: false, // less camera bob and shake
   invertY: false,
   showFps: false,
   name: '', // multiplayer display name
@@ -58,7 +62,10 @@ export function loadSettings() {
   for (const k of ['musicVolume', 'sfxVolume']) s[k] = typeof s[k] === 'number' && Number.isFinite(s[k]) ? Math.min(1, Math.max(0, s[k])) : DEFAULTS[k];
   s.botCount = Math.min(10, Math.max(1, Math.round(s.botCount)));
   if (!['easy', 'normal', 'hard', 'veteran'].includes(s.difficulty)) s.difficulty = 'normal';
-  if (!['high', 'low'].includes(s.quality)) s.quality = 'high';
+  if (!['low', 'medium', 'high', 'ultra'].includes(s.quality)) s.quality = 'high';
+  s.renderScale = typeof s.renderScale === 'number' && s.renderScale >= 0.5 && s.renderScale <= 1 ? s.renderScale : 1;
+  if (![0, 30, 60, 120, 144].includes(s.fpsCap)) s.fpsCap = 0;
+  s.dynRes = !!s.dynRes; s.reduceMotion = !!s.reduceMotion;
   if (!isPrimary(s.primary)) s.primary = DEFAULT_PRIMARY;
   if (!isSecondary(s.secondary)) s.secondary = DEFAULT_SECONDARY;
   if (!isTactical(s.tactical)) s.tactical = DEFAULT_TACTICAL;
@@ -126,7 +133,11 @@ export function buildSettingsUI(container, settings, onChange) {
     { key: 'volume', label: 'Master volume', min: 0, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' },
     { key: 'musicVolume', label: 'Music', min: 0, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' },
     { key: 'sfxVolume', label: 'Effects', min: 0, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' },
-    { key: 'quality', label: 'Graphics', options: [['high', 'High'], ['low', 'Low (faster)']] },
+    { key: 'quality', label: 'Graphics', options: [['low', 'Low (fastest)'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']] },
+    { key: 'renderScale', label: 'Render scale', min: 0.5, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' },
+    { key: 'dynRes', label: 'Dynamic resolution', check: true },
+    { key: 'fpsCap', label: 'Frame rate cap', options: [[0, 'None'], [144, '144'], [120, '120'], [60, '60'], [30, '30']] },
+    { key: 'reduceMotion', label: 'Reduce camera motion', check: true },
     { key: 'killcam', label: 'Kill cam', check: true },
     { key: 'teamPalette', label: 'Team colours', options: [['standard', 'Standard: blue / red'], ['deutan', 'Red-green colour-blind: blue / orange'], ['tritan', 'Blue-yellow colour-blind: cyan / pink'], ['contrast', 'High contrast: blue / yellow']] },
     { key: 'softFlash', label: 'Gentler flashbangs', check: true },
@@ -161,7 +172,8 @@ export function buildSettingsUI(container, settings, onChange) {
         o.value = value; o.textContent = label;
         input.append(o);
       }
-      input.addEventListener('change', () => { settings[r.key] = input.value; saveSettings(settings); onChange(r.key); });
+      const numeric = typeof r.options[0][0] === 'number';
+      input.addEventListener('change', () => { settings[r.key] = numeric ? Number(input.value) : input.value; saveSettings(settings); onChange(r.key); });
       syncers.push(() => { input.value = settings[r.key]; });
     } else if (r.check) {
       input = document.createElement('input');

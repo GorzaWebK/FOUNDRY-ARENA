@@ -207,7 +207,7 @@ a wall, and you can't lean while sprinting or sliding. A slide keeps your sprint
 momentum for about a second with a low profile; jumping or pressing crouch
 again cancels it.
 
-Sensitivity, field of view, volume, graphics quality, announcer voice, kill cam,
+Sensitivity, field of view, volumes, graphics settings, kill cam,
 invert-Y, crosshair, key bindings, mode, map, bots, difficulty, loadout, your
 multiplayer name and your training-range best are saved to `localStorage`.
 ### Career stats
@@ -376,7 +376,21 @@ checksum catches codes that were cut short or mistyped.
 **Crosshair** (under Settings) sets its colour, line length (0 for a dot only),
 thickness, extra gap, centre dot and outline, with a live preview. The lines
 still spread apart to show your current accuracy.
-**Graphics: Low** turns off shadows and fill lights and renders at 75% resolution.
+**Graphics** has four presets:
+
+| Preset | Shadows | Fill lights | Resolution |
+| ------ | ------- | ----------- | ---------- |
+| Low    | off     | off         | 75%, fewer particles |
+| Medium | 1024    | off         | 100% |
+| High   | 2048    | on          | up to 1.5× on high-DPI screens |
+| Ultra  | 4096    | on          | up to 2× on high-DPI screens |
+
+On top of the preset: **Render scale** (50–100%), **Dynamic resolution** (drops
+the resolution by itself, down to 60%, while frames run slow, and raises it again
+when there's room), a **Frame rate cap** (none, 144, 120, 60 or 30) and **Reduce
+camera motion** (a quarter of the head bob and screen shake). Characters and
+pickups are drawn with about a third fewer draw calls than before (their fixed
+parts are merged into one mesh per material).
 
 ## Weapons
 

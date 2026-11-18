@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { CFG } from './config.js';
 import { GRENADE } from './weapons.js';
 import { glowTexture } from './textures.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const PICKUP_TYPES = {
   health: { label: '+50 Health', color: 0x4dff88, respawn: 30, tone: 520 },
@@ -24,7 +25,27 @@ function bx(w, h, d, m, x = 0, y = 0, z = 0) {
   return mesh;
 }
 
+/** One mesh per material (fewer draw calls); the models are built once per type and shared. */
+const modelCache = new Map();
 function buildModel(type) {
+  if (!modelCache.has(type)) {
+    const src = buildParts(type), parts = [];
+    const byMat = new Map();
+    for (const m of src.children) { if (!byMat.has(m.material)) byMat.set(m.material, []); byMat.get(m.material).push(m); }
+    for (const [mat, list] of byMat) {
+      const geos = list.map((m) => { m.updateMatrix(); return m.geometry.clone().applyMatrix4(m.matrix); });
+      parts.push([mergeGeometries(geos, false), mat]);
+      for (const m of list) m.geometry.dispose();
+      for (const gg of geos) gg.dispose();
+    }
+    modelCache.set(type, parts);
+  }
+  const g = new THREE.Group();
+  for (const [geo, mat] of modelCache.get(type)) g.add(new THREE.Mesh(geo, mat));
+  return g;
+}
+
+function buildParts(type) {
   const g = new THREE.Group();
   const c = PICKUP_TYPES[type].color;
   if (type === 'health') {
@@ -158,6 +179,7 @@ export class Pickup {
   dispose() {
     this.scene.remove(this.group);
     this.group.traverse((o) => {
+      if (o.parent === this.model) return; // the model is shared by every pickup of its type
       if (o.geometry) o.geometry.dispose();
       if (o.material) o.material.dispose();
     });

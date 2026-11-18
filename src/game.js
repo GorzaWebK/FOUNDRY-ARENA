@@ -211,16 +211,25 @@ export class Game {
       if (this.hillFx && this.hillFx.recolor) this.hillFx.recolor();
     }
     if (!key || key === 'softFlash') { document.body.classList.toggle('soft-flash', !!this.settings.softFlash); this.hud.softFlash = !!this.settings.softFlash; }
-    if (!key || key === 'quality') {
-      // High: shadows, full resolution, fill lights. Low: none of those, 75% resolution.
-      const high = this.settings.quality !== 'low';
+    if (!key || key === 'quality' || key === 'renderScale') {
+      // Low: no shadows or fill lights, fewer particles, 75% resolution.
+      // Medium: shadows (1024), fill lights off. High: shadows (2048), fill lights,
+      // up to 1.5x pixels on high-DPI screens. Ultra: 4096 shadows, up to 2x pixels.
+      const lvl = { low: 0, medium: 1, high: 2, ultra: 3 }[this.settings.quality] ?? 2;
       const dpr = window.devicePixelRatio || 1;
-      this.renderer.setPixelRatio(high ? Math.min(dpr, 1.5) : Math.min(dpr, 1) * 0.75);
-      this.lights.sun.castShadow = high;
+      this.basePixelRatio = [Math.min(dpr, 1) * 0.75, Math.min(dpr, 1), Math.min(dpr, 1.5), Math.min(dpr, 2)][lvl] * (this.settings.renderScale || 1);
+      this.renderer.setPixelRatio(this.basePixelRatio * (this.dynScale || 1));
+      const sun = this.lights.sun;
+      sun.castShadow = lvl >= 1;
+      const size = [1024, 1024, 2048, 4096][lvl];
+      if (sun.shadow.mapSize.x !== size) {
+        sun.shadow.mapSize.set(size, size);
+        if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+      }
       this.renderer.shadowMap.needsUpdate = true;
-      for (const p of this.lights.points) p.visible = high;
-      this.effects.lowDetail = !high;
-      this.smokes.lowDetail = !high;
+      for (const p of this.lights.points) p.visible = lvl >= 2;
+      this.effects.lowDetail = lvl === 0;
+      this.smokes.lowDetail = lvl === 0;
       this.resize();
     }
     if (!key || key === 'volume') this.audio.setVolume(this.settings.volume);
@@ -1529,6 +1538,14 @@ export class Game {
     if (p.streak >= 3) v += 0.08;
     if (!p.alive) v *= 0.6;
     return Math.min(1, v);
+  }
+
+  /** Dynamic resolution: a scale on top of the settings' pixel ratio (0.6..1). */
+  setDynScale(s) {
+    if (Math.abs((this.dynScale || 1) - s) < 0.01) return;
+    this.dynScale = s;
+    this.renderer.setPixelRatio((this.basePixelRatio || 1) * s);
+    this.resize();
   }
 
   /** Multiplayer client frame: simulate only ourselves; the host sends the rest. */

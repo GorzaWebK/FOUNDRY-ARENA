@@ -6,6 +6,7 @@ import { nameTexture, flashTexture } from './textures.js';
 import { worldGun } from './gunModels.js';
 import { itemOf } from './cosmetics.js';
 import { attList } from './attachments.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const GUN_SCALE = 0.95;
 const HAND = new THREE.Vector3(0.14, 0.4, -0.38); // right hand, in upper-body space
@@ -28,6 +29,38 @@ function part(parent, w, h, d, mat, x, y, z) {
   m.castShadow = true;
   parent.add(m);
   return m;
+}
+
+const mergedCache = new Map();
+/**
+ * Fewer draw calls: the plain parts hanging straight off `group` (not sub-groups,
+ * not the ones in `keep` that get moved or hidden) become one mesh per material.
+ * The merged shapes are shared by every model with the same part layout.
+ */
+function mergeParts(group, keep, cacheKey) {
+  const byMat = new Map();
+  for (const o of [...group.children]) {
+    if (!o.isMesh || keep.has(o)) continue;
+    if (!byMat.has(o.material)) byMat.set(o.material, []);
+    byMat.get(o.material).push(o);
+  }
+  let k = 0;
+  for (const [mat, parts] of byMat) {
+    if (parts.length < 2) continue;
+    const key = `${cacheKey}|${k++}|${parts.length}`;
+    let geo = cacheKey ? mergedCache.get(key) : null;
+    if (!geo) {
+      const geos = parts.map((p) => { p.updateMatrix(); return p.geometry.clone().applyMatrix4(p.matrix); });
+      geo = mergeGeometries(geos, false);
+      for (const g of geos) g.dispose();
+      if (cacheKey) mergedCache.set(key, geo);
+    }
+    for (const p of parts) group.remove(p);
+    const m = new THREE.Mesh(geo, mat);
+    m.castShadow = true;
+    m.userData.merged = !cacheKey; // (a one-off: dispose with the model)
+    group.add(m);
+  }
 }
 
 export class BotModel {
@@ -150,6 +183,11 @@ export class BotModel {
     this.mats[1].color.copy(c).multiplyScalar(0.45);
     this.mats[3].emissive.copy(c);
     this.redrawTag();
+    // every model has the same layout, so the merged body shapes are shared
+    const keep = new Set([this.head, this.helmetTop, this.holster]);
+    mergeParts(this.legL, keep, 'legL');
+    mergeParts(this.legR, keep, 'legR');
+    mergeParts(this.upper, keep, 'upper');
   }
 
   /** Put on the gear from a player's equipped cosmetics. */

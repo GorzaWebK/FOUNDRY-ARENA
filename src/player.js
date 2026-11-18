@@ -295,10 +295,11 @@ export class Player extends Character {
 
   updateCamera(dt, hs) {
     const g = this.game, cam = g.camera;
-    const bobAmt = this.onGround && !this.sliding ? Math.min(1, hs / CFG.sprintSpeed) * (1 - this.ads * 0.8) : 0;
+    const calm = g.settings.reduceMotion ? 0.25 : 1; // Settings → Reduce camera motion
+    const bobAmt = (this.onGround && !this.sliding ? Math.min(1, hs / CFG.sprintSpeed) * (1 - this.ads * 0.8) : 0) * calm;
     const bobY = Math.sin(this.bobPhase * 2) * 0.035 * bobAmt;
     const bobX = Math.cos(this.bobPhase) * 0.02 * bobAmt;
-    const sh = this.shake;
+    const sh = this.shake * calm;
     this.getEye(_v); // includes lean
     cam.position.set(
       _v.x + Math.cos(this.yaw) * bobX,

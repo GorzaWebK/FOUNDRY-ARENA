@@ -2433,12 +2433,27 @@ function tick(dt, render) {
 }
 
 let last = performance.now();
+let dynSlow = 0, dynFast = 0;
 function frame(now) {
   requestAnimationFrame(frame);
+  // Settings → Frame rate cap: skip frames that come too soon
+  const cap = settings.fpsCap;
+  if (cap && now - last < 1000 / cap - 1) return;
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   if (dt <= 0) return;
   tick(dt, true);
+  dynamicResolution(dt);
+}
+
+/** Settings → Dynamic resolution: drop the resolution while frames run slow, raise it back when there's room. */
+function dynamicResolution(dt) {
+  if (!settings.dynRes || state !== 'playing') { if (game.dynScale && game.dynScale !== 1 && !settings.dynRes) game.setDynScale(1); return; }
+  const target = 1 / Math.min(60, settings.fpsCap || 60);
+  const s = game.dynScale || 1;
+  if (dt > target * 1.2) { dynSlow += dt; dynFast = 0; } else if (dt < target * 1.05) { dynFast += dt; dynSlow = 0; }
+  if (dynSlow > 0.75 && s > 0.6) { game.setDynScale(Math.max(0.6, s - 0.1)); dynSlow = 0; }
+  if (dynFast > 4 && s < 1) { game.setDynScale(Math.min(1, s + 0.05)); dynFast = 0; }
 }
 
 // Browsers stop animation frames in hidden tabs. A hosted match must keep
