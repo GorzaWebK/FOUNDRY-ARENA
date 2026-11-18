@@ -11,6 +11,7 @@
 
     <!-- ============================== HUD ============================== -->
     <div id="hud" class="hidden">
+      <div id="tutorial" class="tutorial hidden"></div>
       <!-- first, so the flashbang white-out covers the game but every bit of HUD stays on top of it -->
       <div id="flashbang"></div>
       <div id="vignette"></div>
@@ -166,6 +167,7 @@
         <ul class="keys" id="keys-list"></ul>
         <p class="note">Keep clear of <kbd>Ctrl</kbd> combos. <kbd>Ctrl</kbd>+<kbd>W</kbd> closes the tab.</p>
         <div class="btn-row">
+          <button id="btn-tutorial">Play the tutorial</button>
           <button id="btn-controls">Change controls…</button>
           <button id="btn-keys-done" class="primary">DONE</button>
         </div>
@@ -329,6 +331,16 @@
         <p id="board-me" class="note"></p>
         <p id="board-status" class="note"></p>
         <div class="btn-row"><button id="btn-board-done" class="primary">DONE</button></div>
+      </div>
+    </div>
+
+    <!-- ============================== FIRST VISIT ============================== -->
+    <div id="welcome-ov" class="overlay hidden">
+      <div class="panel welcome-panel">
+        <h2>NEW HERE?</h2>
+        <p>Take the two-minute tutorial: it walks you through moving, shooting, grenades and the rest on the training range.</p>
+        <div class="btn-row"><button id="btn-welcome-no">No thanks</button><button id="btn-welcome-go" class="primary">START TUTORIAL</button></div>
+        <p class="note">You can play it any time from Controls on the main menu.</p>
       </div>
     </div>
 

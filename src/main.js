@@ -15,6 +15,7 @@ import { MAPS, getMap } from './maps/index.js';
 import { MODES, getMode, makeRules, customSummary, TIME_OPTIONS, HARDCORE_HEALTH, TEAM_NAMES } from './modes.js';
 import RANGE_MAP from './maps/range.js';
 import { TRAINING } from './training.js';
+import { TUTORIAL } from './tutorial.js';
 import { WEAPON_BY_ID, PRIMARIES, TACTICALS, TACTICAL_BY_ID, WEAPONS as WEAPON_LIST } from './weapons.js';
 import { loadSettings, saveSettings, buildSettingsUI } from './settings.js';
 import { AudioSys } from './audio.js';
@@ -1410,6 +1411,23 @@ $('btn-again').addEventListener('click', startNext);
 $('btn-resume').addEventListener('click', resume);
 $('btn-restart').addEventListener('click', restart);
 $('btn-train').addEventListener('click', startTraining);
+
+/** The guided tutorial (on the training range). */
+async function startTutorial() {
+  if (net.active) return;
+  for (const id of ['keys-ov', 'welcome-ov']) $(id).classList.add('hidden');
+  cancelRejoin();
+  audio.resume();
+  audio.setVolume(settings.volume);
+  game.newMatch({ botCount: 1, bots: false, difficulty: settings.difficulty, map: RANGE_MAP, rules: TUTORIAL });
+  setState('playing');
+  const ok = await lock();
+  if (!ok && state === 'playing') hud.setLockHint(true);
+}
+game.onTutorialDone = () => { settings.tutorialDone = true; saveSettings(settings); };
+$('btn-tutorial').addEventListener('click', startTutorial);
+$('btn-welcome-go').addEventListener('click', startTutorial);
+$('btn-welcome-no').addEventListener('click', () => { settings.tutorialDone = true; saveSettings(settings); $('welcome-ov').classList.add('hidden'); });
 $('btn-range-reset').addEventListener('click', () => { if (game.range) game.range.resetStats(); resume(); });
 $('btn-quit').addEventListener('click', leaveToMenu);
 $('btn-menu').addEventListener('click', leaveToMenu);
@@ -1438,7 +1456,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (!$('profile-ov').classList.contains('hidden')) { if (e.code === 'Escape') $('profile-ov').classList.add('hidden'); return; }
-  for (const id of ['rooms-ov', 'board-ov']) {
+  for (const id of ['rooms-ov', 'board-ov', 'welcome-ov']) {
     if (!$(id).classList.contains('hidden')) {
       if (e.code === 'Escape') $(id).classList.add('hidden');
       return;
@@ -1667,6 +1685,8 @@ else party.restore(settings.name || 'Player');
 renderParty();
 updateBoardEntry();
 if (!params.has('nolobby')) lobby.connect();
+// first visit: offer the tutorial (not when arriving through an invite, and not to people who've already played)
+if (!settings.tutorialDone && !game.career.stats.matches && !params.get('join') && !params.get('party') && !params.has('notut')) $('welcome-ov').classList.remove('hidden');
 requestAnimationFrame(frame);
 
 // handy for debugging / automated tests

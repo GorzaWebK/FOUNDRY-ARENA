@@ -6,6 +6,7 @@ import { World } from './world.js';
 import { NavGrid } from './navgrid.js';
 import { buildWorldMeshes, buildSky, buildLights } from './worldMesh.js';
 import { buildDecor } from './decor.js';
+import { Tutorial } from './tutorial.js';
 import { Effects } from './effects.js';
 import { Pickup } from './pickups.js';
 import { ViewModel } from './viewmodel.js';
@@ -20,7 +21,7 @@ import { Progress, XP } from './progress.js';
 import { itemOf } from './cosmetics.js';
 import { weaponIdOf } from './career.js';
 import { SKIN_GUNS, SKIN_BY_ID, skinUnlocked } from './skins.js';
-import { getMode, makeRules, MODES, TEAM_COLORS, TEAM_NAMES, GUN_LADDER, gunLevel } from './modes.js';
+import { getMode, makeRules, MODES, TEAM_COLORS, TEAM_NAMES, GUN_LADDER, gunLevel, setTeamPalette } from './modes.js';
 import { MAPS, getMap } from './maps/index.js';
 import { Announcer } from './announcer.js';
 import { KillCam } from './killcam.js';
@@ -196,6 +197,13 @@ export class Game {
   }
 
   applySettings(key) {
+    if (!key || key === 'teamPalette') {
+      setTeamPalette(this.settings.teamPalette);
+      for (const c of new Set([...this.chars, ...this.bots, ...this.remotes])) this.paint(c);
+      if (this.ctf) for (const f of this.ctf.flags) { f.mesh.cloth.material.color.setHex(TEAM_COLORS[f.team]); f.mesh.cloth.material.emissive.setHex(TEAM_COLORS[f.team]); for (const o of f.base.children) o.material.color.setHex(TEAM_COLORS[f.team]); }
+      if (this.hillFx && this.hillFx.recolor) this.hillFx.recolor();
+    }
+    if (!key || key === 'softFlash') { document.body.classList.toggle('soft-flash', !!this.settings.softFlash); this.hud.softFlash = !!this.settings.softFlash; }
     if (!key || key === 'quality') {
       // High: shadows, full resolution, fill lights. Low: none of those, 75% resolution.
       const high = this.settings.quality !== 'low';
@@ -243,6 +251,9 @@ export class Game {
     this.stats = { stuck: 0, shots: 0, kills: 0 };
     if (this.range) { this.range.dispose(); this.range = null; }
     if (this.rules.training) this.range = new Range(this);
+    if (this.tutorial) { this.tutorial.dispose(); this.tutorial = null; }
+    this.playerThrows = [];
+    if (this.rules.tutorial && !attract) this.tutorial = new Tutorial(this, () => { if (this.onTutorialDone) this.onTutorialDone(); });
     this.effects.clear();
     this.hud.reset();
     this.resetPickups();
@@ -260,7 +271,7 @@ export class Game {
     this.killcam.reset();
     if (this.mode === 'host') this.net.onStart(); // tell clients before anyone spawns
     for (const c of this.chars) this.respawn(c, true);
-    if (!attract) this.hud.centerMessage(this.rules.name.toUpperCase(), this.rules.blurb, 3.2, '#ff8a2a');
+    if (!attract && !this.rules.tutorial) this.hud.centerMessage(this.rules.name.toUpperCase(), this.rules.blurb, 3.2, '#ff8a2a');
     if (!attract && !this.rules.training) this.sting('sting-start');
   }
 
@@ -942,6 +953,7 @@ export class Game {
 
   /** `fuse` = seconds left on it (cooking burns some); `drop` = let go of it, no throw. */
   throwGrenade(char, dir, def = GRENADE, fuse = def.fuse, drop = false) {
+    if (char === this.player && this.playerThrows) this.playerThrows.push(def); // (the tutorial watches these)
     char.getEye(_o);
     if (dir) _dir.copy(dir);
     else { char.aimDir(_dir); _dir.y += 0.1; _dir.normalize(); } // a little loft
@@ -1084,7 +1096,7 @@ export class Game {
         const dur = FLASH.maxBlind * a;
         p.blindUntil = Math.max(p.blindUntil, this.time + dur);
         this.hud.flashed(a, dur);
-        this.audio.deafen(a, dur);
+        this.audio.deafen(a, dur, this.settings.softFlash);
       }
     }
     if (!authority) return;
@@ -1330,6 +1342,7 @@ export class Game {
     if (this.attract) this.orbitCamera(dt, 0.045);
     else this.player.update(dt, this.input);
     if (this.range) this.range.update(dt);
+    if (this.tutorial) this.tutorial.update(dt);
     for (const r of this.remotes) r.update(dt);
     for (const b of this.bots) b.update(dt);
     this.updateGrenades(dt);

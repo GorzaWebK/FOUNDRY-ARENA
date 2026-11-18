@@ -83,7 +83,7 @@ export class AudioSys {
    * Flashbanged: everything goes quiet and muffled behind a ringing tone, then
    * comes back over `dur` seconds. `amount` 0..1.
    */
-  deafen(amount, dur) {
+  deafen(amount, dur, soft = false) {
     if (!this.ctx || this.muted || this.ctx.state !== 'running') return;
     const ctx = this.ctx, t = ctx.currentTime;
     if (!this.duck) {
@@ -109,7 +109,7 @@ export class AudioSys {
     o.type = 'sine';
     o.frequency.value = 3400 + Math.random() * 300;
     og.gain.setValueAtTime(0.0001, t);
-    og.gain.exponentialRampToValueAtTime(0.09 * amount * this.volume + 0.0002, t + 0.05);
+    og.gain.exponentialRampToValueAtTime((soft ? 0.025 : 0.09) * amount * this.volume + 0.0002, t + (soft ? 0.4 : 0.05));
     og.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(og).connect(this.ringOut);
     o.start(t);

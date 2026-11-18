@@ -24,7 +24,7 @@ import { CFG, HUMAN_COLORS, MAX_HUMANS } from './config.js';
 import * as THREE from 'three';
 import { WEAPONS, WEAPON_BY_ID, KNIFE, GRENADE, NADES, TACTICALS, TACTICAL_BY_ID, isPrimary, damageAtDistance } from './weapons.js';
 import { getMap } from './maps/index.js';
-import { getMode, makeRules } from './modes.js';
+import { getMode, makeRules, TEAM_COLORS } from './modes.js';
 import { tracerColor } from './game.js';
 import { NetChar } from './netChar.js';
 import { getTransport, makeRoomCode, cleanRoomCode } from './transport.js';
@@ -708,7 +708,8 @@ export class Net {
       if (!Array.isArray(e) || !num(e[0])) continue;
       const [id, name, color, bot, team, cos] = e;
       seen.add(id);
-      const col = num(color) ? color : 0xffffff;
+      // team colours come from our own palette (Settings → Team colours), not the host's
+      const col = g.rules && g.rules.teams && (team === 0 || team === 1) ? TEAM_COLORS[team] : num(color) ? color : 0xffffff;
       if (id === g.player.id) {
         g.player.name = cleanName(name) || 'You';
         g.player.color = col;

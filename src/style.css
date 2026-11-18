@@ -757,3 +757,20 @@ input[type='password'] { background: var(--steel-1); color: var(--ink); border: 
 .pf-level.pr { border-color: #f2b417; color: #f2b417; }
 .pf-fav { margin: 0 0 10px; font-size: 14px; color: var(--dim); }
 .pf-fav b { color: var(--ink); }
+
+/* ---- tutorial ---- */
+.tutorial { position: absolute; top: 74px; left: 50%; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); padding: 12px 16px 10px; background: rgba(12,14,17,0.86); border-left: 4px solid var(--accent); pointer-events: none; z-index: 5; }
+.tut-step { font-family: var(--cond); font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.tut-step b { color: var(--accent); font-size: 16px; }
+.tut-how { margin: 6px 0 8px; font-size: 16px; line-height: 1.4; color: var(--ink); }
+.tut-how kbd { font-size: 13px; }
+.tut-bar { height: 5px; background: rgba(255,255,255,0.1); }
+.tut-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.15s; }
+.tut-skip { margin-top: 6px; font-size: 11px; color: var(--dim); }
+.welcome-panel { width: min(460px, calc(100vw - 32px)); }
+
+/* the tutorial panel takes the range's stats panel's place */
+body.tutorial-on #range-panel { display: none; }
+
+/* gentler flashbangs (Settings) */
+body.soft-flash #flashbang { background: #8b9096; transition: opacity 0.35s ease-out; }

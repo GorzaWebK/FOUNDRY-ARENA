@@ -6,7 +6,8 @@ import { FLAG_STATE } from './ctf.js';
 import { itemOf } from './cosmetics.js';
 
 const _hv = new THREE.Vector3();
-const HILL_TEXT_COL = { [-1]: '#e8e8e8', 0: '#' + TEAM_COLORS[0].toString(16).padStart(6, '0'), 1: '#' + TEAM_COLORS[1].toString(16).padStart(6, '0'), 2: '#ffd24d' };
+// (a getter: the team colours can change in Settings)
+const HILL_TEXT_COL = { [-1]: '#e8e8e8', get 0() { return '#' + TEAM_COLORS[0].toString(16).padStart(6, '0'); }, get 1() { return '#' + TEAM_COLORS[1].toString(16).padStart(6, '0'); }, 2: '#ffd24d' };
 
 
 const $ = (id) => document.getElementById(id);
@@ -353,6 +354,8 @@ export class Hud {
     this.flashT = dur;
     this.flashDur = dur;
     this.flashPeak = Math.min(1, 0.45 + amount * 0.7);
+    // gentler flashbangs (Settings): the same blinding, but a grey fade-in, never a sudden white screen
+    if (this.softFlash) this.flashPeak = Math.min(0.94, this.flashPeak + 0.1);
     this.el.flash.style.opacity = this.flashPeak;
   }
 

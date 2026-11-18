@@ -81,6 +81,26 @@ Solo, you pick one and press **Play again**. In multiplayer everyone votes; the
 host can start whenever they like, and the next match starts by itself after
 30 seconds. Most votes wins, and a tie goes to the host's pick.
 
+## Tutorial
+
+New players are offered a two-minute tutorial on their first visit (also under
+**Controls → Play the tutorial**). It runs on the training range and walks
+through twelve steps: look, move, sprint, jump, crouch, slide, aim, shoot,
+reload, switch weapons, grenades, and knife and lean. Each step shows your own
+key for it and ticks off once you've actually done it.
+
+## Accessibility
+
+- **Team colours** (Settings): standard blue / red, or palettes for red-green
+  colour blindness (blue / orange), blue-yellow colour blindness (cyan / pink)
+  and high contrast (blue / yellow). It changes only what you see: the teams are
+  still Cobalt and Crimson, and it applies in rooms other people host too.
+- **Gentler flashbangs** (Settings): a flash fades in to grey instead of a sudden
+  white screen, with a much quieter ring. It blinds you just as long, so it
+  isn't an advantage.
+- **Field of view**, sensitivity, invert Y, toggle lean, crosshair style and
+  every key binding are adjustable too.
+
 ## Training range
 
 **TRAINING RANGE** on the main menu opens a practice map with no bots and

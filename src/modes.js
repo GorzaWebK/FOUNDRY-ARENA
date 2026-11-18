@@ -24,6 +24,24 @@ import { CFG } from './config.js';
 
 // the two crews: Cobalt (blue) and Crimson (red)
 export const TEAM_COLORS = [0x3f7fd0, 0xc9343c];
+
+/**
+ * Team colour sets (Settings → Team colours). The team names stay Cobalt and
+ * Crimson; only what they look like changes, on this screen only.
+ */
+export const TEAM_PALETTES = {
+  standard: [0x3f7fd0, 0xc9343c], // blue / red
+  deutan: [0x2f7fe8, 0xf0a020], // red-green colour blindness: blue / orange
+  tritan: [0x18b8c8, 0xe0306a], // blue-yellow colour blindness: cyan / pink-red
+  contrast: [0x2a62ff, 0xffd400], // high contrast: deep blue / yellow
+};
+
+/** Switch palette in place (everything that reads TEAM_COLORS picks it up). */
+export function setTeamPalette(id) {
+  const p = TEAM_PALETTES[id] || TEAM_PALETTES.standard;
+  TEAM_COLORS[0] = p[0];
+  TEAM_COLORS[1] = p[1];
+}
 export const TEAM_NAMES = ['Cobalt', 'Crimson'];
 export const GUN_LADDER = ['lmg', 'rifle', 'smg', 'shotgun', 'sniper', 'pistol'];
 export const KILLS_PER_GUN = 2;

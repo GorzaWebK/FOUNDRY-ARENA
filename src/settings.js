@@ -22,6 +22,9 @@ export const DEFAULTS = {
   tactical: DEFAULT_TACTICAL, // 'flash' | 'smoke'
   map: DEFAULT_MAP,
   mode: DEFAULT_MODE,
+  teamPalette: 'standard', // colour-blind friendly team colours (modes.js TEAM_PALETTES)
+  softFlash: false, // flashbangs fade in to grey instead of a sudden white flash, with a quieter ring
+  tutorialDone: false, // finished (or declined) the first-time tutorial
   announcer: false, // spoken (text-to-speech) killstreak call-outs; the banner and sting play either way
   killcam: true,
   leanToggle: true, // tap Q / E to lean instead of holding
@@ -114,6 +117,8 @@ export function buildSettingsUI(container, settings, onChange) {
     { key: 'quality', label: 'Graphics', options: [['high', 'High'], ['low', 'Low (faster)']] },
     { key: 'announcer', label: 'Spoken call-outs', check: true },
     { key: 'killcam', label: 'Kill cam', check: true },
+    { key: 'teamPalette', label: 'Team colours', options: [['standard', 'Standard: blue / red'], ['deutan', 'Red-green colour-blind: blue / orange'], ['tritan', 'Blue-yellow colour-blind: cyan / pink'], ['contrast', 'High contrast: blue / yellow']] },
+    { key: 'softFlash', label: 'Gentler flashbangs', check: true },
     { key: 'leanToggle', label: 'Toggle lean', check: true },
     { key: 'invertY', label: 'Invert Y', check: true },
     { key: 'showFps', label: 'Show FPS', check: true },
