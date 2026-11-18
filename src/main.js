@@ -43,6 +43,7 @@ import { ATT_SLOTS, ATTACHMENTS, fits, attUnlocked, attList, withAttachments } f
 import { PASS_TIERS, PASS_TIER_XP, THEMES, themeOf, track as passTrack } from './seasonpass.js';
 import { XP, levelFromXp, MAX_LEVEL } from './progress.js';
 import { msToReset, msToWeekReset } from './challenges.js';
+import { Music } from './music.js';
 
 {
   // version stamp on the main menu, so players can compare before joining
@@ -60,6 +61,9 @@ const canvas = $('game');
 const settings = loadSettings();
 const audio = new AudioSys();
 audio.volume = settings.volume;
+audio.musicVol = settings.musicVolume;
+audio.sfxVol = settings.sfxVolume;
+const music = new Music(audio);
 const hud = new Hud();
 const input = new Input(canvas);
 input.binds = settings.binds; // the same object: rebinding updates input immediately
@@ -103,9 +107,23 @@ function setState(s) {
   // into play: nothing on the page keeps the keyboard focus (a text box would eat keys, a button would take Space)
   if (s === 'playing' && document.activeElement && document.activeElement !== document.body && !chatting) document.activeElement.blur();
   audio.muted = s === 'menu' || (s === 'paused' && !net.active);
+  syncMusic(s);
   if (s !== 'playing') hud.setScoreboard(false, game);
   hud.setLockHint(false);
   updateRoomUi();
+}
+
+/** Music and ambience for the screen we're on: the menu theme, the match music, quiet on the range. */
+function syncMusic(s) {
+  if (s === 'menu') { music.play('menu'); music.ambience(null); music.duck(false); return; }
+  if (s === 'ended') { music.stop(0.6); music.ambience(null); return; }
+  if (s === 'paused') { music.duck(true); return; }
+  if (s === 'playing') {
+    music.duck(false);
+    if (game.rules.training || game.rules.tutorial) music.stop(1.5);
+    else music.play('match');
+    music.ambience(game.map.id, game.map.ambience || game.map.theme);
+  }
 }
 
 // ---------------------------------------------------------------- settings UI
@@ -2393,6 +2411,9 @@ function startNext() {
 
 // ---------------------------------------------------------------- main loop
 function tick(dt, render) {
+  music.update(dt);
+  music.updateAmbience();
+  if (state === 'playing' && !game.over) music.setIntensity(game.musicIntensity());
   if (state === 'playing') {
     hud.setScoreboard(input.act('scoreboard'), game);
     game.update(dt);
@@ -2462,4 +2483,5 @@ window.__net = net;
 window.__party = party;
 window.__lobby = lobby;
 window.__editor = editor;
+window.__music = music;
 window.__app = { get state() { return state; }, startMatch, hostGame, joinGame, pause, resume, setState, openChat, closeChat, input, settings };

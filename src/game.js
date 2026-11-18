@@ -224,6 +224,8 @@ export class Game {
       this.resize();
     }
     if (!key || key === 'volume') this.audio.setVolume(this.settings.volume);
+    if (!key || key === 'musicVolume') this.audio.setMusicVolume(this.settings.musicVolume);
+    if (!key || key === 'sfxVolume') this.audio.setSfxVolume(this.settings.sfxVolume);
     if (!key || key.startsWith('xh')) applyCrosshair(this.settings);
   }
 
@@ -1393,6 +1395,9 @@ export class Game {
 
   /** Let bots within `radius` hear a sound. */
   emitNoise(x, y, z, radius, src, kind) {
+    // (the music: gunfire close to you counts as a fight)
+    const p = this.player;
+    if (kind === 'shot' && p.alive && (src === p || Math.hypot(p.pos.x - x, p.pos.z - z) < 28)) this.combatT = this.time;
     for (const b of this.bots) {
       if (b === src || !b.alive) continue;
       const d = Math.hypot(b.pos.x - x, b.pos.y - y, b.pos.z - z);
@@ -1504,6 +1509,26 @@ export class Game {
     const cam = this.camera;
     this.audio.setListener(cam.position.x, cam.position.y, cam.position.z, this.attract ? 0 : this.player.yaw);
     if (!this.attract) this.hud.update(this, dt);
+  }
+
+  /**
+   * How heated things are for you, 0..1, for the match music (music.js): calm
+   * while you look for a fight, up when one is on (shooting, getting shot,
+   * gunfire close by), up a bit more in the last minute or with a bomb ticking.
+   */
+  musicIntensity() {
+    const p = this.player;
+    if (p.alive && p.health < (this.lastHealth ?? p.health)) this.combatT = this.time; // you got hit
+    if (p.alive && p.weapon && p.weapon.sinceShot < 0.2) this.combatT = this.time; // you're shooting
+    this.lastHealth = p.health;
+    let v = 0.22;
+    const since = this.time - (this.combatT ?? -99);
+    if (since < 10) v += 0.6 * Math.min(1, 1.3 - since / 10);
+    if (Number.isFinite(this.matchTime) && this.matchTime <= 60) v += 0.15;
+    if (this.obj && this.obj.bomb && this.obj.bomb.state === 'planted') v += 0.3;
+    if (p.streak >= 3) v += 0.08;
+    if (!p.alive) v *= 0.6;
+    return Math.min(1, v);
   }
 
   /** Multiplayer client frame: simulate only ourselves; the host sends the rest. */

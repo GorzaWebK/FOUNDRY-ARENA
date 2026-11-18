@@ -146,6 +146,17 @@ Everything is synthesised in the browser (`src/audio.js`), no audio files:
   material's surface with `surface:` in their materials list.
 - **Music stings** for the match starting, the last minute (with an on-screen
   call), and the end (victory or defeat).
+- **Music** (`src/music.js`) is played live by a small step sequencer: a slow
+  menu theme, and match music in three variations that follows the fight. While
+  you're looking for one it's a pad and a bass line; shooting, getting shot or
+  gunfire close by brings in drums and an arpeggio, a lead joins when it's really
+  on, and it settles back down a few seconds after. The last minute and a planted
+  bomb push it up too. Pausing muffles it; the training range is music-free.
+- **Ambience** per map, under everything: machinery hum and distant clanks in
+  the foundry and depot, wind and water with gulls at the dockyard, birds and a
+  far bell in the cloister, high wind on the skyline and the span, heavy presses
+  and steam at the steelworks.
+- **Settings** has three volume sliders: master, music and effects.
 
 ## Rules
 
@@ -669,6 +680,7 @@ src/objectives.js     Domination, Search & Destroy and Infected: rules, zones, b
 src/medals.js         medal and achievement definitions
 src/attachments.js    Gunsmith attachments: slots, unlocks, stat changes
 src/seasonpass.js     the free season pass: themes, tiers, rewards
+src/music.js          music sequencer (menu + adaptive match music) and map ambience
 src/bolts.js          crossbow bolts (projectiles)
 src/career.js         career stats (local, part of the account)
 src/skins.js          weapon camos: patterns, unlocks, colours

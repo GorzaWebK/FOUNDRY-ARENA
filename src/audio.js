@@ -3,7 +3,9 @@
 export class AudioSys {
   constructor() {
     this.ctx = null;
-    this.volume = 0.6;
+    this.volume = 0.6; // master
+    this.musicVol = 0.5;
+    this.sfxVol = 1;
     this.muted = false;
     this.lx = 0; this.ly = 0; this.lz = 0; this.lyaw = 0;
     this.voices = 0;
@@ -20,6 +22,14 @@ export class AudioSys {
       const comp = this.ctx.createDynamicsCompressor();
       comp.threshold.value = -14; comp.ratio.value = 6; comp.attack.value = 0.002; comp.release.value = 0.12;
       this.master.connect(comp).connect(this.ctx.destination);
+      // two channels into the master: effects (everything in the game) and music
+      this.sfx = this.ctx.createGain();
+      this.sfx.gain.value = this.sfxVol;
+      this.sfx.connect(this.master);
+      this.music = this.ctx.createGain();
+      this.music.gain.value = this.musicVol;
+      this.music.connect(this.master);
+      if (this.onReady) this.onReady();
       const len = this.ctx.sampleRate;
       this.noiseBuf = this.ctx.createBuffer(1, len, len);
       const d = this.noiseBuf.getChannelData(0);
@@ -71,12 +81,22 @@ export class AudioSys {
     this.verb.buffer = ir;
     this.verbIn = ctx.createGain();
     this.verbIn.gain.value = 0.55;
-    this.verbIn.connect(this.verb).connect(this.master);
+    this.verbIn.connect(this.verb).connect(this.sfx);
   }
 
   setVolume(v) {
     this.volume = v;
     if (this.master) this.master.gain.value = v;
+  }
+
+  setMusicVolume(v) {
+    this.musicVol = v;
+    if (this.music) this.music.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05);
+  }
+
+  setSfxVolume(v) {
+    this.sfxVol = v;
+    if (this.sfx) this.sfx.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05);
   }
 
   /**
@@ -121,7 +141,7 @@ export class AudioSys {
   // --- building blocks -----------------------------------------------------
 
   /** Output node for a sound at `pos` (or centred if null). Returns null if inaudible. */
-  _out(pos, vol, refDist = 9, verb = 0) {
+  _out(pos, vol, refDist = 9, verb = 0, bus = null) {
     const ctx = this.ctx;
     let gain = vol, pan = 0, lp = 0, d = 0;
     if (pos) {
@@ -155,7 +175,7 @@ export class AudioSys {
       p.pan.value = pan;
       node.connect(p); node = p;
     }
-    node.connect(this.master);
+    node.connect(bus || this.sfx);
     return g;
   }
 
@@ -523,7 +543,7 @@ export class AudioSys {
       // ---- music stings: synthesised, a couple of seconds each, foundry flavoured
       case 'sting-start': {
         // two drum hits, an anvil strike, and a rising open fifth
-        const o = this._out(null, 0.42 * vol); if (!o) return;
+        const o = this._out(null, 0.42 * vol * 2, 9, 0, this.music); if (!o) return;
         this._drum(o, t, 0.9, 60);
         this._drum(o, t + 0.28, 0.9, 60);
         this._clang(o, t + 0.56, 880, 1.4, 0.22);
@@ -533,7 +553,7 @@ export class AudioSys {
       }
       case 'sting-minute': {
         // a clock-tick pulse under a tense, close-voiced pad
-        const o = this._out(null, 0.4 * vol); if (!o) return;
+        const o = this._out(null, 0.4 * vol * 2, 9, 0, this.music); if (!o) return;
         for (let i = 0; i < 6; i++) {
           this._noise(o, t + i * 0.25, 0.03, 'bandpass', i % 2 ? 2400 : 3200, 8, 0.5);
           if (i % 2 === 0) this._drum(o, t + i * 0.25, 0.55, 58);
@@ -543,7 +563,7 @@ export class AudioSys {
         break;
       }
       case 'sting-win': {
-        const o = this._out(null, 0.45 * vol); if (!o) return;
+        const o = this._out(null, 0.45 * vol * 2, 9, 0, this.music); if (!o) return;
         this._drum(o, t, 1.0, 55);
         this._clang(o, t, 1046, 1.6, 0.2);
         this._pad(o, t, [131, 196, 262, 330], 1.2, 0.16, [500, 3200]);
@@ -553,7 +573,7 @@ export class AudioSys {
         break;
       }
       case 'sting-lose': {
-        const o = this._out(null, 0.42 * vol); if (!o) return;
+        const o = this._out(null, 0.42 * vol * 2, 9, 0, this.music); if (!o) return;
         this._drum(o, t, 0.9, 50);
         this._pad(o, t, [110, 131, 165], 1.3, 0.15, [300, 1500]);
         this._pad(o, t + 1.1, [87, 104, 131], 2.4, 0.15, [250, 1000]);

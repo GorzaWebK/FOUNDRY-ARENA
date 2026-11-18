@@ -10,7 +10,9 @@ const KEY = 'foundry-arena-settings-v3';
 export const DEFAULTS = {
   sensitivity: 1.0,
   fov: 95, // horizontal, degrees (at 16:9)
-  volume: 0.6,
+  volume: 0.6, // master
+  musicVolume: 0.5,
+  sfxVolume: 1,
   botCount: 5,
   bots: true,
   difficulty: 'normal',
@@ -53,6 +55,7 @@ export function loadSettings() {
   s.sensitivity = Math.min(3, Math.max(0.1, s.sensitivity));
   s.fov = Math.min(120, Math.max(70, s.fov));
   s.volume = Math.min(1, Math.max(0, s.volume));
+  for (const k of ['musicVolume', 'sfxVolume']) s[k] = typeof s[k] === 'number' && Number.isFinite(s[k]) ? Math.min(1, Math.max(0, s[k])) : DEFAULTS[k];
   s.botCount = Math.min(10, Math.max(1, Math.round(s.botCount)));
   if (!['easy', 'normal', 'hard', 'veteran'].includes(s.difficulty)) s.difficulty = 'normal';
   if (!['high', 'low'].includes(s.quality)) s.quality = 'high';
@@ -120,7 +123,9 @@ export function buildSettingsUI(container, settings, onChange) {
   const rows = [
     { key: 'sensitivity', label: 'Sensitivity', min: 0.1, max: 3, step: 0.05, fmt: (v) => v.toFixed(2) },
     { key: 'fov', label: 'Field of view', min: 70, max: 120, step: 1, fmt: (v) => v + '°' },
-    { key: 'volume', label: 'Volume', min: 0, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' },
+    { key: 'volume', label: 'Master volume', min: 0, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' },
+    { key: 'musicVolume', label: 'Music', min: 0, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' },
+    { key: 'sfxVolume', label: 'Effects', min: 0, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' },
     { key: 'quality', label: 'Graphics', options: [['high', 'High'], ['low', 'Low (faster)']] },
     { key: 'killcam', label: 'Kill cam', check: true },
     { key: 'teamPalette', label: 'Team colours', options: [['standard', 'Standard: blue / red'], ['deutan', 'Red-green colour-blind: blue / orange'], ['tritan', 'Blue-yellow colour-blind: cyan / pink'], ['contrast', 'High contrast: blue / yellow']] },
