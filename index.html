@@ -117,8 +117,10 @@
           </section>
           <section class="card">
             <h4 class="h-with-btn">Loadout <button id="btn-skins" class="link-btn">Weapon skins…</button></h4>
-            <div id="menu-loadout" class="loadout"></div>
-            <p class="note">Every kit carries a pistol, two frags and your pick of flash or smoke.</p>
+            <div id="menu-loadout" class="loadout compact"></div>
+            <p id="loadout-blurb" class="note loadout-blurb"></p>
+            <div id="menu-kit" class="loadout compact kit"></div>
+            <p class="note">Sidearm and flash or smoke on the bottom row. Every kit carries two frags.</p>
           </section>
           <div class="col-stack">
           <section class="card">
@@ -200,7 +202,7 @@
         </div>
         <h4 class="h-with-btn">Loadout <small>next spawn</small> <button id="btn-skins-pause" class="link-btn">Weapon skins…</button></h4>
         <div id="pause-loadout" class="loadout compact"></div>
-        <div id="pause-tac" class="loadout compact tac"></div>
+        <div id="pause-tac" class="loadout compact kit"></div>
         <p id="loadout-note" class="note"></p>
         <h4>Settings</h4>
         <div id="pause-settings"></div>
@@ -283,7 +285,7 @@
         <div id="career-stats" class="c-page">
           <div id="career-grid" class="career-grid"></div>
           <h4>Kills and skins by weapon</h4>
-          <table class="career-weapons"><thead><tr><th class="l">Weapon</th><th>Kills</th><th class="l prog-h">Skins <small>camos at 50 kills, Gold at level 20 and 150, Diamond with Gold on all six</small></th></tr></thead><tbody id="career-weapons"></tbody></table>
+          <table class="career-weapons"><thead><tr><th class="l">Weapon</th><th>Kills</th><th class="l prog-h">Skins <small>camos at 50 kills, Gold at level 20 and 150, Diamond with Gold on the first six guns</small></th></tr></thead><tbody id="career-weapons"></tbody></table>
         </div>
         <div id="career-medals" class="c-page hidden"><div id="medal-grid" class="medal-grid"></div></div>
         <div id="career-achs" class="c-page hidden"><div id="ach-list" class="ach-list"></div></div>

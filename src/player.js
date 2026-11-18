@@ -37,6 +37,7 @@ export class Player extends Character {
 
   spawnAt(x, y, z, yaw) {
     this.primary = this.game.settings.primary; // loadout choices apply on (re)spawn
+    this.secondary = this.game.settings.secondary;
     this.tacId = this.game.settings.tactical;
     this.game.applyOwnSkins();
     super.spawnAt(x, y, z, yaw);
@@ -259,6 +260,7 @@ export class Player extends Character {
         || this.switchT > 0 || this.meleeT > 0 || !!this.cook,
       cooking: !!this.cook,
       unarmed: !!(g.obj && g.obj.noGuns && g.obj.noGuns(this)),
+      mag: this.weapon.mag,
     });
   }
 

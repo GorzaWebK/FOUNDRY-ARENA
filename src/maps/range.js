@@ -97,9 +97,12 @@ export default {
     { kind: 'popup', pos: [14.5, 0, -8] },
   ],
   stands: [
+    { weapon: 'burst', pos: [-20, 0, 12] },
     { weapon: 'rifle', pos: [-16, 0, 12] },
     { weapon: 'smg', pos: [-12, 0, 12] },
     { weapon: 'shotgun', pos: [-8, 0, 12] },
+    { weapon: 'dmr', pos: [-4, 0, 12] },
+    { weapon: 'crossbow', pos: [4, 0, 12] },
     { weapon: 'sniper', pos: [8, 0, 12] },
     { weapon: 'lmg', pos: [12, 0, 12] },
   ],

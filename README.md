@@ -326,8 +326,9 @@ Skins show on your gun in first person and on your character, other players
 see them in multiplayer, and some bots run camos too.
 
 Two mastery camos sit on top: **Gold** for a gun once you're level 20 (or have
-prestiged) and have 150 kills with it, and **Diamond** (for any gun) once every
-gun has Gold. Both cover the whole gun, metal included, and shine.
+prestiged) and have 150 kills with it, and **Diamond** (for any gun) once the
+pistol, rifle, SMG, shotgun, sniper and LMG all have Gold (the newer guns don't
+count towards it, so nobody loses a Diamond they had). Both cover the whole gun, metal included, and shine.
 
 ### Your account
 
@@ -360,7 +361,11 @@ still spread apart to show your current accuracy.
 | Shotgun       | 6 / 24        | 8 × 10  | wide spread, falls off quickly with distance         |
 | Sniper rifle  | 3 / 21        | 80      | bolt action; scoped shots are pinpoint, hip fire is not |
 | LMG           | 60 / 120      | 17      | huge belt, heavy: slower movement, long reload       |
-| Pistol        | 12 / ∞        | 25      | everyone's sidearm                                   |
+| Burst rifle   | 30 / 90       | 20 × 3  | each trigger pull fires a three-round burst; red-dot sight |
+| Marksman rifle| 12 / 48       | 42      | semi-auto with a low-power optic (a wide scope view with a chevron): three body shots or a head and a body |
+| Crossbow      | 1 / 14        | 110     | fires a real bolt that flies at 85 m/s and drops, so lead moving targets and aim a touch high at range. One hit kills. Almost silent (bots barely hear it); bolts stick in walls |
+| Pistol        | 12 / ∞        | 25      | the standard sidearm                                 |
+| Revolver      | 6 / ∞         | 52      | the other sidearm: slow and heavy, two body shots up close |
 | Grenade       | 2 (max 3)     | up to 130 | 2.3 s fuse, bounces, 7.5 m blast; walls block it; hurts you too |
 | Flashbang     | 2             | —       | 1.6 s fuse; whites out the game view (your HUD stays visible on top) and muffles sound for up to 3.6 s for anyone who can see it (much less if they're facing away). Bots lose track of you while blinded |
 | Smoke         | 2             | —       | 1.2 s fuse; a 4.6 m cloud for 15 s that nobody (bots included) can see through. Bullets still go through it |
@@ -375,10 +380,14 @@ feet.
 Every gun is modelled in detail (rails, sights, scopes, moving slides, pumps and
 bolts), with hand-animated reloads, ejected casings, barrel smoke after sustained
 fire and a muzzle flash that lights up your hands. Other players carry the gun
-they are actually using: the primary in their hands with the pistol holstered on
-the hip, or the pistol out with the primary slung across their back.
+they are actually using: the primary in their hands with the sidearm holstered on
+the hip, or the sidearm out with the primary slung across their back.
 
-All guns are hitscan, and reload by themselves when the magazine runs dry. Headshots deal 2×. Damage falls off with distance. Moving,
+**Loadout:** pick one of eight primaries, a sidearm (pistol or revolver) and a
+tactical (flashbang or smoke) on the main menu, or from the pause menu for your
+next spawn. Snipers Only always gives the pistol.
+
+Every gun but the crossbow is hitscan, and reloads by themselves when the magazine runs dry. Headshots deal 2×. Damage falls off with distance. Moving,
 jumping and holding the trigger widen the cone; crouching and aiming tighten it.
 
 ## Maps

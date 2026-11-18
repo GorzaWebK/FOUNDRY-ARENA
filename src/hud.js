@@ -136,6 +136,7 @@ export class Hud {
     const haze = game.smokes.density(cam.x, cam.y, cam.z);
     this._set('haze', Math.round(haze * 40), (v) => { e.haze.style.opacity = (v / 40) * 0.88; });
     this._set('scope', p.alive && p.scoped, (v) => e.scope.classList.toggle('hidden', !v));
+    this._set('scopeLow', w.def.scope === 'low', (v) => e.scope.classList.toggle('low', v)); // marksman: a wider, lighter view
     this._set('knife', p.knifeT > 0, (v) => { $('slot-knife').classList.toggle('empty', v); });
 
     // match info

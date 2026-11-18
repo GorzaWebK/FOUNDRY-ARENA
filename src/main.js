@@ -16,7 +16,7 @@ import { MODES, getMode, makeRules, customSummary, TIME_OPTIONS, HARDCORE_HEALTH
 import RANGE_MAP from './maps/range.js';
 import { TRAINING } from './training.js';
 import { TUTORIAL } from './tutorial.js';
-import { WEAPON_BY_ID, PRIMARIES, TACTICALS, TACTICAL_BY_ID, WEAPONS as WEAPON_LIST } from './weapons.js';
+import { WEAPON_BY_ID, PRIMARIES, SECONDARIES, TACTICALS, TACTICAL_BY_ID, WEAPONS as WEAPON_LIST } from './weapons.js';
 import { loadSettings, saveSettings, buildSettingsUI } from './settings.js';
 import { AudioSys } from './audio.js';
 import { Hud } from './hud.js';
@@ -211,10 +211,8 @@ function buildLoadoutUI(container) {
     const def = WEAPON_BY_ID[id];
     const b = document.createElement('button');
     b.type = 'button';
-    b.textContent = def.name;
-    const small = document.createElement('small');
-    small.textContent = def.blurb;
-    b.append(small);
+    b.textContent = def.short || def.name;
+    b.title = def.blurb;
     b.addEventListener('click', () => {
       settings.primary = id;
       saveSettings(settings);
@@ -225,8 +223,24 @@ function buildLoadoutUI(container) {
     loadoutButtons.push([id, b]);
   }
 }
-const tacButtons = [];
+const tacButtons = [], sideButtons = [];
+/** Sidearm (pistol / revolver) and tactical (flash / smoke) on one row. */
 function buildTacUI(container) {
+  for (const id of SECONDARIES) {
+    const def = WEAPON_BY_ID[id];
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = def.name;
+    b.title = def.blurb;
+    b.addEventListener('click', () => {
+      settings.secondary = id;
+      saveSettings(settings);
+      syncLoadout();
+      if (state === 'paused') $('pause-hint').textContent = `${def.name} is ready on your next spawn.`;
+    });
+    container.append(b);
+    sideButtons.push([id, b]);
+  }
   for (const id of TACTICALS) {
     const def = TACTICAL_BY_ID[id];
     const b = document.createElement('button');
@@ -246,16 +260,13 @@ function buildTacUI(container) {
 function syncLoadout() {
   for (const [id, b] of loadoutButtons) b.classList.toggle('on', id === settings.primary);
   for (const [id, b] of tacButtons) b.classList.toggle('on', id === settings.tactical);
+  for (const [id, b] of sideButtons) b.classList.toggle('on', id === settings.secondary);
+  const d = WEAPON_BY_ID[settings.primary];
+  if (d) $('loadout-blurb').innerHTML = `<b>${d.name}</b> ${d.blurb}`;
 }
 buildLoadoutUI($('menu-loadout'));
 buildLoadoutUI($('pause-loadout'));
-{
-  // main menu: the flashbang / smoke pick sits in the spare grid cell beside the LMG
-  const cell = document.createElement('div');
-  cell.className = 'tac-cell';
-  $('menu-loadout').append(cell);
-  buildTacUI(cell);
-}
+buildTacUI($('menu-kit'));
 buildTacUI($('pause-tac'));
 syncLoadout();
 

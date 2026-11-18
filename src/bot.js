@@ -36,7 +36,7 @@ const _d = new THREE.Vector3();
 const _e2 = new THREE.Vector3();
 
 // what bots like to carry (weights)
-const PRIMARY_WEIGHTS = [['rifle', 34], ['smg', 24], ['shotgun', 16], ['lmg', 14], ['sniper', 12]];
+const PRIMARY_WEIGHTS = [['rifle', 26], ['burst', 12], ['smg', 22], ['shotgun', 14], ['dmr', 10], ['lmg', 12], ['sniper', 10], ['crossbow', 5]];
 function rollPrimary() {
   let r = Math.random() * 100;
   for (const [id, w] of PRIMARY_WEIGHTS) { r -= w; if (r <= 0) return id; }
@@ -65,6 +65,7 @@ export class Bot extends Character {
       react: rand(0.85, 1.2),
       headBias: rand(0.5, 1.2),
       favorite: rollPrimary(), // each bot has a go-to gun, but mixes it up
+      revolver: Math.random() < 0.3, // and a sidearm
     };
     this.goal = new THREE.Vector3();
     this.spot = new THREE.Vector3();
@@ -118,10 +119,11 @@ export class Bot extends Character {
 
   spawnAt(x, y, z, yaw) {
     this.primary = Math.random() < 0.7 ? this.pers.favorite : rollPrimary();
+    this.secondary = this.pers.revolver ? 'revolver' : 'pistol';
     this.tacId = TACTICALS[(Math.random() * TACTICALS.length) | 0];
     // some bots run a camo or two
     this.skins = {};
-    for (const id of [this.primary, 'pistol']) if (Math.random() < 0.3) this.skins[id] = COMMON_SKINS[(Math.random() * COMMON_SKINS.length) | 0].id;
+    for (const id of [this.primary, this.secondary]) if (Math.random() < 0.3) this.skins[id] = COMMON_SKINS[(Math.random() * COMMON_SKINS.length) | 0].id;
     super.spawnAt(x, y, z, yaw);
     this.resetAI();
     this.lastStuckPos.copy(this.pos);
@@ -1154,10 +1156,14 @@ export class Bot extends Character {
       const track = Math.min(1, this.trackTime / skill.trackTime);
       // aim centre drifts from chest towards the head as the bot settles in
       const hb = clamp(skill.headBias * this.pers.headBias * track, 0, 1);
-      const lead = 0.14; // seconds of target motion to lead by (incl. our own tracking lag)
+      // seconds of target motion to lead by (incl. our own tracking lag); a crossbow
+      // bolt's flight time on top, and aim up for the drop
+      const pj = this.weapon.def.projectile;
+      const fly = pj ? Math.hypot(t.pos.x - this.pos.x, t.pos.z - this.pos.z) / pj.speed : 0;
+      const lead = 0.14 + fly;
       _t.set(
         t.pos.x + t.vel.x * lead,
-        t.pos.y + t.height * (0.6 + 0.3 * hb) + t.vel.y * lead * 0.4,
+        t.pos.y + t.height * (0.6 + 0.3 * hb) + t.vel.y * lead * 0.4 + (pj ? 0.5 * pj.gravity * fly * fly : 0),
         t.pos.z + t.vel.z * lead,
       );
       _d.subVectors(_t, _eye);

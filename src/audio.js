@@ -416,6 +416,33 @@ export class AudioSys {
         this._noise(o, t + 0.83, 0.03, 'bandpass', 3000, 6, 0.2);
         break;
       }
+      case 'burst': {
+        this._shot(pos, 0.8 * vol, 13, { crack: [3500, 0.02, 0.95], body: [1300, 0.8, 0.09, 1.0], low: [185, 60, 0.08, 0.7], sub: [100, 42, 0.06, 0.3], tail: [0.2, 560, 0.26], mech: [[0.03, 2400, 6, 0.16]] });
+        break;
+      }
+      case 'dmr': {
+        const o = this._shot(pos, 0.95 * vol, 17, { crack: [3000, 0.035, 1.15], body: [1200, 0.6, 0.2, 1.1], low: [160, 44, 0.18, 0.95], sub: [80, 32, 0.14, 0.5], tail: [0.5, 440, 0.35], verb: 1.3 });
+        if (!o) return;
+        this._noise(o, t + 0.06, 0.04, 'bandpass', 2600, 5, 0.18); // the action cycling
+        break;
+      }
+      case 'revolver': {
+        const o = this._shot(pos, 1.0 * vol, 15, { crack: [3000, 0.04, 1.15], body: [1100, 0.7, 0.2, 1.15], low: [190, 50, 0.16, 1.0], sub: [85, 34, 0.12, 0.5], tail: [0.45, 500, 0.35], verb: 1.2 });
+        if (!o) return;
+        this._tone(o, t + 0.3, 0.03, 'square', 900, 700, 0.06); // the cylinder turning
+        this._noise(o, t + 0.3, 0.025, 'bandpass', 4200, 6, 0.15);
+        break;
+      }
+      case 'crossbow': {
+        // a thwack and a twang: string slap, then the limbs ringing
+        const o = this._out(pos, 0.55 * vol, 6, 0.35); if (!o) return;
+        this._noise(o, t, 0.035, 'bandpass', 1800, 2, 0.9);
+        this._tone(o, t, 0.06, 'triangle', 320, 140, 0.5);
+        this._tone(o, t + 0.005, 0.28, 'sine', 196, 180, 0.22);
+        this._tone(o, t + 0.005, 0.22, 'sine', 392, 370, 0.08);
+        this._noise(o, t + 0.02, 0.18, 'highpass', 5000, 0.6, 0.12, 0.05); // the bolt whistling off
+        break;
+      }
       case 'lmg': {
         this._shot(pos, 0.75 * vol, 14, { crack: [2900, 0.025, 0.95], body: [950, 0.65, 0.13, 1.05], low: [135, 44, 0.12, 0.8], sub: [80, 34, 0.1, 0.5], tail: [0.3, 450, 0.36], mech: [[0.04, 1700, 5, 0.22], [0.06, 3200, 7, 0.12]], verb: 1.1 });
         break;

@@ -22,7 +22,7 @@
 
 import { CFG, HUMAN_COLORS, MAX_HUMANS } from './config.js';
 import * as THREE from 'three';
-import { WEAPONS, WEAPON_BY_ID, KNIFE, GRENADE, NADES, TACTICALS, TACTICAL_BY_ID, isPrimary, damageAtDistance } from './weapons.js';
+import { WEAPONS, WEAPON_BY_ID, KNIFE, GRENADE, NADES, TACTICALS, TACTICAL_BY_ID, isPrimary, isSecondary, damageAtDistance } from './weapons.js';
 import { getMap } from './maps/index.js';
 import { buildMap, cleanSpec, registerMap } from './mapspec.js';
 import { getMode, makeRules, TEAM_COLORS } from './modes.js';
@@ -404,6 +404,7 @@ export class Net {
     c.lastSeen = performance.now();
     if (m.t === 'u') this._hostState(c, m.d);
     else if (m.t === 'f') this._hostFire(c, m);
+    else if (m.t === 'bo') this._hostBolt(c, m);
     else if (m.t === 'g') this._hostGrenade(c, m);
     else if (m.t === 'k') this._hostKnife(c, m);
     else if (m.t === 'vote') this._vote(c.id, m.i);
@@ -510,23 +511,59 @@ export class Net {
     c.netGround = !!(d[5] & 8);
     c.netLean = clamp(d[9], -1, 1);
     // their loadout: mirrored so pickups know what this player could use
-    const prim = WEAPONS[d[10] | 0];
+    const prim = WEAPONS[d[10] | 0], side = num(d[14]) ? WEAPONS[d[14] | 0] : null;
     const g = this.game;
-    if (prim && isPrimary(prim.id) && prim.id !== c.primary) {
-      c.primary = prim.id;
+    const newSide = side && isSecondary(side.id) && side.id !== c.secondary;
+    if ((prim && isPrimary(prim.id) && prim.id !== c.primary) || newSide) {
+      if (prim && isPrimary(prim.id)) c.primary = prim.id;
+      if (newSide) c.secondary = side.id;
       if (!g.rules.gunGame) c.weapons = g.loadoutFor(c);
     }
     c.weaponIdx = Math.min(c.weapons.length - 1, (d[6] | 0) === c.weapons[0].def.index ? 0 : 1);
     if (!g.rules.gunGame) c.weapons[0].reserve = clamp(d[7] | 0, 0, c.weapons[0].def.reserveMax);
     // their weapon skins (cosmetic, so taken at their word)
     if (num(d[12]) && num(d[13]) && SKINS[d[12] | 0] && SKINS[d[13] | 0]) {
-      c.skins = { [c.weapons[0].def.id]: SKINS[d[12] | 0].id, pistol: SKINS[d[13] | 0].id };
+      c.skins = { [c.weapons[0].def.id]: SKINS[d[12] | 0].id, [c.weapons[c.weapons.length - 1].def.id]: SKINS[d[13] | 0].id };
     }
     const tac = TACTICALS[d[11] | 0];
     if (num(d[11]) && tac && tac !== c.tacId) {
       c.tacId = tac;
       c.tacDef = TACTICAL_BY_ID[tac];
     }
+  }
+
+  /** A remote player loosed a crossbow bolt: the host flies the real one, others see a copy. */
+  _hostBolt(c, m) {
+    const g = this.game;
+    if (!c.alive || g.over) return;
+    const def = WEAPONS[m.w];
+    if (!def || !def.projectile || !Array.isArray(m.o) || !Array.isArray(m.d) || !m.o.every(num) || !m.d.every(num)) return;
+    const now = performance.now() / 1000;
+    if (now - c.lastFireT < def.interval * 0.6) return;
+    c.lastFireT = now;
+    c.weaponIdx = 0;
+    c.protectedUntil = 0;
+    const l = Math.hypot(m.d[0], m.d[1], m.d[2]);
+    if (l < 0.5) return;
+    // from where they said, if that's close to where we have them
+    c.getEye(_eye);
+    const o = Math.hypot(m.o[0] - _eye.x, m.o[1] - _eye.y, m.o[2] - _eye.z) < 2.5 ? m.o : [_eye.x, _eye.y, _eye.z];
+    g.bolts.fire(c, def, o[0], o[1], o[2], m.d[0] / l, m.d[1] / l, m.d[2] / l, true);
+    this.broadcast({ t: 'bo', id: c.id, w: def.index, o: o.map(r2), d: [r3(m.d[0] / l), r3(m.d[1] / l), r3(m.d[2] / l)] }, c.conn);
+    g.audio.play(def.id, c.pos);
+    g.emitNoise(c.pos.x, c.pos.y, c.pos.z, def.noise, c, 'shot');
+  }
+
+  /** Host: our own (or a bot's) bolt, for everyone to see. */
+  onBolt(shooter, def, o, d) {
+    if (!this.game.remotes.some((r) => r.conn)) return;
+    this.broadcast({ t: 'bo', id: shooter.id, w: def.index, o: [r2(o.x), r2(o.y), r2(o.z)], d: [r3(d.x), r3(d.y), r3(d.z)] });
+  }
+
+  /** Client: we loosed a bolt. */
+  sendBolt(def, o, d) {
+    if (!this.conn) return;
+    this.conn.send({ t: 'bo', w: def.index, o: [r2(o.x), r2(o.y), r2(o.z)], d: [r3(d.x), r3(d.y), r3(d.z)] });
   }
 
   /** A remote player fired. Relay the visuals and check their hit claims. */
@@ -536,9 +573,9 @@ export class Net {
     const def = WEAPONS[m.w];
     if (!def || !Array.isArray(m.m) || !m.m.every(num)) return;
     const now = performance.now() / 1000;
-    if (now - c.lastFireT < def.interval * 0.6) return; // faster than the gun can shoot
+    if (now - c.lastFireT < (def.burst ? def.burstGap : def.interval) * 0.6) return; // faster than the gun can shoot
     c.lastFireT = now;
-    c.weaponIdx = def.id === 'pistol' ? 1 : 0;
+    c.weaponIdx = def.sidearm || def.id === 'pistol' ? Math.min(1, c.weapons.length - 1) : 0;
     c.protectedUntil = 0;
 
     const ends = [];
@@ -585,8 +622,8 @@ export class Net {
       (ch.alive ? 1 : 0) | (ch.crouching ? 2 : 0) | (ch.isProtected() ? 4 : 0) | (ch.onGround ? 8 : 0),
       Math.max(0, Math.round(ch.health * 10) / 10), Math.round(ch.armor * 10) / 10,
       ch.kills, ch.deaths, ch.weapon.def.index, r2(ch.lean), ch.lives,
-      ch.weapons[0].def.index, ch.weapons.length > 1 ? 1 : 0, Math.round(ch.hillTime || 0), ch.caps || 0,
-      skinIndex(ch.skinOf(ch.weapons[0].def.id)), skinIndex(ch.skinOf('pistol')),
+      ch.weapons[0].def.index, ch.weapons.length > 1 ? 1 + ch.weapons[1].def.index : 0, Math.round(ch.hillTime || 0), ch.caps || 0,
+      skinIndex(ch.skinOf(ch.weapons[0].def.id)), skinIndex(ch.skinOf(ch.weapons.length > 1 ? ch.weapons[1].def.id : 'pistol')),
       ch === g.player ? 0 : ch.isHuman ? (ch.ping ?? -2) : -1, // -2: not measured yet
     ]);
     let p = '';
@@ -775,6 +812,14 @@ export class Net {
       case 'shot':
         if (m.id !== p.id) this.showShot(m);
         break;
+      case 'bo': {
+        // someone else's crossbow bolt (looks only: the host's copy does the damage)
+        const def = WEAPONS[m.w], c = g.charById(m.id);
+        if (!def || !def.projectile || !c || c === p || !Array.isArray(m.o) || !Array.isArray(m.d) || !m.o.every(num) || !m.d.every(num)) break;
+        g.bolts.fire(c, def, m.o[0], m.o[1], m.o[2], m.d[0], m.d[1], m.d[2], false);
+        g.audio.play(def.id, c.pos);
+        break;
+      }
       case 'kill': {
         const victim = g.charById(m.v);
         if (!victim || !victim.alive) break;
@@ -921,7 +966,7 @@ export class Net {
         if (num(skinS)) c.netSkinS = skinS | 0;
         if (num(held)) c.netHeld = held | 0;
         if (num(prim)) c.netPrim = prim | 0;
-        if (num(side)) c.netSide = !!side;
+        if (num(side)) c.netSide = side | 0; // 0: no sidearm, else 1 + its weapon index
       }
     }
     if (typeof m.p === 'string') {
@@ -944,7 +989,8 @@ export class Net {
         (p.crouching ? 2 : 0) | (p.onGround ? 8 : 0),
         p.weapon.def.index, p.weapons[0].reserve === Infinity ? 0 : p.weapons[0].reserve, this.mySeq,
         r2(p.lean), WEAPON_BY_ID[p.primary].index, Math.max(0, TACTICALS.indexOf(p.tacId)),
-        skinIndex(p.skinOf(p.weapons[0].def.id)), skinIndex(p.skinOf('pistol'))],
+        skinIndex(p.skinOf(p.weapons[0].def.id)), skinIndex(p.skinOf(p.weapons[p.weapons.length - 1].def.id)),
+        WEAPON_BY_ID[p.secondary] ? WEAPON_BY_ID[p.secondary].index : 0],
     });
   }
 

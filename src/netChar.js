@@ -35,7 +35,7 @@ export class NetChar extends Character {
     this.netLean = 0;
     this.netHeld = 1; // weapon indices from the host's snapshot (clients only)
     this.netPrim = 1;
-    this.netSide = true;
+    this.netSide = 1; // 1 + the sidearm's weapon index (0 = none)
     this.netSkinP = 0; // skin indices (primary, pistol) from snapshots
     this.netSkinS = 0;
   }
@@ -48,9 +48,10 @@ export class NetChar extends Character {
     const held = (WEAPONS[this.netHeld] || WEAPONS[1]).id;
     const prim = (WEAPONS[this.netPrim] || WEAPONS[1]).id;
     const skinP = (SKINS[this.netSkinP] || SKINS[0]).id, skinS = (SKINS[this.netSkinS] || SKINS[0]).id;
-    const sk = (id) => (id === 'pistol' && prim !== 'pistol' ? skinS : skinP);
-    if (!this.netSide) return [held, null, null, sk(held), 'none'];
-    return held === 'pistol' && prim !== 'pistol' ? [held, prim, 'back', skinS, skinP] : [held, 'pistol', 'hip', sk(held), skinS];
+    const side = this.netSide ? (WEAPONS[this.netSide - 1] || WEAPONS[0]).id : null;
+    const sk = (id) => (id === side && prim !== side ? skinS : skinP);
+    if (!side) return [held, null, null, sk(held), 'none'];
+    return held === side && prim !== side ? [held, prim, 'back', skinS, skinP] : [held, side, 'hip', sk(held), skinS];
   }
 
   /** Host: (re)spawn this remote player. */

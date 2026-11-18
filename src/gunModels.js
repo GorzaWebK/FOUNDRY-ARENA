@@ -318,7 +318,133 @@ function lmg(mats) {
   };
 }
 
-const BUILDERS = { pistol, rifle, smg, shotgun, sniper, lmg };
+function burst(mats) {
+  // a bullpup: the magazine sits behind the grip, so it's short for a rifle
+  const k = kit(mats), g = new THREE.Group();
+  k.box(g, 0.056, 0.08, 0.5, 'polymerLight', 0, -0.002, 0.04); // one-piece shell
+  k.box(g, 0.058, 0.02, 0.32, 'polymer', 0, -0.05, 0.12); // lower edge
+  k.box(g, 0.06, 0.012, 0.09, 'cyan', 0, 0.02, -0.12); // accent
+  k.rail(g, 0.3, 0, 0.046, -0.02);
+  k.box(g, 0.05, 0.05, 0.16, 'polymer', 0, 0.004, -0.27); // handguard
+  k.cyl(g, 0.011, 0.14, 'metal', 0, 0.006, -0.39);
+  k.cyl(g, 0.016, 0.05, 'metal', 0, 0.006, -0.47, 8); // flash hider
+  // red-dot sight on the rail: an open frame you look through, and the dot
+  k.box(g, 0.028, 0.012, 0.05, 'metal', 0, 0.058, -0.02);
+  k.box(g, 0.004, 0.04, 0.03, 'metal', -0.016, 0.082, -0.03);
+  k.box(g, 0.004, 0.04, 0.03, 'metal', 0.016, 0.082, -0.03);
+  k.box(g, 0.036, 0.005, 0.03, 'metal', 0, 0.102, -0.03);
+  k.box(g, 0.0045, 0.0045, 0.002, 'red', 0, 0.083, -0.044);
+  const charge = k.box(g, 0.012, 0.016, 0.03, 'metal', -0.032, 0.02, -0.16); // side charging handle
+  k.box(g, 0.03, 0.09, 0.042, 'polymer', 0, -0.085, -0.07, -0.25); // grip
+  k.guard(g, -0.14, -0.06, -0.048, -0.075);
+  k.box(g, 0.05, 0.085, 0.02, 'polymer', 0, -0.006, 0.3); // butt pad
+  const mag = k.group(g, 0, -0.05, 0.1);
+  k.box(mag, 0.028, 0.12, 0.06, 'metal', 0, -0.05, 0, 0.12);
+  k.box(mag, 0.032, 0.012, 0.064, 'polymer', 0, -0.11, 0.007, 0.12);
+  return {
+    group: g, parts: { mag, charge }, casing: 'brass',
+    points: {
+      muzzle: V(0, 0.006, -0.5), eject: V(0.03, 0.01, 0.12), sight: V(0, 0.083, 0),
+      grip: V(0, -0.08, -0.06), fore: V(0, -0.025, -0.26), magwell: V(0, -0.05, 0.1), center: V(0, 0, -0.06),
+    },
+  };
+}
+
+function dmr(mats) {
+  const k = kit(mats), g = new THREE.Group();
+  k.box(g, 0.05, 0.055, 0.3, 'metal', 0, 0.012, -0.01); // receiver
+  k.box(g, 0.054, 0.056, 0.34, 'tan', 0, -0.006, -0.32); // long handguard
+  for (let i = 0; i < 5; i++) k.box(g, 0.056, 0.01, 0.026, 'polymer', 0, 0.006, -0.44 + i * 0.055);
+  k.cyl(g, 0.012, 0.3, 'metal', 0, 0.01, -0.62);
+  k.cyl(g, 0.018, 0.07, 'metal', 0, 0.01, -0.8, 8); // brake
+  k.rail(g, 0.3, 0, 0.044, -0.06);
+  // low-power scope
+  k.cyl(g, 0.016, 0.2, 'polymer', 0, 0.078, -0.03, 12);
+  k.cone(g, 0.024, 0.016, 0.06, 'polymer', 0, 0.078, -0.16);
+  k.cyl(g, 0.0235, 0.004, 'glass', 0, 0.078, -0.192, 12);
+  k.cone(g, 0.016, 0.02, 0.04, 'polymer', 0, 0.078, 0.09);
+  k.box(g, 0.02, 0.028, 0.018, 'metal', 0, 0.056, -0.09);
+  k.box(g, 0.02, 0.028, 0.018, 'metal', 0, 0.056, 0.04);
+  const charge = k.box(g, 0.03, 0.012, 0.02, 'metal', 0, 0.042, 0.13);
+  k.box(g, 0.03, 0.09, 0.045, 'polymer', 0, -0.08, 0.1, -0.3); // grip
+  k.guard(g, 0.0, 0.085, -0.045, -0.072);
+  k.box(g, 0.042, 0.06, 0.2, 'tan', 0, -0.01, 0.24); // stock
+  k.box(g, 0.042, 0.03, 0.1, 'tan', 0, 0.034, 0.25); // cheek riser
+  k.box(g, 0.044, 0.085, 0.02, 'polymer', 0, -0.014, 0.35);
+  const mag = k.group(g, 0, -0.04, -0.05);
+  k.box(mag, 0.03, 0.08, 0.07, 'metal', 0, -0.04, 0, 0.05);
+  k.box(mag, 0.034, 0.012, 0.074, 'polymer', 0, -0.082, 0.002, 0.05);
+  return {
+    group: g, parts: { mag, charge }, casing: 'brass',
+    points: {
+      muzzle: V(0, 0.01, -0.84), eject: V(0.03, 0.02, -0.01), sight: V(0, 0.078, 0),
+      grip: V(0, -0.075, 0.11), fore: V(0, -0.03, -0.32), magwell: V(0, -0.04, -0.05), center: V(0, 0, -0.16),
+    },
+  };
+}
+
+function crossbow(mats) {
+  const k = kit(mats), g = new THREE.Group();
+  k.box(g, 0.04, 0.05, 0.56, 'woodDark', 0, -0.01, -0.12); // stock / rail body
+  k.box(g, 0.012, 0.008, 0.46, 'metal', 0, 0.018, -0.16); // the bolt's groove
+  // the bow: two limbs swept back from the front, and the string between their tips
+  const lim = (side) => {
+    k.box(g, 0.24, 0.022, 0.03, 'polymer', side * 0.13, 0.004, -0.38, 0, side * 0.32, 0);
+    k.box(g, 0.02, 0.026, 0.03, 'metalLight', side * 0.245, 0.004, -0.31); // cam
+  };
+  lim(1); lim(-1);
+  k.box(g, 0.07, 0.05, 0.05, 'metal', 0, 0.0, -0.4); // riser
+  k.box(g, 0.49, 0.004, 0.004, 'white', 0, 0.006, -0.12); // string (drawn)
+  k.box(g, 0.06, 0.02, 0.06, 'metal', 0, 0.015, -0.11); // latch
+  // sight: a ring on a post
+  k.box(g, 0.006, 0.04, 0.008, 'metal', 0, 0.045, -0.3);
+  k.box(g, 0.02, 0.004, 0.008, 'orange', 0, 0.066, -0.3);
+  k.box(g, 0.024, 0.02, 0.02, 'metal', 0, 0.04, 0.05);
+  k.box(g, 0.03, 0.09, 0.045, 'wood', 0, -0.08, 0.08, -0.3); // grip
+  k.guard(g, -0.0, 0.07, -0.035, -0.065);
+  k.box(g, 0.04, 0.075, 0.18, 'wood', 0, -0.03, 0.24); // butt
+  k.box(g, 0.042, 0.085, 0.02, 'polymer', 0, -0.032, 0.335);
+  // the loaded bolt: shaft, steel tip, fletching (it's the "mag": gone once fired)
+  const mag = k.group(g, 0, 0.026, -0.2);
+  k.cyl(mag, 0.005, 0.42, 'polymerLight', 0, 0, 0, 6);
+  k.cone(mag, 0.0, 0.009, 0.04, 'metalLight', 0, 0, -0.23);
+  k.box(mag, 0.002, 0.016, 0.05, 'orange', 0, 0.008, 0.17);
+  k.box(mag, 0.016, 0.002, 0.05, 'orange', 0, 0.003, 0.17);
+  return {
+    group: g, parts: { mag }, casing: null,
+    points: {
+      muzzle: V(0, 0.026, -0.44), eject: V(0, 0.03, -0.1), sight: V(0, 0.066, 0),
+      grip: V(0, -0.075, 0.09), fore: V(0, -0.03, -0.26), magwell: V(0, 0.03, -0.2), center: V(0, 0, -0.1),
+    },
+  };
+}
+
+function revolver(mats) {
+  const k = kit(mats), g = new THREE.Group();
+  k.box(g, 0.03, 0.05, 0.11, 'metal', 0, 0.006, 0.0); // frame
+  k.cyl(g, 0.011, 0.17, 'metalLight', 0, 0.02, -0.13); // barrel
+  k.box(g, 0.012, 0.012, 0.17, 'metalLight', 0, 0.034, -0.13); // top rib
+  k.box(g, 0.006, 0.012, 0.008, 'orange', 0, 0.044, -0.205); // front blade
+  k.box(g, 0.02, 0.008, 0.012, 'metal', 0, 0.034, 0.05); // rear notch
+  k.box(g, 0.01, 0.022, 0.02, 'metal', 0, 0.032, 0.07, -0.5); // hammer
+  // the cylinder (the "mag": it swings out to reload)
+  const mag = k.group(g, 0, 0.008, -0.025);
+  k.cyl(mag, 0.024, 0.05, 'metal', 0, 0, 0, 12);
+  for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; k.box(mag, 0.004, 0.006, 0.048, 'metalLight', Math.cos(a) * 0.024, Math.sin(a) * 0.024, 0); }
+  k.box(g, 0.03, 0.1, 0.045, 'wood', 0, -0.065, 0.06, 0.32); // grip
+  k.box(g, 0.032, 0.06, 0.03, 'woodDark', 0, -0.06, 0.062, 0.32);
+  k.guard(g, -0.03, 0.03, -0.02, -0.045);
+  k.box(g, 0.006, 0.02, 0.006, 'metal', 0, -0.026, 0.0, 0.3); // trigger
+  return {
+    group: g, parts: { mag }, casing: null,
+    points: {
+      muzzle: V(0, 0.02, -0.215), eject: V(0.02, 0.02, -0.02), sight: V(0, 0.047, 0),
+      grip: V(0, -0.065, 0.065), fore: V(-0.012, -0.1, 0.055), magwell: V(0, 0.008, -0.025), center: V(0, -0.01, -0.04),
+    },
+  };
+}
+
+const BUILDERS = { pistol, rifle, smg, shotgun, sniper, lmg, burst, dmr, crossbow, revolver };
 
 /** First-person gun: separate meshes so parts can move. */
 export function buildGun(id, mats) {

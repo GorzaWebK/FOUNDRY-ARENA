@@ -1,6 +1,6 @@
 // User settings, persisted to localStorage.
 
-import { DEFAULT_PRIMARY, isPrimary, DEFAULT_TACTICAL, isTactical } from './weapons.js';
+import { DEFAULT_PRIMARY, isPrimary, DEFAULT_SECONDARY, isSecondary, DEFAULT_TACTICAL, isTactical } from './weapons.js';
 import { DEFAULT_MAP, MAPS } from './maps/index.js';
 import { DEFAULT_MODE, MODES } from './modes.js';
 import { defaultBinds, cleanBinds } from './bindings.js';
@@ -19,6 +19,7 @@ export const DEFAULTS = {
   showFps: false,
   name: '', // multiplayer display name
   primary: DEFAULT_PRIMARY, // loadout
+  secondary: DEFAULT_SECONDARY, // 'pistol' | 'revolver'
   tactical: DEFAULT_TACTICAL, // 'flash' | 'smoke'
   map: DEFAULT_MAP,
   mode: DEFAULT_MODE,
@@ -55,6 +56,7 @@ export function loadSettings() {
   if (!['easy', 'normal', 'hard', 'veteran'].includes(s.difficulty)) s.difficulty = 'normal';
   if (!['high', 'low'].includes(s.quality)) s.quality = 'high';
   if (!isPrimary(s.primary)) s.primary = DEFAULT_PRIMARY;
+  if (!isSecondary(s.secondary)) s.secondary = DEFAULT_SECONDARY;
   if (!isTactical(s.tactical)) s.tactical = DEFAULT_TACTICAL;
   if (!['auto', 'cobalt', 'crimson'].includes(s.team)) s.team = 'auto';
   if (!MAPS.some((m) => m.id === s.map)) s.map = DEFAULT_MAP;

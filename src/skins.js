@@ -7,7 +7,9 @@ import * as THREE from 'three';
 export const SKIN_KILLS = 50;
 export const GOLD_KILLS = 150; // plus level 20 (or any prestige)
 export const GOLD_LEVEL = 20;
-export const SKIN_GUNS = ['pistol', 'rifle', 'smg', 'shotgun', 'sniper', 'lmg'];
+export const SKIN_GUNS = ['pistol', 'rifle', 'smg', 'shotgun', 'sniper', 'lmg', 'burst', 'dmr', 'crossbow', 'revolver'];
+/** Diamond needs Gold on these (the six original guns, so adding guns never takes Diamond away). */
+export const DIAMOND_GUNS = ['pistol', 'rifle', 'smg', 'shotgun', 'sniper', 'lmg'];
 
 export const SKINS = [
   { id: 'none', name: 'Factory' },
@@ -132,13 +134,13 @@ export function goldUnlocked(career, progress, weaponId) {
 export function skinUnlocked(career, weaponId, id, progress = null) {
   if (id === 'none') return true;
   if (id === 'gold') return !!progress && goldUnlocked(career, progress, weaponId);
-  if (id === 'diamond') return !!progress && SKIN_GUNS.every((w) => goldUnlocked(career, progress, w));
+  if (id === 'diamond') return !!progress && DIAMOND_GUNS.every((w) => goldUnlocked(career, progress, w));
   return career.weaponKills(weaponId) >= SKIN_KILLS;
 }
 
 /** Why a skin is locked, for tooltips. */
 export function skinLockText(career, weaponId, id, progress, gunName) {
   if (id === 'gold') return `Gold: level ${GOLD_LEVEL} and ${GOLD_KILLS} ${gunName} kills (${career.weaponKills(weaponId)}/${GOLD_KILLS})`;
-  if (id === 'diamond') return 'Diamond: Gold on every gun';
+  if (id === 'diamond') return 'Diamond: Gold on the pistol, rifle, SMG, shotgun, sniper and LMG';
   return `${SKIN_BY_ID[id].name}: ${Math.max(0, SKIN_KILLS - career.weaponKills(weaponId))} more ${gunName} kills`;
 }

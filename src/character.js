@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { CFG } from './config.js';
-import { makeLoadout, SWITCH_TIME, GRENADE, KNIFE, DEFAULT_PRIMARY, DEFAULT_TACTICAL, TACTICAL_BY_ID } from './weapons.js';
+import { makeLoadout, SWITCH_TIME, GRENADE, KNIFE, DEFAULT_PRIMARY, DEFAULT_SECONDARY, DEFAULT_TACTICAL, TACTICAL_BY_ID } from './weapons.js';
 import { gunLevel } from './modes.js';
 import { hasHeadroom } from './physics.js';
 import { DEFAULT_EQUIPPED } from './cosmetics.js';
@@ -49,8 +49,9 @@ export class Character {
     this.lastHurtBy = null;
     this.lastHurtT = -99;
 
-    this.primary = DEFAULT_PRIMARY; // loadout choice, applied on (re)spawn
-    this.weapons = makeLoadout(this.primary); // [primary, pistol]
+    this.primary = DEFAULT_PRIMARY; // loadout choices, applied on (re)spawn
+    this.secondary = DEFAULT_SECONDARY;
+    this.weapons = makeLoadout(this.primary, this.secondary); // [primary, sidearm]
     this.weaponIdx = 0;
     this.switchT = 0;
     this.grenades = GRENADE.start;
@@ -162,6 +163,11 @@ export class Character {
     for (let i = 0; i < this.weapons.length; i++) {
       const w = this.weapons[i];
       if (w.cooldown > 0) w.cooldown -= dt;
+      // the rest of a burst fires by itself (unless something interrupts it)
+      if (w.burstLeft > 0) {
+        if (i !== this.weaponIdx || !this.alive || w.reloadT > 0 || this.switchT > 0 || this.meleeT > 0 || w.mag <= 0) w.burstLeft = 0;
+        else if (w.cooldown <= 0) this.fireRound(w, w.burstAds || 0);
+      }
       w.sinceShot += dt;
       if (w.sinceShot > w.def.interval + 0.08 && w.heat > 0) w.heat = Math.max(0, w.heat - w.def.heatDecay * dt);
       if (w.reloadT > 0) {
@@ -257,12 +263,21 @@ export class Character {
       this.startReload();
       return false;
     }
+    if (w.def.burst) { w.burstLeft = w.def.burst; w.burstAds = ads; }
+    this.fireRound(w, ads);
+    return true;
+  }
+
+  /** One round out of the barrel (and, for a burst, the gap before the next). */
+  fireRound(w, ads) {
     w.mag--;
-    w.cooldown = w.def.interval;
+    if (w.def.burst) {
+      w.burstLeft = w.mag > 0 ? w.burstLeft - 1 : 0;
+      w.cooldown = w.burstLeft > 0 ? w.def.burstGap : w.def.interval;
+    } else w.cooldown = w.def.interval;
     this.game.fireWeapon(this, w, ads);
     w.heat = Math.min(1, w.heat + w.def.heatPerShot);
     w.sinceShot = 0;
-    return true;
   }
 
   /** Quick knife attack. Cancels a reload; the gun is back in your hands right after. */

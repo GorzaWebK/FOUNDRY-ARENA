@@ -259,7 +259,11 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 .loadout button small { display: block; font-weight: 400; letter-spacing: 0; color: var(--dim); font-size: 11px; margin-top: 2px; line-height: 1.25; }
 .loadout button.on { border-color: var(--accent); background: rgba(255, 138, 42, 0.14); }
-.loadout.compact { grid-template-columns: repeat(5, 1fr); }
+.loadout.compact { grid-template-columns: repeat(4, 1fr); }
+.loadout.kit { margin-top: 6px; }
+.loadout.kit button:nth-child(3) { margin-left: 8px; }
+.loadout-blurb { margin: 5px 0 0; min-height: 1.3em; }
+.loadout-blurb b { color: var(--ink); font-weight: 600; margin-right: 4px; }
 .loadout.compact button { text-align: center; padding: 7px 4px; font-size: 12px; }
 .loadout.compact button small { display: none; }
 .loadout.tac, .loadout.compact.tac { grid-template-columns: 1fr 1fr; margin-top: 6px; }
@@ -289,6 +293,11 @@ h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 #scope i { position: absolute; background: rgba(0, 0, 0, 0.85); }
 #scope .sc-h { left: calc(50% - 34vh); right: calc(50% - 34vh); top: 50%; height: 1px; }
 #scope .sc-v { top: calc(50% - 34vh); bottom: calc(50% - 34vh); left: 50%; width: 1px; }
+/* marksman rifle: a low-power optic: wide view, thin ring, a chevron to aim with */
+#scope.low { background: radial-gradient(circle at center, rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 42vh, rgba(10, 12, 14, 0.9) 42.6vh, #050607 100%); }
+#scope.low i { display: none; }
+#scope.low::after { content: ''; position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -2px 0 0 -7px; border-left: 2px solid #ff6b1a; border-top: 2px solid #ff6b1a; transform: rotate(45deg); }
+#scope.low::before { content: ''; position: absolute; left: 50%; top: 50%; width: 1px; height: 14vh; margin-top: 14px; background: rgba(0, 0, 0, 0.7); }
 #chat { position: absolute; left: 22px; bottom: 118px; width: min(420px, 60vw); font-size: 14px; }
 #chat-log { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
 .chat-line { background: rgba(12, 16, 22, 0.55); padding: 3px 8px; border-radius: 5px; width: fit-content; max-width: 100%; overflow-wrap: anywhere; transition: opacity 0.5s; }
