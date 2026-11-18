@@ -284,6 +284,61 @@ export class CloudLobby {
     await this.D.remove(this.D.ref(this.db, `mapVotes/${id}/${this.uid}`)).catch(() => {});
   }
 
+  // ---------------------------------------------------------------- friends
+  // presence/<friend code>  who's online and what they're doing (gone when their tab closes)
+  // invites/<to>/<from>     an invite into a party or room, readable only by <to>
+
+  get canFriends() { return !!this.uid; }
+
+  /** Say what we're doing. `p`: { code, name, st, mode, map, room, open, party }. Only writes on a change (or a heartbeat). */
+  async setPresence(p) {
+    if (!this.uid || !p || !/^[2-9A-HJ-NP-Z]{8}$/.test(p.code)) return;
+    const D = this.D, ref = D.ref(this.db, `presence/${p.code}`);
+    const row = { uid: this.uid, name: clean(p.name) || 'Player', st: p.st || 'menu', mode: clean(p.mode, 24), map: clean(p.map, 24), room: /^[A-Z0-9]{0,8}$/.test(p.room || '') ? p.room || '' : '', open: !!p.open };
+    const key = JSON.stringify(row);
+    const now = Date.now();
+    if (key === this.presKey && now - (this.presAt || 0) < 60000) return;
+    if (now - (this.presAt || 0) < 2500) { clearTimeout(this.presT); this.presT = setTimeout(() => this.setPresence(p), 2600); return; }
+    this.presKey = key; this.presAt = now;
+    try {
+      await D.set(ref, { ...row, at: D.serverTimestamp() });
+      if (this.presFor !== p.code) { await D.onDisconnect(ref).remove(); this.presFor = p.code; }
+      if (!this.inviteOff) this._listenInvites(p.code);
+    } catch (e) { this.presKey = ''; }
+  }
+
+  /** Watch a friend's presence: cb(row | null). Returns an unsubscribe function. */
+  watchFriend(code, cb) {
+    if (!this.D) return () => {};
+    return this.D.onValue(this.D.ref(this.db, `presence/${code}`), (s) => {
+      const v = s.val();
+      cb(v && typeof v === 'object' ? { name: clean(v.name) || 'Player', st: String(v.st || ''), mode: clean(v.mode, 24), map: clean(v.map, 24), room: /^[A-Z0-9]{0,8}$/.test(v.room || '') ? v.room : '', open: !!v.open, at: v.at || 0 } : null);
+    }, () => cb(null));
+  }
+
+  _listenInvites(code) {
+    const D = this.D;
+    this.inviteOff = D.onChildAdded(D.ref(this.db, `invites/${code}`), (s) => {
+      const v = s.val();
+      if (!v || typeof v !== 'object') return;
+      const inv = { from: s.key, name: clean(v.name) || 'A friend', kind: v.kind === 'room' ? 'room' : 'party', code: String(v.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8), pw: typeof v.pw === 'string' ? v.pw.slice(0, 32) : '', at: v.at || 0 };
+      // old ones (over 10 minutes) are just cleared away
+      if (Date.now() + this.offset - inv.at > 600000) { D.remove(s.ref).catch(() => {}); return; }
+      if (this.hooks.onInvite) this.hooks.onInvite(inv);
+    });
+  }
+
+  /** Invite a friend (by their code) into our party or room. */
+  async sendInvite(toCode, fromCode, inv) {
+    if (!this.uid) throw new Error('Not connected to the online service yet.');
+    await this.D.set(this.D.ref(this.db, `invites/${toCode}/${fromCode}`), { name: clean(inv.name) || 'Player', kind: inv.kind, code: inv.code, pw: inv.pw || '', at: this.D.serverTimestamp() });
+  }
+
+  async clearInvite(myCode, fromCode) {
+    if (!this.uid) return;
+    await this.D.remove(this.D.ref(this.db, `invites/${myCode}/${fromCode}`)).catch(() => {});
+  }
+
   close() {
     if (this.myRoom) this._removeRoom(this.myRoom.code);
     clearInterval(this.beat);

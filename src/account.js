@@ -13,7 +13,7 @@ export const RANGE_BEST_KEY = 'foundry-arena-range-best';
 export const CAREER_KEY = 'foundry-arena-career';
 export const PROGRESS_KEY = 'foundry-arena-progress';
 // every key that belongs to an account (add new saved data here)
-const DATA_KEYS = [SETTINGS_KEY, RANGE_BEST_KEY, CAREER_KEY, PROGRESS_KEY, 'foundry-arena-maps'];
+const DATA_KEYS = [SETTINGS_KEY, RANGE_BEST_KEY, CAREER_KEY, PROGRESS_KEY, 'foundry-arena-maps', 'foundry-arena-friends'];
 
 const ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // no 0/O/1/I to misread
 const ID_RE = /^FA-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/;
@@ -38,6 +38,22 @@ function writeStore(key, value) {
     return true;
   } catch (e) { return false; }
 }
+
+/**
+ * The friend code for a player ID: 8 characters (shown as XXXX-XXXX) that friends
+ * add you by. It's a one-way hash, so sharing it doesn't give away the player ID
+ * (which rejoining trusts), and it's the same on any browser with this account.
+ */
+export function friendCode(pid) {
+  let h1 = 0x9e3779b9, h2 = 0x85ebca6b;
+  const s = 'friend:' + pid;
+  for (let i = 0; i < s.length; i++) { h1 = Math.imul(h1 ^ s.charCodeAt(i), 0x01000193); h2 = Math.imul(h2 ^ s.charCodeAt(i), 0xc2b2ae35); }
+  let out = '';
+  for (let i = 0; i < 8; i++) { const v = i < 4 ? h1 >>> (i * 7) : h2 >>> ((i - 4) * 7); out += ALPHABET[v & 31]; }
+  return out;
+}
+export const cleanFriendCode = (s) => String(s || '').toUpperCase().replace(/[^2-9A-HJ-NP-Z]/g, '').slice(0, 8);
+export const showFriendCode = (c) => `${c.slice(0, 4)}-${c.slice(4)}`;
 
 /** This browser's account: { id, created }. Made on first visit. */
 export function getAccount() {

@@ -829,3 +829,18 @@ body.soft-flash #flashbang { background: #8b9096; transition: opacity 0.35s ease
 /* cosmetic previews (rendered models and drawings) */
 .citem .sw.pic { height: 84px; padding: 0; background: radial-gradient(ellipse at 50% 60%, #2a3038, #15181c 75%); color: var(--dim); font-weight: 700; }
 .citem .sw.pic img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+/* ---- friends ---- */
+.fr-add { margin: 4px 0 12px; }
+.fr-add input { flex: 1; letter-spacing: 0.12em; text-transform: uppercase; }
+.fr-row { grid-template-columns: 12px 1fr auto; }
+.fr-dot { width: 10px; height: 10px; border-radius: 50%; background: #5a6068; }
+.fr-dot.on { background: #5dd47a; box-shadow: 0 0 6px #5dd47a; }
+.fr-dot.busy { background: #f2b417; box-shadow: 0 0 6px #f2b417; }
+.fr-invite { display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin-bottom: 8px; background: rgba(255,107,26,0.12); border-left: 3px solid var(--accent); }
+.fr-invite span { flex: 1; }
+.invite-toast { position: fixed; right: 18px; bottom: 18px; z-index: 80; width: 300px; padding: 12px 14px; background: #1b1f24; border-left: 4px solid var(--accent); box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+.invite-toast b { display: block; font-family: var(--cond); font-size: 16px; letter-spacing: 0.04em; margin-bottom: 4px; }
+.invite-toast p { margin: 0 0 10px; font-size: 13px; color: var(--dim); }
+.invite-toast .btn-row { margin: 0; }
+#btn-friends.on { color: var(--accent); }

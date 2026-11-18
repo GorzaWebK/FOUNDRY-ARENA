@@ -117,7 +117,7 @@
           </section>
           <div class="col-stack">
           <section class="card">
-            <h4 class="h-with-btn">Play online <button id="btn-rooms" class="link-btn">Browse rooms</button><button id="btn-party" class="link-btn party-link">Party…</button></h4>
+            <h4 class="h-with-btn">Play online <button id="btn-rooms" class="link-btn">Rooms</button><button id="btn-friends" class="link-btn party-link">Friends</button><button id="btn-party" class="link-btn party-link">Party…</button></h4>
             <label class="row mp"><span>Your name</span><input type="text" id="mp-name" maxlength="16" placeholder="Player" autocomplete="off" spellcheck="false" /></label>
             <div class="row mp"><span>Password</span><div class="pass-pub"><input type="password" id="mp-pass" maxlength="32" placeholder="optional" autocomplete="off" /><label class="pub-tick" title="List your room in Browse rooms so anyone can join"><input type="checkbox" id="mp-public" /> Public</label></div></div>
             <div class="host-row"><button id="btn-host" class="wide-btn">Host a room</button><button id="btn-quick" class="wide-btn quick-btn" title="Join the fullest open public room, or host one if there are none">Quick play</button></div>
@@ -345,6 +345,24 @@
         <p class="note">You can play it any time from Controls on the main menu.</p>
       </div>
     </div>
+
+    <!-- ============================== FRIENDS ============================== -->
+    <div id="friends-ov" class="overlay hidden">
+      <div class="panel wide-panel">
+        <h2>FRIENDS</h2>
+        <p class="acct-line">Your friend code <b id="fr-code" class="acct-id">—</b> <button id="btn-fr-copy" class="small-btn">Copy</button></p>
+        <p class="note">Send it to friends so they can add you. It's the same on any browser where you import your account code.</p>
+        <div class="mp-actions fr-add">
+          <input type="text" id="fr-input" maxlength="9" placeholder="FRIEND CODE" autocomplete="off" spellcheck="false" />
+          <button id="btn-fr-add">Add friend</button>
+        </div>
+        <div id="fr-invites"></div>
+        <div id="fr-list" class="rooms-list"></div>
+        <p id="fr-msg" class="note"></p>
+        <div class="btn-row"><button id="btn-fr-done" class="primary">DONE</button></div>
+      </div>
+    </div>
+    <div id="invite-toast" class="invite-toast hidden"></div>
 
     <!-- ============================== MAPS: community, my maps, import ============================== -->
     <div id="maps-ov" class="overlay hidden">

@@ -34,7 +34,7 @@ import { MAX_HUMANS } from './config.js';
 import { cleanRoomCode } from './transport.js';
 import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
 import { BUILD, BUILD_TIME } from './version.js';
-import { getAccount, exportCode, parseCode, importAccount } from './account.js';
+import { getAccount, exportCode, parseCode, importAccount, friendCode, cleanFriendCode, showFriendCode } from './account.js';
 import { SKINS, SKIN_KILLS, skinSwatchCss, skinUnlocked, skinLockText } from './skins.js';
 import { SLOTS, ITEMS, itemOf, itemUnlocked, unlocksAt, packCosmetics, unpackCosmetics } from './cosmetics.js';
 import { XP, levelFromXp, MAX_LEVEL } from './progress.js';
@@ -303,7 +303,7 @@ function updateRoomUi() {
   $('end-wait').classList.toggle('hidden', net.role !== 'client');
   hud.chatHint(on && state === 'playing' && !chatting);
   syncBotsUi();
-  if (typeof lobby !== 'undefined') syncPublicRoom();
+  if (typeof lobby !== 'undefined') { syncPublicRoom(); syncPresence(); }
 }
 
 $('btn-copy').addEventListener('click', async () => {
@@ -583,6 +583,7 @@ const lobbyHooks = {
   onRooms: () => { if (!$('rooms-ov').classList.contains('hidden')) renderRooms(); },
   onBoard: () => { if (!$('board-ov').classList.contains('hidden')) renderBoard(); },
   onStatus: () => {
+    if (typeof syncPresence === 'function' && lobby.online) { syncPresence(); watchFriends(); }
     if (!$('rooms-ov').classList.contains('hidden')) renderRooms();
     if (!$('board-ov').classList.contains('hidden')) renderBoard();
   },
@@ -988,6 +989,187 @@ async function renderMaps() {
 $('btn-maps').addEventListener('click', () => { renderMaps(); $('maps-ov').classList.remove('hidden'); });
 $('btn-maps-done').addEventListener('click', () => $('maps-ov').classList.add('hidden'));
 $('btn-open-editor').addEventListener('click', () => openEditor());
+
+// ---------------------------------------------------------------- friends
+// Friend codes, who's online (Firebase presence) and invites into your party.
+
+const FRIENDS_KEY = 'foundry-arena-friends';
+const myFriendCode = friendCode(getAccount().id);
+const friendState = new Map(); // code -> presence row or null
+const friendWatch = new Map(); // code -> unsubscribe
+let pendingInvites = [];
+function loadFriends() {
+  try { const a = JSON.parse(localStorage.getItem(FRIENDS_KEY) || '[]'); return Array.isArray(a) ? a.filter((f) => f && /^[2-9A-HJ-NP-Z]{8}$/.test(f.code)).slice(0, 50) : []; } catch (e) { return []; }
+}
+function saveFriends(list) { try { localStorage.setItem(FRIENDS_KEY, JSON.stringify(list.slice(0, 50))); } catch (e) { /* full */ } }
+
+/** Tell friends what we're doing (menu, solo, in a room). */
+function syncPresence() {
+  if (!lobby.setPresence || !lobby.online) return;
+  const inRoom = net.active;
+  lobby.setPresence({
+    code: myFriendCode, name: settings.name || 'Player',
+    st: state === 'menu' ? 'menu' : inRoom ? (game.rules.ranked ? 'ranked' : 'room') : 'solo',
+    mode: state === 'menu' ? '' : game.rules.name, map: state === 'menu' ? '' : game.map.name,
+    room: inRoom ? net.code : '', open: inRoom && !(net.role === 'host' ? net.password : net.lastPw) && !game.rules.ranked,
+  });
+}
+setInterval(syncPresence, 30000); // a heartbeat (the write itself is skipped if nothing changed)
+
+function watchFriends() {
+  if (!lobby.watchFriend) return;
+  const list = loadFriends();
+  for (const f of list) {
+    if (friendWatch.has(f.code)) continue;
+    friendWatch.set(f.code, lobby.watchFriend(f.code, (row) => {
+      friendState.set(f.code, row);
+      if (row && row.name) { const l = loadFriends(); const it = l.find((x) => x.code === f.code); if (it && it.name !== row.name) { it.name = row.name; saveFriends(l); } }
+      renderFriendsChip();
+      if (!$('friends-ov').classList.contains('hidden')) renderFriends();
+    }));
+  }
+}
+
+function renderFriendsChip() {
+  const on = loadFriends().filter((f) => friendState.get(f.code)).length;
+  const b = $('btn-friends');
+  b.textContent = on ? `Friends · ${on}` : 'Friends';
+  b.classList.toggle('on', on > 0);
+}
+
+function friendStatus(row) {
+  if (!row) return ['Offline', ''];
+  if (row.st === 'menu') return ['Online, in the menu', 'on'];
+  if (row.st === 'solo') return [`Playing solo · ${row.mode} on ${row.map}`, 'busy'];
+  if (row.st === 'ranked') return [`Playing ranked · ${row.map}`, 'busy'];
+  return [`In a room · ${row.mode} on ${row.map}${row.open ? '' : ' (private)'}`, 'busy'];
+}
+
+function setFrMsg(t, err = false) { const e = $('fr-msg'); e.textContent = t || ''; e.classList.toggle('err', !!err); }
+
+function renderFriends() {
+  $('fr-code').textContent = showFriendCode(myFriendCode);
+  const inv = $('fr-invites');
+  inv.textContent = '';
+  for (const i of pendingInvites) inv.append(inviteRow(i));
+  const list = $('fr-list');
+  list.textContent = '';
+  if (!lobby.canFriends) {
+    const p = document.createElement('div'); p.className = 'rooms-empty';
+    p.textContent = lobby.setPresence ? 'Connecting to the online service…' : 'Friends need the online service, which is unavailable right now.';
+    list.append(p);
+    return;
+  }
+  const friends = loadFriends();
+  if (!friends.length) { const p = document.createElement('div'); p.className = 'rooms-empty'; p.textContent = 'No friends added yet. Swap friend codes with someone and add theirs above.'; list.append(p); }
+  const follower = party.active && !party.leader;
+  friends.sort((a, b) => !!friendState.get(b.code) - !!friendState.get(a.code));
+  for (const f of friends) {
+    const row = friendState.get(f.code);
+    const [text, cls] = friendStatus(row);
+    const r = document.createElement('div'); r.className = 'room-row fr-row';
+    const dot = document.createElement('i'); dot.className = 'fr-dot ' + cls;
+    const info = document.createElement('div');
+    const n = document.createElement('b'); n.textContent = (row && row.name) || f.name || showFriendCode(f.code);
+    const sub = document.createElement('small'); sub.textContent = `${text} · ${showFriendCode(f.code)}`;
+    info.append(n, sub);
+    const act = document.createElement('div'); act.className = 'pw-join';
+    const btn = (label, fn, disabled = false, title = '') => { const b = document.createElement('button'); b.textContent = label; b.disabled = disabled; if (title) b.title = title; b.addEventListener('click', fn); act.append(b); };
+    btn('Invite', () => inviteFriend(f.code), !row || follower, follower ? 'Your party leader does the inviting' : !row ? 'They\'re offline' : 'Invite them into your party');
+    if (row && row.st === 'room' && row.room && row.open) btn('Join', () => { closeFriends(); codeInput.value = row.room; joinRoom(row.room, ''); }, follower || (net.active && net.code === row.room));
+    btn('Remove', () => { if (!window.confirm(`Remove ${n.textContent} from your friends?`)) return; saveFriends(loadFriends().filter((x) => x.code !== f.code)); const off = friendWatch.get(f.code); if (off) off(); friendWatch.delete(f.code); friendState.delete(f.code); renderFriends(); renderFriendsChip(); });
+    r.append(dot, info, act);
+    list.append(r);
+  }
+}
+
+/** Invite a friend into our party (starting one if we're not in one). */
+async function inviteFriend(code) {
+  try {
+    if (!party.active) { await party.start(settings.name || 'Player'); if (net.active) party.enteredRoom(net.code, net.role === 'host' ? net.password : net.lastPw); }
+    await lobby.sendInvite(code, myFriendCode, { name: settings.name || 'Player', kind: 'party', code: party.code });
+    setFrMsg(`Invite sent. When they accept, they join your party${net.active ? ' and come into this room' : ''}.`);
+  } catch (e) { setFrMsg("Couldn't send the invite: " + (e.message || 'try again'), true); }
+}
+
+function inviteRow(i) {
+  const r = document.createElement('div'); r.className = 'fr-invite';
+  const t = document.createElement('span'); t.textContent = `${i.name} invited you to their ${i.kind === 'party' ? 'party' : 'room'}.`;
+  const yes = document.createElement('button'); yes.textContent = 'Join'; yes.className = 'primary';
+  const no = document.createElement('button'); no.textContent = 'Decline';
+  yes.addEventListener('click', () => acceptInvite(i));
+  no.addEventListener('click', () => dropInvite(i));
+  r.append(t, yes, no);
+  return r;
+}
+
+function dropInvite(i) {
+  pendingInvites = pendingInvites.filter((x) => x !== i);
+  lobby.clearInvite(myFriendCode, i.from);
+  renderInviteToast();
+  if (!$('friends-ov').classList.contains('hidden')) renderFriends();
+}
+
+async function acceptInvite(i) {
+  dropInvite(i);
+  closeFriends();
+  if (i.kind === 'party') {
+    if (party.active && party.code === i.code) return;
+    try { await party.join(i.code, settings.name || 'Player'); setMpStatus(`You joined ${i.name}'s party.`); } catch (e) { setMpStatus(e.message, true); }
+  } else {
+    codeInput.value = i.code;
+    joinRoom(i.code, i.pw);
+  }
+}
+
+function renderInviteToast() {
+  const t = $('invite-toast');
+  const i = pendingInvites[pendingInvites.length - 1];
+  t.classList.toggle('hidden', !i);
+  if (!i) return;
+  t.textContent = '';
+  const h = document.createElement('b'); h.textContent = `${i.name} invited you`;
+  const p = document.createElement('p'); p.textContent = i.kind === 'party' ? "Join their party: you'll follow them into rooms and play on their team." : 'Join their room.';
+  const row = document.createElement('div'); row.className = 'btn-row';
+  const yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = 'JOIN';
+  const no = document.createElement('button'); no.textContent = 'Decline';
+  yes.addEventListener('click', () => acceptInvite(i));
+  no.addEventListener('click', () => dropInvite(i));
+  row.append(no, yes);
+  t.append(h, p, row);
+}
+lobbyHooks.onInvite = (i) => {
+  if (!loadFriends().length && !i.name) return;
+  pendingInvites = pendingInvites.filter((x) => x.from !== i.from).concat(i);
+  renderInviteToast();
+  audio.play('chat');
+  if (state === 'playing') hud.chatAdd('', 0, `${i.name} invited you to their party. Press Esc to answer.`);
+  if (!$('friends-ov').classList.contains('hidden')) renderFriends();
+};
+
+function openFriends() { setFrMsg(''); watchFriends(); renderFriends(); $('friends-ov').classList.remove('hidden'); }
+function closeFriends() { $('friends-ov').classList.add('hidden'); }
+$('btn-friends').addEventListener('click', openFriends);
+$('btn-fr-done').addEventListener('click', closeFriends);
+$('btn-fr-copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(showFriendCode(myFriendCode)); setFrMsg('Friend code copied.'); } catch (e) { setFrMsg(`Your code: ${showFriendCode(myFriendCode)}`); }
+});
+$('fr-input').addEventListener('input', () => { const c = cleanFriendCode($('fr-input').value); $('fr-input').value = c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c; });
+$('fr-input').addEventListener('keydown', (e) => { e.stopPropagation(); if (e.code === 'Enter') $('btn-fr-add').click(); });
+$('btn-fr-add').addEventListener('click', () => {
+  const code = cleanFriendCode($('fr-input').value);
+  if (code.length !== 8) { setFrMsg('Friend codes are 8 characters, like K7Q2-M9XD.', true); return; }
+  if (code === myFriendCode) { setFrMsg("That's your own code.", true); return; }
+  const list = loadFriends();
+  if (list.some((f) => f.code === code)) { setFrMsg('Already on your list.'); return; }
+  if (list.length >= 50) { setFrMsg('Your list is full (50 friends).', true); return; }
+  list.push({ code, name: '' });
+  saveFriends(list);
+  $('fr-input').value = '';
+  setFrMsg(`Added ${showFriendCode(code)}. They show as online once they're playing.`);
+  watchFriends();
+  renderFriends();
+});
 
 function openParty() { setPartyStatus(''); renderParty(); $('party-ov').classList.remove('hidden'); }
 function closeParty() { $('party-ov').classList.add('hidden'); }
@@ -1604,7 +1786,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (!$('profile-ov').classList.contains('hidden')) { if (e.code === 'Escape') $('profile-ov').classList.add('hidden'); return; }
-  for (const id of ['rooms-ov', 'board-ov', 'welcome-ov', 'maps-ov']) {
+  for (const id of ['rooms-ov', 'board-ov', 'welcome-ov', 'maps-ov', 'friends-ov']) {
     if (!$(id).classList.contains('hidden')) {
       if (e.code === 'Escape') $(id).classList.add('hidden');
       return;

@@ -402,6 +402,12 @@ connect to them directly.
    can still have a password: it shows a lock and asks for it on Join.
    **Quick play** (next to Host a room) drops you into the fullest open public
    room on your version, or hosts an open public room if there isn't one.
+5. **Friends** (top of the Play online card): everyone has a friend code
+   (like `K7Q2-M9XD`, the same on any browser with your account). Add a friend's
+   code to see when they're online and what they're doing (in the menu, playing
+   solo, in a room). **Invite** puts them in your party (starting one if needed),
+   so they follow you into rooms; they get a pop-up to accept. **Join** drops you
+   into a friend's room when it has no password. Uses the online service.
 5. **Party:** press **Party…** (top of the Play online card) and **Start a
    party**, then send friends the invite link or the 5-letter party code (up to 4
    players). Whoever started the party leads: when they host or join a room, the
