@@ -1,0 +1,116 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "board": {
+      ".read": true,
+      ".indexOn": [
+        "at"
+      ],
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['name','at','level','prestige','xp','matches','wins','kills','deaths','heads','bestStreak','longest','knives','nades','caps','shots','hits','time']) && newData.child('at').val() === now && (!data.exists() || now - data.child('at').val() >= 15000) && newData.child('wins').val() <= newData.child('matches').val() && newData.child('heads').val() <= newData.child('kills').val() && newData.child('hits').val() <= newData.child('shots').val() && newData.child('knives').val() + newData.child('nades').val() <= newData.child('kills').val() && newData.child('kills').val() <= newData.child('time').val() / 3 + 30 && newData.child('matches').val() <= newData.child('time').val() / 45 + 5 && newData.child('caps').val() <= newData.child('time').val() / 20 + 5 && newData.child('prestige').val() * 90000 + newData.child('xp').val() <= newData.child('time').val() * 25 + 5000 && (data.exists() ? (newData.child('time').val() >= data.child('time').val() && newData.child('time').val() - data.child('time').val() <= (now - data.child('at').val()) / 1000 + 30 && newData.child('kills').val() >= data.child('kills').val() && newData.child('kills').val() - data.child('kills').val() <= (newData.child('time').val() - data.child('time').val()) / 3 + 30 && newData.child('matches').val() >= data.child('matches').val() && newData.child('prestige').val() >= data.child('prestige').val()) : newData.child('time').val() <= 72000)",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 18"
+        },
+        "at": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        },
+        "level": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 50"
+        },
+        "prestige": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10"
+        },
+        "xp": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 200000"
+        },
+        "matches": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+        },
+        "wins": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+        },
+        "kills": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000000"
+        },
+        "deaths": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000000"
+        },
+        "heads": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000000"
+        },
+        "bestStreak": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500"
+        },
+        "longest": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500"
+        },
+        "knives": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+        },
+        "nades": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+        },
+        "caps": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+        },
+        "shots": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000000"
+        },
+        "hits": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000000"
+        },
+        "time": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000"
+        },
+        "bid": {
+          ".validate": "newData.isString() && newData.val().matches(/^[0-9a-f]{16}$/)"
+        }
+      }
+    },
+    "rooms": {
+      ".read": true,
+      "$code": {
+        ".write": "auth != null && (data.exists() ? data.child('uid').val() === auth.uid : newData.child('uid').val() === auth.uid)",
+        ".validate": "$code.matches(/^[A-Z0-9]{4,8}$/) && newData.hasChildren(['uid','host','mode','map','n','max','bots','locked','v','at']) && newData.child('at').val() === now && (!data.exists() || now - data.child('at').val() >= 2000)",
+        "uid": {
+          ".validate": "newData.isString() && newData.val().length <= 128"
+        },
+        "host": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 18"
+        },
+        "mode": {
+          ".validate": "newData.isString() && newData.val().length <= 24"
+        },
+        "map": {
+          ".validate": "newData.isString() && newData.val().length <= 24"
+        },
+        "v": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "n": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 64"
+        },
+        "max": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 64"
+        },
+        "bots": {
+          ".validate": "newData.isBoolean()"
+        },
+        "locked": {
+          ".validate": "newData.isBoolean()"
+        },
+        "at": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
+}

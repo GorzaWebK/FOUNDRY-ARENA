@@ -24,6 +24,8 @@ import { Game } from './game.js';
 import { Net, cleanName } from './net.js';
 import { Party, PARTY_MAX, cleanPartyCode } from './party.js';
 import { Lobby, boardId } from './lobby.js';
+import { CloudLobby } from './lobby-cloud.js';
+import { FIREBASE_CONFIG } from './online-config.js';
 import { MAX_HUMANS } from './config.js';
 import { cleanRoomCode } from './transport.js';
 import { ACTIONS, keyName, bindLabel, defaultBinds } from './bindings.js';
@@ -562,14 +564,27 @@ function renderParty() {
 // (see lobby.js: a serverless meeting point shared by everyone with the game open)
 
 let hostPublic = false; // the room we're hosting is listed publicly
-const lobby = new Lobby({
+const lobbyHooks = {
   onRooms: () => { if (!$('rooms-ov').classList.contains('hidden')) renderRooms(); },
   onBoard: () => { if (!$('board-ov').classList.contains('hidden')) renderBoard(); },
   onStatus: () => {
     if (!$('rooms-ov').classList.contains('hidden')) renderRooms();
     if (!$('board-ov').classList.contains('hidden')) renderBoard();
   },
-});
+  // the cloud couldn't be reached: carry on with the peer-to-peer lobby
+  onFail: () => {
+    lobby = new Lobby(lobbyHooks);
+    updateBoardEntry();
+    syncPublicRoom();
+    lobby.connect();
+  },
+};
+// Firebase when a project is configured (or ?fbemu=<host> for the local emulator), else peer-to-peer
+const FB_EMU = params.get('fbemu');
+const cloudConfig = FB_EMU
+  ? { apiKey: 'demo-key', projectId: 'demo-foundry', databaseURL: `http://${FB_EMU}:9000?ns=demo-foundry-default-rtdb` }
+  : FIREBASE_CONFIG;
+let lobby = cloudConfig ? new CloudLobby(lobbyHooks, cloudConfig, FB_EMU || '') : new Lobby(lobbyHooks);
 
 /** Keep the lobby's listing of our room up to date (or take it down). */
 function syncPublicRoom() {
@@ -593,7 +608,7 @@ function updateBoardEntry() {
   });
 }
 
-const lobbyStatus = () => (lobby.role === 'hub' || lobby.role === 'member' ? 'Connected to the lobby.' : lobby.connecting ? 'Connecting to the lobby…' : 'Looking for the lobby…');
+const lobbyStatus = () => (lobby.online ? (lobby instanceof CloudLobby ? 'Connected to the online service.' : 'Connected to the lobby.') : lobby.connecting ? 'Connecting…' : 'Looking for the lobby…');
 
 function renderRooms() {
   $('rooms-status').textContent = lobbyStatus();
@@ -725,15 +740,23 @@ function renderBoard() {
   const stat = BOARD_STATS.find((s) => s.id === boardTab);
   for (const b of tabs.children) b.classList.toggle('on', b.dataset.id === boardTab);
   $('board-col').textContent = stat.col || stat.name;
-  const myId = boardId(getAccount().id);
-  const all = [...lobby.board.values()].filter((e) => (!stat.min || stat.min(e)) && stat.score(e) > 0);
+  const myId = lobby.myId || boardId(getAccount().id);
+  // one row per account (a player on a second browser has a second sign-in): keep the one with the most play
+  const byAccount = new Map();
+  const myBid = boardId(getAccount().id);
+  for (const e of lobby.board.values()) {
+    const k = e.bid || e.id, cur = byAccount.get(k);
+    if (!cur || e.time > cur.time || (e.time === cur.time && e.at > cur.at)) byAccount.set(k, e);
+  }
+  const mineRow = byAccount.get(myBid) || lobby.board.get(myId);
+  const all = [...byAccount.values()].filter((e) => (!stat.min || stat.min(e)) && stat.score(e) > 0);
   all.sort((a, b) => stat.score(b) - stat.score(a) || a.at - b.at);
   const body = $('board-body');
   body.textContent = '';
   const top = all.slice(0, 100);
   top.forEach((e, i) => {
     const tr = document.createElement('tr');
-    if (e.id === myId) tr.className = 'me';
+    if (e === mineRow) tr.className = 'me';
     const cells = [String(i + 1), e.name, `${e.prestige ? '★' + e.prestige + ' ' : ''}${e.level}`, stat.show ? stat.show(e) : fmt(stat.score(e))];
     cells.forEach((t, k) => { const td = document.createElement('td'); if (k === 1) td.className = 'l'; td.textContent = t; tr.append(td); });
     body.append(tr);
@@ -744,11 +767,12 @@ function renderBoard() {
     td.textContent = stat.min ? `Nobody has ${stat.minText} yet.` : 'Nobody on the board yet. Play a match!';
     tr.append(td); body.append(tr);
   }
-  const rank = all.findIndex((e) => e.id === myId);
-  const me = lobby.board.get(myId);
+  const rank = all.findIndex((e) => e === mineRow);
+  const me = mineRow;
   $('board-me').textContent = rank >= 0 ? `You're #${rank + 1} of ${all.length} for ${stat.name.toLowerCase()}${settings.name ? '' : '. Set your name on the main menu so people know who you are'}.`
-    : stat.min && me && !stat.min(me) ? `You'll show up here after ${stat.minText}.` : 'Play a match to get on the board.';
-  $('board-status').textContent = `${lobby.board.size} player${lobby.board.size === 1 ? '' : 's'} · ${lobby.online ? 'live from the lobby' : 'offline: showing the last copy you saw'}. Stats come from each player's own game.`;
+    : stat.min && me && !stat.min(me) ? `You'll show up here after ${stat.minText}.`
+    : lobby.refused ? "The server didn't accept your stats: they don't add up against your play time." : 'Play a match to get on the board.';
+  $('board-status').textContent = `${byAccount.size} player${byAccount.size === 1 ? '' : 's'} · ${lobby.online ? 'live' : 'offline: showing the last copy you saw'}. ${lobby instanceof CloudLobby ? 'Checked against play time by the server.' : "Stats come from each player's own game."}`;
 }
 
 function openBoard() { lobby.refresh(); renderBoard(); $('board-ov').classList.remove('hidden'); }

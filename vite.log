@@ -3,3 +3,10 @@
 
   ➜  Local:   http://localhost:5173/
   ➜  Network: use --host to expose
+6:24:52 AM [vite] (client) page reload src/lobby.js
+6:24:52 AM [vite] (client) page reload src/main.js
+6:24:59 AM [vite] (client) page reload src/main.js
+6:26:46 AM [vite] (client) page reload src/main.js
+6:26:48 AM [vite] (client) dependencies optimized: firebase/app, firebase/auth, firebase/database
+6:26:48 AM [vite] (client) optimized dependencies changed. reloading
+6:26:51 AM [vite] (client) [console.warn] Cloud lobby unavailable, using the peer-to-peer lobby: Failed to fetch dynamically imported module: http://localhost:5173/node_modules/.vite/deps/firebase_app.js?v=4c925008

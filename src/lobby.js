@@ -42,8 +42,9 @@ export const BOARD_FIELDS = {
 
 /** Tidy an entry that came from someone else. Returns null if it's no good. */
 export function cleanEntry(e) {
-  if (!e || typeof e !== 'object' || typeof e.id !== 'string' || !/^[0-9a-f]{8,16}$/.test(e.id)) return null;
+  if (!e || typeof e !== 'object' || typeof e.id !== 'string' || !/^[A-Za-z0-9]{8,40}$/.test(e.id)) return null;
   const out = { id: e.id, name: clean(e.name) || 'Player', at: int(e.at, 4e12) };
+  if (typeof e.bid === 'string' && /^[0-9a-f]{16}$/.test(e.bid)) out.bid = e.bid;
   for (const [k, max] of Object.entries(BOARD_FIELDS)) out[k] = int(e[k], max);
   // impossible combinations
   out.wins = Math.min(out.wins, out.matches);
@@ -91,6 +92,7 @@ export class Lobby {
   }
 
   get online() { return this.role !== null; }
+  get myId() { return this.me ? this.me.id : null; }
 
   // ---------------------------------------------------------------- connecting
 

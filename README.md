@@ -399,6 +399,44 @@ How it works:
 - If a connection goes quiet for 10 seconds the player is dropped (or, for a
   client, returned to the menu, where it retries the room up to 5 times).
 
+### Online backend (Firebase), optional
+
+Out of the box, public rooms and the leaderboard run on the peer-to-peer lobby
+above: no setup, but the leaderboard only trusts players. Connect a free
+Firebase project and both move to Firebase instead:
+
+- **Leaderboard** rows are checked by server-side rules
+  (`firebase/database.rules.json`), which a modified game can't skip. Each
+  player can only write their own row, at most once every 15 seconds; a row only
+  moves forward; play time can't grow faster than real time; kills, matches,
+  captures and XP are capped against play time; a new row can bring at most 20
+  hours of play. The board works even when nobody else is online. (With no game
+  server watching the matches, a cheat could still invent plausible matches
+  inside those limits; it can't post absurd numbers or touch anyone else's row.)
+- **Public rooms** vanish the instant the host's tab closes.
+- Players sign in anonymously in the background: no accounts, nothing to type.
+- If Firebase can't be reached, the game falls back to the peer-to-peer lobby.
+
+Setup (about 10 minutes, free Spark plan):
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com),
+   **Create a project** (Google Analytics can be off).
+2. **Build → Authentication → Get started → Sign-in method → Anonymous →
+   Enable → Save.**
+3. **Build → Realtime Database → Create database**, pick a location, start in
+   **locked mode**.
+4. In the database's **Rules** tab, replace everything with the contents of
+   `firebase/database.rules.json` and press **Publish**.
+5. **Project settings** (the gear) → **Your apps** → the **</>** (Web) icon →
+   register an app (no Hosting needed) and copy the `firebaseConfig` values.
+6. Put them in `src/online-config.js` as `FIREBASE_CONFIG` (they're not secret:
+   every Firebase web app ships them to the browser; the rules are what protect
+   the data) and redeploy.
+
+For development, `?fbemu=127.0.0.1` points the game at the Firebase emulators
+(`firebase emulators:start --only database,auth --project demo-foundry`, with
+`firebase.json` pointing at the rules file).
+
 Limits worth knowing: very strict corporate / school networks can block
 peer-to-peer connections, and the experience is only as good as the host's
 connection, since everything relays through them.
@@ -460,6 +498,8 @@ src/netChar.js        characters driven over the network (interpolated)
 src/transport.js      PeerJS (WebRTC) and local-tab transports
 src/party.js          parties: friends who follow their leader between rooms
 src/lobby.js          serverless lobby: public room list and the leaderboard
+src/lobby-cloud.js    the same on Firebase, when src/online-config.js has a project
+firebase/             database security rules for the Firebase backend
 src/config.js         gameplay tuning, difficulty presets, bot roster
 src/maps/index.js     map registry
 src/maps/*.js         the maps (data only); range.js is the training range
