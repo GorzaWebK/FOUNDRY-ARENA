@@ -1,6 +1,21 @@
-# Foundry Arena
+<div align="center">
 
-*Six crews. Six yards. Nobody clocks off until the whistle.*
+<img src="docs/media/cloister-firefight.gif" width="720" alt="Foundry Arena: a firefight in the Cloister">
+
+# ⚠️ FOUNDRY ARENA ⚠️
+
+### *Six crews. Six yards. Nobody clocks off until the whistle.*
+
+<a href="https://gorzawebk.github.io/FOUNDRY-ARENA/"><img src="https://img.shields.io/badge/Clock%20in-play%20now-FF6A00?style=for-the-badge" alt="Clock in: play now"></a>
+<img src="https://img.shields.io/badge/Mode-solo%20vs%20bots%20·%20online%20rooms-2B2F33?style=for-the-badge" alt="Mode: solo vs bots · online rooms">
+<img src="https://img.shields.io/badge/Teams-Cobalt%20vs%20Crimson-1F5FBF?style=for-the-badge" alt="Teams: Cobalt vs Crimson">
+<img src="https://img.shields.io/badge/Built%20with-Three.js-000000?style=for-the-badge&logo=threedotjs&logoColor=white" alt="Built with: Three.js">
+
+<sub>▲ Real gameplay: a solo deathmatch against the bots on Cloister, recorded in the browser.</sub>
+
+`▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚`
+
+</div>
 
 An arena shooter with its own look: tempered steel and safety orange, stencil
 type, a crew of bots named for the shop floor (Slag, Rivet, Cinder, Anvil, Flux…)
@@ -9,8 +24,17 @@ and two teams, **Cobalt** (blue) and **Crimson** (red).
 A complete browser first-person shooter: you, your friends and AI bots in a
 free-for-all deathmatch. Play solo, or host a room and share the code.
 Three.js for rendering, Vite for tooling, plain JavaScript modules.
-Everything is procedural — geometry from primitives, textures drawn on canvases,
-sound synthesised with the Web Audio API. No assets are downloaded.
+Everything in the game is procedural — geometry from primitives, textures drawn on canvases,
+sound synthesised with the Web Audio API. The game downloads no assets (the pictures on this page are only screenshots).
+
+## 📋 Shift report
+
+<table>
+<tr><td align="center" valign="top"><img src="docs/media/menu.jpg" width="400" alt="The yard office: mode, map, loadout"><br><sub>The yard office: mode, map, loadout</sub></td><td align="center" valign="top"><img src="docs/media/cloister.jpg" width="400" alt="Smoke and tracers in the Cloister"><br><sub>Smoke and tracers in the Cloister</sub></td></tr>
+<tr><td align="center" valign="top"><img src="docs/media/steelworks.jpg" width="400" alt="Clearing the Steelworks floor"><br><sub>Clearing the Steelworks floor</sub></td><td align="center" valign="top"><img src="docs/media/steelworks.gif" width="400" alt="Hunting bots in the Steelworks"><br><sub>Hunting bots in the Steelworks</sub></td></tr>
+</table>
+
+## 🔨 Clock in
 
 **▶ Play in your browser:** https://gorzawebk.github.io/FOUNDRY-ARENA/
 
@@ -37,7 +61,7 @@ Open the printed URL (http://localhost:5173), pick a mode, a map and a loadout, 
 Every push to `main` is built and published to GitHub Pages by
 `.github/workflows/deploy.yml`.
 
-## Game modes
+## 🎯 Game modes
 
 Pick one in the main menu for solo play, or as the host of a multiplayer room.
 
@@ -78,7 +102,7 @@ modes (team kills hurt but score nothing), pickups on or off, and **hardcore**:
 50 HP, with no crosshair, health or ammo on screen. In multiplayer the host's
 rules apply to everyone.
 
-## End of a match
+## 🏁 End of a match
 
 The end screen shows the final scores, **awards** (Sharpshooter for best
 accuracy, Headhunter, Unstoppable for the longest streak, Long Shot, Demolitions,
@@ -88,7 +112,7 @@ Solo, you pick one and press **Play again**. In multiplayer everyone votes; the
 host can start whenever they like, and the next match starts by itself after
 30 seconds. Most votes wins, and a tie goes to the host's pick.
 
-## Tutorial
+## 🦺 Tutorial
 
 New players are offered a two-minute tutorial on their first visit (also under
 **Controls → Play the tutorial**). It runs on the training range and walks
@@ -96,7 +120,7 @@ through twelve steps: look, move, sprint, jump, crouch, slide, aim, shoot,
 reload, switch weapons, grenades, and knife and lean. Each step shows your own
 key for it and ticks off once you've actually done it.
 
-## Accessibility
+## ♿ Accessibility
 
 - **Team colours** (Settings): standard blue / red, or palettes for red-green
   colour blindness (blue / orange), blue-yellow colour blindness (cyan / pink)
@@ -108,7 +132,7 @@ key for it and ticks off once you've actually done it.
 - **Field of view**, sensitivity, invert Y, toggle lean, crosshair style and
   every key binding are adjustable too.
 
-## Training range
+## 🎯 Training range
 
 **TRAINING RANGE** on the main menu opens a practice map with no bots and
 unlimited ammo: static targets at 10, 20, 30 and 40 m, moving targets, pop-ups,
@@ -117,14 +141,14 @@ damage numbers (yellow for headshots) and a panel tracks shots, accuracy,
 headshots and targets down. Step on the orange pad for a 30-second challenge:
 knock down as many targets as you can. Your best is saved.
 
-## Kill cam
+## 🎥 Kill cam
 
 When you die, the game replays the last couple of seconds from your killer's
 eyes while you wait to respawn. Every player's machine records a short rolling
 history of what it sees, so it works in solo and multiplayer alike. It can be
 switched off with **Kill cam** in settings.
 
-## Killstreak announcer
+## 📢 Killstreak announcer
 
 Your multi-kills (Double, Triple, Quad, Mega Kill within 4 seconds of each other)
 and streaks (Killing Spree at 3, Rampage 5, Dominating 7, Unstoppable 10, Godlike 15,
@@ -132,7 +156,7 @@ Legendary 20), plus First Blood and Shutdown (ending someone's streak), get a bi
 banner and a sting. Other players' big streaks show up in the kill feed. Call-outs
 are on-screen text only (there's no spoken voice).
 
-## Sound
+## 🔊 Sound
 
 Everything is synthesised in the browser (`src/audio.js`), no audio files:
 
@@ -158,7 +182,7 @@ Everything is synthesised in the browser (`src/audio.js`), no audio files:
   and steam at the steelworks.
 - **Settings** has three volume sliders: master, music and effects.
 
-## Rules
+## 📜 Rules
 
 - Bots fill the match (1–10, or switch them off entirely) and fight each other as
   well as you.
@@ -171,7 +195,7 @@ Everything is synthesised in the browser (`src/audio.js`), no audio files:
   (primary ammo + 1 grenade) and supply crates (full ammo + grenades).
   Health, armour and crates return after 30 s, ammo boxes after 20 s.
 
-## Controls
+## 🎮 Controls
 
 | Input                 | Action                                        |
 | --------------------- | --------------------------------------------- |
@@ -398,7 +422,7 @@ camera motion** (a quarter of the head bob and screen shake). Characters and
 pickups are drawn with about a third fewer draw calls than before (their fixed
 parts are merged into one mesh per material).
 
-## Weapons
+## 🔫 Weapons
 
 | Weapon        | Mag / reserve | Damage  | Notes                                               |
 | ------------- | ------------- | ------- | --------------------------------------------------- |
@@ -432,7 +456,7 @@ the hip, or the sidearm out with the primary slung across their back.
 tactical (flashbang or smoke) on the main menu, or from the pause menu for your
 next spawn. Snipers Only always gives the pistol.
 
-### Gunsmith (attachments)
+### 🔧 Gunsmith (attachments)
 
 **Gunsmith…** (Loadout card, or the pause menu) fits attachments to any gun:
 four slots, each empty or holding one of two pieces, unlocked by kills with that
@@ -457,7 +481,7 @@ sets. A suppressor doesn't fit the shotgun.
 All guns are hitscan, and reload by themselves when the magazine runs dry. Headshots deal 2×. Damage falls off with distance. Moving,
 jumping and holding the trigger widen the cone; crouching and aiming tighten it.
 
-## Maps
+## 🗺️ Maps
 
 | Map          | Size      | Character                                                  |
 | ------------ | --------- | ---------------------------------------------------------- |
@@ -490,7 +514,7 @@ over brick, Dockyard rust and crane yellow. Oil drums sit in open corners (solid
 cover, placed by `src/world.js` so collision, bullets and the bot nav grid all
 know about them); `npm run check:map` validates maps with them in.
 
-## Map editor and community maps
+## 📐 Map editor and community maps
 
 **Maps** (bottom of the main menu) has three tabs, **Community**, **My maps** and
 **Import code**, and the **Open map editor** button.
@@ -519,7 +543,7 @@ look it borrows (materials, sky, set dressing).
   `Ctrl+D` duplicate, arrows nudge, `[` `]` lower / raise, wheel to zoom,
   right-drag to pan.
 
-## Multiplayer
+## 🌐 Multiplayer
 
 No server to set up — one player hosts the match in their browser and the others
 connect to them directly.
@@ -656,7 +680,7 @@ For development: `?net=local` swaps WebRTC for a same-browser channel so two tab
 can play together offline, and `?peerhost=…&peerport=…&peersecure=1` points the
 game at your own [PeerServer](https://github.com/peers/peerjs-server).
 
-## The bots
+## 🤖 The bots
 
 Each bot (`src/bot.js`) is a state machine layered on perception, navigation and
 combat systems:
@@ -701,7 +725,7 @@ combat systems:
 Difficulty (Easy / Normal / Hard) changes reaction time, aim error, turn speed
 and how much damage bots deal to you. Tune it in `src/config.js`.
 
-## Project layout
+## 🗂️ Project layout
 
 ```
 index.html            HUD + menu markup
@@ -760,3 +784,13 @@ tools/check-map.mjs   offline map validator
 
 Append `?nolock` to the URL to run without pointer lock (handy for debugging);
 `window.__game` exposes the running game in the console.
+
+---
+
+<div align="center">
+
+`▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚`
+
+**🔔 WHISTLE BLOWS. SHIFT'S OVER.** <br><sub>Slag, Rivet, Cinder, Anvil and Flux will be waiting tomorrow.</sub>
+
+</div>
