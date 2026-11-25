@@ -11,7 +11,7 @@
 <img src="https://img.shields.io/badge/Teams-Cobalt%20vs%20Crimson-1F5FBF?style=for-the-badge" alt="Teams: Cobalt vs Crimson">
 <img src="https://img.shields.io/badge/Built%20with-Three.js-000000?style=for-the-badge&logo=threedotjs&logoColor=white" alt="Built with: Three.js">
 
-<sub>▲ Real gameplay: a solo deathmatch against the bots on Cloister, recorded in the browser.</sub>
+<sub>▲ Real gameplay: a solo deathmatch against the bots on Cloister, recorded in the browser. The player was steered by a small aiming script.</sub>
 
 `▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚▚`
 
